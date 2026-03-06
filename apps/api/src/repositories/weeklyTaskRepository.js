@@ -5,7 +5,7 @@ function findAll() {
 }
 
 function findById(id) {
-  return findById(id);
+  return db.prepare('SELECT * FROM weekly_tasks WHERE id = ?').get(id);
 }
 
 function create(payload) {
@@ -57,3 +57,4 @@ function remove(id) {
 }
 
 module.exports = { findAll, findById, create, update, remove };
+
