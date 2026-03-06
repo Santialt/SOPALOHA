@@ -12,41 +12,12 @@ apps/api/
     app.js
     server.js
     controllers/
-      healthController.js
-      locationController.js
-      deviceController.js
-      incidentController.js
-      weeklyTaskController.js
-      locationNoteController.js
-      teamviewerConnectionController.js
     services/
-      locationService.js
-      deviceService.js
-      incidentService.js
-      weeklyTaskService.js
-      locationNoteService.js
     repositories/
-      locationRepository.js
-      deviceRepository.js
-      incidentRepository.js
-      weeklyTaskRepository.js
-      locationNoteRepository.js
     routes/
-      locationRoutes.js
-      deviceRoutes.js
-      incidentRoutes.js
-      weeklyTaskRoutes.js
-      locationNoteRoutes.js
-      teamviewerConnectionRoutes.js
     db/
-      connection.js
-      initDb.js
     middleware/
-      validate.js
-      errorHandler.js
-      notFound.js
     utils/
-      httpError.js
 ```
 
 ## Cómo correr
@@ -62,7 +33,7 @@ npm run dev
 Servidor:
 - `http://localhost:3001`
 
-## Endpoints base
+## Endpoints
 
 - `GET /health`
 - `GET|POST|GET:id|PUT:id|DELETE:id /locations`
@@ -70,7 +41,45 @@ Servidor:
 - `GET|POST|GET:id|PUT:id|DELETE:id /incidents`
 - `GET|POST|PUT:id|DELETE:id /weekly-tasks`
 - `GET|POST|DELETE:id /location-notes`
-- `GET /teamviewer-connections` (placeholder, 501)
+- `GET /teamviewer-connections` (placeholder, responde `501`)
+
+## Campos esperados y enums válidos
+
+### `POST/PUT /locations`
+- Requerido: `name`
+- Opcional: `company_name`, `address`, `city`, `province`, `phone`, `main_contact`, `notes`
+- Enum: `status` = `active | inactive`
+
+### `POST/PUT /devices`
+- Requerido: `location_id`, `name`, `type`
+- Opcional: `ip_address`, `teamviewer_id`, `username`, `password`, `operating_system`, `sql_version`, `sql_instance`, `aloha_path`, `brand`, `model`, `notes`
+- Enum: `type` =
+  - `server`
+  - `pos_terminal`
+  - `fiscal_printer`
+  - `kitchen_printer`
+  - `pinpad`
+  - `router`
+  - `switch`
+  - `other`
+
+### `POST/PUT /incidents`
+- Requerido: `location_id`, `incident_date`, `title`, `description`
+- Opcional: `device_id`, `solution`, `category`, `time_spent_minutes`, `status`, `notes`
+- **Importante:** el campo correcto es `incident_date` (no `date`).
+- Formato: `incident_date` = `YYYY-MM-DD`
+- Enum: `category` = `network | sql | aloha | printer | fiscal | hardware | other`
+- Enum: `status` = `open | closed`
+
+### `POST/PUT /weekly-tasks`
+- Requerido: `title`
+- Opcional: `location_id`, `description`, `priority`, `status`, `due_date`
+- Formato: `due_date` = `YYYY-MM-DD`
+- Enum: `priority` = `low | medium | high | urgent`
+- Enum: `status` = `todo | in_progress | blocked | done`
+
+### `POST /location-notes`
+- Requerido: `location_id`, `note`
 
 ## Ejemplos cURL
 
@@ -87,10 +96,7 @@ curl -X POST http://localhost:3001/locations \
     "status":"active"
   }'
 
-# Listar locations
-curl http://localhost:3001/locations
-
-# Crear device
+# Crear device (type en inglés, según enum del schema)
 curl -X POST http://localhost:3001/devices \
   -H "Content-Type: application/json" \
   -d '{
@@ -100,7 +106,7 @@ curl -X POST http://localhost:3001/devices \
     "teamviewer_id":"223344556"
   }'
 
-# Crear incidente
+# Crear incidente (usar incident_date, no date)
 curl -X POST http://localhost:3001/incidents \
   -H "Content-Type: application/json" \
   -d '{
@@ -113,22 +119,13 @@ curl -X POST http://localhost:3001/incidents \
     "status":"open"
   }'
 
-# Crear weekly task
-curl -X POST http://localhost:3001/weekly-tasks \
+# Error esperado si enviás date en lugar de incident_date
+curl -X POST http://localhost:3001/incidents \
   -H "Content-Type: application/json" \
   -d '{
     "location_id":1,
-    "title":"Revisar backup SQL",
-    "priority":"high",
-    "status":"todo",
-    "due_date":"2026-03-10"
-  }'
-
-# Crear note
-curl -X POST http://localhost:3001/location-notes \
-  -H "Content-Type: application/json" \
-  -d '{
-    "location_id":1,
-    "note":"Caja 3 pierde red intermitentemente"
+    "date":"2026-03-06",
+    "title":"Campo incorrecto",
+    "description":"Test"
   }'
 ```
