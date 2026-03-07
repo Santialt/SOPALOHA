@@ -19,7 +19,7 @@ function DashboardPage() {
         const [locations, incidents, tasks] = await Promise.all([
           api.getLocations(),
           api.getIncidents(),
-          api.getWeeklyTasks()
+          api.getTasks()
         ]);
 
         setStats({
@@ -46,7 +46,7 @@ function DashboardPage() {
       <div className="card-grid">
         <StatCard label="Locales" value={stats.locations} tone="primary" />
         <StatCard label="Incidentes" value={stats.incidents} tone="warning" />
-        <StatCard label="Tareas Semanales" value={stats.tasks} tone="neutral" />
+        <StatCard label="Tareas" value={stats.tasks} tone="neutral" />
       </div>
 
       <section className="section-card">
@@ -57,7 +57,7 @@ function DashboardPage() {
         <div className="quick-links">
           <Link to="/locations" className="btn-link">Ver locales</Link>
           <Link to="/incidents" className="btn-link">Gestionar incidentes</Link>
-          <Link to="/weekly-tasks" className="btn-link">Gestionar tareas</Link>
+          <Link to="/tasks" className="btn-link">Gestionar tareas</Link>
           <Link to="/location-notes" className="btn-link">Notas tecnicas</Link>
           <Link to="/teamviewer-explorer" className="btn-link">TeamViewer Explorer</Link>
           <Link to="/teamviewer-import" className="btn-link">TeamViewer Import</Link>

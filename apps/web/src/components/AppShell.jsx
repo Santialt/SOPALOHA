@@ -6,8 +6,7 @@ const navItems = [
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/locations', label: 'Locales' },
   { to: '/incidents', label: 'Incidentes' },
-  { to: '/tasks', label: 'Tareas Operativas' },
-  { to: '/weekly-tasks', label: 'Tareas Semanales' },
+  { to: '/tasks', label: 'Tareas' },
   { to: '/location-notes', label: 'Notas Tecnicas' },
   { to: '/teamviewer-explorer', label: 'TeamViewer Explorer' },
   { to: '/teamviewer-import', label: 'TeamViewer Import' }
@@ -17,8 +16,7 @@ const pageTitles = {
   '/dashboard': 'Dashboard Operativo',
   '/locations': 'Gestion de Locales',
   '/incidents': 'Incidentes',
-  '/tasks': 'Tareas Operativas',
-  '/weekly-tasks': 'Tareas Semanales',
+  '/tasks': 'Tareas',
   '/location-notes': 'Notas Tecnicas',
   '/teamviewer-explorer': 'TeamViewer Explorer',
   '/teamviewer-import': 'TeamViewer Import'

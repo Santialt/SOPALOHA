@@ -95,7 +95,7 @@ function LocationDetailPage() {
         api.getDevices(),
         api.getIncidents(),
         api.getLocationNotes(),
-        api.getWeeklyTasks(),
+        api.getTasks(),
         api.getLocationIntegrations(id)
       ]);
 
@@ -803,7 +803,7 @@ function LocationDetailPage() {
       </section>
 
       <section className="section-card full-width">
-        <h3>Tareas Semanales ({tasks.length})</h3>
+        <h3>Tareas ({tasks.length})</h3>
         <table className="table compact">
           <thead>
             <tr>

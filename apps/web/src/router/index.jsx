@@ -4,7 +4,6 @@ import DashboardPage from '../pages/DashboardPage';
 import LocationsPage from '../pages/LocationsPage';
 import LocationDetailPage from '../pages/LocationDetailPage';
 import IncidentsPage from '../pages/IncidentsPage';
-import WeeklyTasksPage from '../pages/WeeklyTasksPage';
 import TasksPage from '../pages/TasksPage';
 import LocationNotesPage from '../pages/LocationNotesPage';
 import TeamViewerImportPage from '../pages/TeamViewerImportPage';
@@ -19,7 +18,6 @@ export function AppRouter() {
         <Route path="locations" element={<LocationsPage />} />
         <Route path="locations/:id" element={<LocationDetailPage />} />
         <Route path="incidents" element={<IncidentsPage />} />
-        <Route path="weekly-tasks" element={<WeeklyTasksPage />} />
         <Route path="tasks" element={<TasksPage />} />
         <Route path="location-notes" element={<LocationNotesPage />} />
         <Route path="teamviewer-explorer" element={<TeamViewerExplorerPage />} />

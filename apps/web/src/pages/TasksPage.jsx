@@ -141,7 +141,7 @@ function TasksPage() {
   return (
     <div className="grid-two-columns">
       <section className="section-card">
-        <h2>{editingTaskId ? `Editar tarea #${editingTaskId}` : 'Alta de tarea operativa'}</h2>
+        <h2>{editingTaskId ? `Editar tarea #${editingTaskId}` : 'Alta de tarea'}</h2>
         <InlineError message={error} />
         <InlineSuccess message={success} />
 
