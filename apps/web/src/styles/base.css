@@ -419,19 +419,36 @@ button:disabled {
   color: #64748b;
 }
 
+.teamviewer-explorer-page {
+  min-height: calc(100vh - 150px);
+  display: flex;
+  flex-direction: column;
+}
+
 .teamviewer-explorer-layout {
   display: grid;
   grid-template-columns: minmax(260px, 360px) minmax(0, 1fr);
   gap: 12px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  align-items: start;
 }
 
 .explorer-tree {
-  min-height: 520px;
-  overflow: auto;
+  min-height: 0;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
 }
 
 .explorer-detail {
-  min-height: 520px;
+  position: sticky;
+  top: 0;
+  min-height: 0;
+  max-height: 100%;
+  overflow-y: auto;
 }
 
 .explorer-group-block {
@@ -528,6 +545,22 @@ button:disabled {
   .detail-grid,
   .teamviewer-explorer-layout {
     grid-template-columns: 1fr;
+  }
+
+  .teamviewer-explorer-page {
+    min-height: auto;
+  }
+
+  .teamviewer-explorer-layout {
+    overflow: visible;
+  }
+
+  .explorer-tree,
+  .explorer-detail {
+    height: auto;
+    max-height: none;
+    overflow: visible;
+    position: static;
   }
 
   .form-grid-3 {

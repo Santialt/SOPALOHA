@@ -181,7 +181,7 @@ function TeamViewerExplorerPage() {
       : '/incidents';
 
   return (
-    <div>
+    <div className="teamviewer-explorer-page">
       <InlineError message={error} />
       <InlineSuccess message={success} />
 
