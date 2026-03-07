@@ -1,21 +1,34 @@
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import InlineError from '../components/InlineError';
 import InlineSuccess from '../components/InlineSuccess';
 import LoadingBlock from '../components/LoadingBlock';
 import { useDataLoader } from '../hooks/useDataLoader';
 import { api, enums } from '../services/api';
 
-const initialForm = {
-  location_id: '',
-  device_id: '',
-  incident_date: new Date().toISOString().slice(0, 10),
-  title: '',
-  description: '',
-  category: 'other',
-  status: 'open'
-};
+function nowForDatetimeInput() {
+  const date = new Date();
+  date.setSeconds(0, 0);
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
+function buildInitialForm(prefillLocationId, prefillDeviceId) {
+  return {
+    location_id: prefillLocationId || '',
+    device_id: prefillDeviceId || '',
+    incident_date: nowForDatetimeInput(),
+    problem: '',
+    solution: '',
+    time_spent_minutes: ''
+  };
+}
 
 function IncidentsPage() {
+  const [searchParams] = useSearchParams();
+  const prefillLocationId = Number(searchParams.get('location_id')) || '';
+  const prefillDeviceId = Number(searchParams.get('device_id')) || '';
+
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState('');
 
@@ -24,7 +37,7 @@ function IncidentsPage() {
   const [incidents, setIncidents] = useState([]);
 
   const [filters, setFilters] = useState({ status: '', category: '' });
-  const [form, setForm] = useState(initialForm);
+  const [form, setForm] = useState(buildInitialForm(prefillLocationId, prefillDeviceId));
   const [updatingIncidentId, setUpdatingIncidentId] = useState(null);
   const [deletingIncidentId, setDeletingIncidentId] = useState(null);
 
@@ -55,12 +68,18 @@ function IncidentsPage() {
 
     try {
       await api.createIncident({
-        ...form,
         location_id: Number(form.location_id),
-        device_id: form.device_id ? Number(form.device_id) : null
+        device_id: form.device_id ? Number(form.device_id) : null,
+        incident_date: form.incident_date,
+        title: form.problem,
+        description: form.problem,
+        solution: form.solution,
+        category: 'other',
+        status: 'open',
+        time_spent_minutes: Number(form.time_spent_minutes || 0)
       });
 
-      setForm(initialForm);
+      setForm(buildInitialForm(prefillLocationId, prefillDeviceId));
       setSuccess('Incidente creado.');
       await load();
     } catch (err) {
@@ -113,18 +132,19 @@ function IncidentsPage() {
   return (
     <div className="grid-two-columns">
       <section className="section-card">
-        <h2>Alta rapida de incidente</h2>
+        <h2>Registro operativo de incidente</h2>
         <InlineError message={error} />
         <InlineSuccess message={success} />
 
         <form onSubmit={onSubmit} className="form-grid">
           <label>
-            Local *
+            Local
             <select
               className="input"
               value={form.location_id}
               onChange={(event) => setForm({ ...form, location_id: event.target.value, device_id: '' })}
               required
+              disabled={Boolean(prefillLocationId)}
             >
               <option value="">Seleccionar</option>
               {locations.map((location) => (
@@ -139,6 +159,7 @@ function IncidentsPage() {
               className="input"
               value={form.device_id}
               onChange={(event) => setForm({ ...form, device_id: event.target.value })}
+              disabled={Boolean(prefillDeviceId)}
             >
               <option value="">Sin dispositivo</option>
               {devices
@@ -150,59 +171,46 @@ function IncidentsPage() {
           </label>
 
           <label>
-            Fecha *
+            Fecha y hora
             <input
               className="input"
-              type="date"
+              type="datetime-local"
               value={form.incident_date}
               onChange={(event) => setForm({ ...form, incident_date: event.target.value })}
               required
             />
           </label>
 
-          <label>
-            Titulo *
-            <input
+          <label className="full-row">
+            Problema *
+            <textarea
               className="input"
-              value={form.title}
-              onChange={(event) => setForm({ ...form, title: event.target.value })}
+              rows="4"
+              value={form.problem}
+              onChange={(event) => setForm({ ...form, problem: event.target.value })}
+              required
+            />
+          </label>
+
+          <label className="full-row">
+            Solucion *
+            <textarea
+              className="input"
+              rows="3"
+              value={form.solution}
+              onChange={(event) => setForm({ ...form, solution: event.target.value })}
               required
             />
           </label>
 
           <label>
-            Categoria
-            <select
+            Tiempo (minutos) *
+            <input
               className="input"
-              value={form.category}
-              onChange={(event) => setForm({ ...form, category: event.target.value })}
-            >
-              {enums.incidentCategories.map((category) => (
-                <option key={category} value={category}>{category}</option>
-              ))}
-            </select>
-          </label>
-
-          <label>
-            Estado
-            <select
-              className="input"
-              value={form.status}
-              onChange={(event) => setForm({ ...form, status: event.target.value })}
-            >
-              {enums.incidentStatus.map((status) => (
-                <option key={status} value={status}>{status}</option>
-              ))}
-            </select>
-          </label>
-
-          <label className="full-row">
-            Descripcion *
-            <textarea
-              className="input"
-              rows="4"
-              value={form.description}
-              onChange={(event) => setForm({ ...form, description: event.target.value })}
+              type="number"
+              min="0"
+              value={form.time_spent_minutes}
+              onChange={(event) => setForm({ ...form, time_spent_minutes: event.target.value })}
               required
             />
           </label>

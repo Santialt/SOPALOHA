@@ -223,6 +223,7 @@ textarea.input {
 .form-actions {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
   margin-top: 4px;
 }
 

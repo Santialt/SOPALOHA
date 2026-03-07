@@ -7,7 +7,12 @@ const router = express.Router();
 const incidentRules = [
   { field: 'location_id', required: true, type: 'integer' },
   { field: 'device_id', type: 'integer' },
-  { field: 'incident_date', required: true, pattern: /^\d{4}-\d{2}-\d{2}$/, patternDescription: 'YYYY-MM-DD' },
+  {
+    field: 'incident_date',
+    required: true,
+    pattern: /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2})?)?$/,
+    patternDescription: 'YYYY-MM-DD o YYYY-MM-DDTHH:mm'
+  },
   { field: 'title', required: true },
   { field: 'description', required: true },
   { field: 'category', allowedValues: ['network', 'sql', 'aloha', 'printer', 'fiscal', 'hardware', 'other'] },

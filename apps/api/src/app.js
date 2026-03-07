@@ -6,6 +6,7 @@ const incidentRoutes = require('./routes/incidentRoutes');
 const weeklyTaskRoutes = require('./routes/weeklyTaskRoutes');
 const locationNoteRoutes = require('./routes/locationNoteRoutes');
 const teamviewerConnectionRoutes = require('./routes/teamviewerConnectionRoutes');
+const supportActionRoutes = require('./routes/supportActionRoutes');
 const { notFound } = require('./middleware/notFound');
 const { errorHandler } = require('./middleware/errorHandler');
 
@@ -32,6 +33,7 @@ app.use('/incidents', incidentRoutes);
 app.use('/weekly-tasks', weeklyTaskRoutes);
 app.use('/location-notes', locationNoteRoutes);
 app.use('/teamviewer-connections', teamviewerConnectionRoutes);
+app.use('/support-actions', supportActionRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

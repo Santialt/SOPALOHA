@@ -84,6 +84,7 @@ function LocationDetailPage() {
   const [savingNote, setSavingNote] = useState(false);
   const [deletingDeviceId, setDeletingDeviceId] = useState(null);
   const [deletingNoteId, setDeletingNoteId] = useState(null);
+  const [runningActionKey, setRunningActionKey] = useState('');
   const [success, setSuccess] = useState('');
 
   const { load, loading, error, setError } = useDataLoader(async () => {
@@ -256,6 +257,99 @@ function LocationDetailPage() {
       setError(err.message);
     } finally {
       setDeletingNoteId(null);
+    }
+  };
+
+  const copyToClipboard = async (value) => {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(value);
+      return;
+    }
+
+    const textarea = document.createElement('textarea');
+    textarea.value = value;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'absolute';
+    textarea.style.left = '-9999px';
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+  };
+
+  const onCopyTeamviewerId = async (device) => {
+    if (!device.teamviewer_id) {
+      setError('El dispositivo no tiene TeamViewer ID.');
+      return;
+    }
+
+    setError('');
+    setSuccess('');
+
+    try {
+      await copyToClipboard(device.teamviewer_id);
+      setSuccess(`TeamViewer ID copiado: ${device.teamviewer_id}`);
+    } catch (err) {
+      setError('No se pudo copiar el TeamViewer ID.');
+    }
+  };
+
+  const onOpenTeamviewer = async (device) => {
+    if (!device.teamviewer_id) {
+      setError('El dispositivo no tiene TeamViewer ID.');
+      return;
+    }
+
+    const actionKey = `tv-${device.id}`;
+    setRunningActionKey(actionKey);
+    setError('');
+    setSuccess('');
+
+    try {
+      const protocolUrl = `teamviewer10://control?device=${device.teamviewer_id}`;
+      const popup = window.open(protocolUrl, '_blank', 'noopener,noreferrer');
+
+      if (!popup) {
+        const result = await api.openTeamviewer(device.teamviewer_id);
+        setSuccess(`TeamViewer lanzado por backend (${result.method}).`);
+        return;
+      }
+
+      setSuccess('Intento de apertura de TeamViewer enviado al navegador.');
+    } catch (err) {
+      try {
+        const result = await api.openTeamviewer(device.teamviewer_id);
+        setSuccess(`TeamViewer lanzado por backend (${result.method}).`);
+      } catch (fallbackError) {
+        setError(fallbackError.message);
+      }
+    } finally {
+      setRunningActionKey('');
+    }
+  };
+
+  const onPingDevice = async (device) => {
+    if (!device.ip_address) {
+      setError('El dispositivo no tiene IP cargada.');
+      return;
+    }
+
+    const actionKey = `ping-${device.id}`;
+    setRunningActionKey(actionKey);
+    setError('');
+    setSuccess('');
+
+    try {
+      const result = await api.pingDeviceIp(device.ip_address);
+      setSuccess(
+        result.success
+          ? `Ping exitoso a ${device.ip_address}.`
+          : `Ping sin respuesta a ${device.ip_address}.`
+      );
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setRunningActionKey('');
     }
   };
 
@@ -458,8 +552,8 @@ function LocationDetailPage() {
       <section className="section-card">
         <div className="section-head wrap">
           <h3>Dispositivos ({devices.length})</h3>
-          <Link to="/incidents" className="btn-link">
-            Crear incidente
+          <Link to={`/incidents?location_id=${numericLocationId}`} className="btn-link">
+            Registrar incidente del local
           </Link>
         </div>
         <table className="table compact">
@@ -485,10 +579,38 @@ function LocationDetailPage() {
                 <td>{device.windows_version || '-'}</td>
                 <td>
                   <div className="form-actions">
-                    <button className="btn-small" onClick={() => onEditDevice(device)}>
+                    <button type="button" className="btn-small" onClick={() => onCopyTeamviewerId(device)}>
+                      Copiar TV ID
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-small"
+                      onClick={() => onOpenTeamviewer(device)}
+                      disabled={runningActionKey === `tv-${device.id}`}
+                    >
+                      {runningActionKey === `tv-${device.id}` ? 'Abriendo...' : 'Abrir TeamViewer'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-small"
+                      onClick={() => onPingDevice(device)}
+                      disabled={runningActionKey === `ping-${device.id}`}
+                    >
+                      {runningActionKey === `ping-${device.id}` ? 'Pingeando...' : 'Ping IP'}
+                    </button>
+                    <Link
+                      to={`/incidents?location_id=${numericLocationId}&device_id=${device.id}`}
+                      className="btn-link"
+                    >
+                      Incidente
+                    </Link>
+                  </div>
+                  <div className="form-actions">
+                    <button type="button" className="btn-small" onClick={() => onEditDevice(device)}>
                       Editar
                     </button>
                     <button
+                      type="button"
                       className="btn-danger"
                       onClick={() => onDeleteDevice(device)}
                       disabled={deletingDeviceId === device.id}

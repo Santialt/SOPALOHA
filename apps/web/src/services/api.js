@@ -62,5 +62,16 @@ export const api = {
 
   getLocationNotes: () => request('/location-notes'),
   createLocationNote: (payload) => request('/location-notes', { method: 'POST', body: JSON.stringify(payload) }),
-  deleteLocationNote: (id) => request(`/location-notes/${id}`, { method: 'DELETE' })
+  deleteLocationNote: (id) => request(`/location-notes/${id}`, { method: 'DELETE' }),
+
+  pingDeviceIp: (ip) =>
+    request('/support-actions/ping', {
+      method: 'POST',
+      body: JSON.stringify({ ip })
+    }),
+  openTeamviewer: (teamviewerId) =>
+    request('/support-actions/teamviewer/open', {
+      method: 'POST',
+      body: JSON.stringify({ teamviewer_id: teamviewerId })
+    })
 };
