@@ -17,6 +17,23 @@ function buildExplorerSnapshot() {
   return loadTeamviewerSnapshot();
 }
 
+function getSortableGroupName(group) {
+  return String(group?.name ?? group?.group_name ?? '').trim();
+}
+
+function stableSortByText(items, getText) {
+  return items
+    .map((item, index) => ({ item, index }))
+    .sort((a, b) => {
+      const textA = String(getText(a.item) || '');
+      const textB = String(getText(b.item) || '');
+      const byText = textA.localeCompare(textB, 'es', { sensitivity: 'base' });
+      if (byText !== 0) return byText;
+      return a.index - b.index;
+    })
+    .map((entry) => entry.item);
+}
+
 async function buildExplorerData() {
   const snapshot = await buildExplorerSnapshot();
   const locationsByName = buildExistingLocationsMap();
@@ -67,7 +84,7 @@ async function buildExplorerData() {
 
   const groups = snapshot.groups.map((group) => {
     const linkedLocation = locationsByName.get(normalizeKey(group.group_name)) || null;
-    const devices = devicesByGroupId.get(group.group_id) || [];
+    const devices = stableSortByText(devicesByGroupId.get(group.group_id) || [], (device) => device.alias);
 
     return {
       kind: 'group',
@@ -83,6 +100,8 @@ async function buildExplorerData() {
     };
   });
 
+  const sortedGroups = stableSortByText(groups, (group) => getSortableGroupName(group));
+
   return {
     generated_at: new Date().toISOString(),
     summary: {
@@ -91,7 +110,7 @@ async function buildExplorerData() {
       groups_linked_to_locations: groups.filter((group) => group.exists_in_sopaloha).length,
       devices_linked_to_sopaloha: flatDevices.filter((device) => device.exists_in_sopaloha).length
     },
-    groups
+    groups: sortedGroups
   };
 }
 
