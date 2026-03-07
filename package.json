@@ -1,0 +1,29 @@
+{
+  "name": "sopaloha",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "dev": "concurrently \"npm run dev --prefix apps/api\" \"npm run dev --prefix apps/web\"",
+    "dev:api": "npm run dev --prefix apps/api",
+    "dev:web": "npm run dev --prefix apps/web",
+    "install:all": "npm install --prefix apps/api && npm install --prefix apps/web"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Santialt/SOPALOHA.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Santialt/SOPALOHA/issues"
+  },
+  "homepage": "https://github.com/Santialt/SOPALOHA#readme",
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

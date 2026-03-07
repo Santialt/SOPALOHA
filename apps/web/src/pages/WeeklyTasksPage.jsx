@@ -1,12 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import InlineError from '../components/InlineError';
+import InlineSuccess from '../components/InlineSuccess';
 import LoadingBlock from '../components/LoadingBlock';
+import { useDataLoader } from '../hooks/useDataLoader';
 import { api, enums } from '../services/api';
 
 function WeeklyTasksPage() {
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
+  const [updatingTaskId, setUpdatingTaskId] = useState(null);
+  const [deletingTaskId, setDeletingTaskId] = useState(null);
+  const [success, setSuccess] = useState('');
 
   const [tasks, setTasks] = useState([]);
   const [locations, setLocations] = useState([]);
@@ -20,29 +23,17 @@ function WeeklyTasksPage() {
     due_date: ''
   });
 
-  const load = async () => {
-    setLoading(true);
-    setError('');
-
-    try {
-      const [tasksData, locationsData] = await Promise.all([api.getWeeklyTasks(), api.getLocations()]);
-      setTasks(tasksData);
-      setLocations(locationsData);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    load();
+  const { load, loading, error, setError } = useDataLoader(async () => {
+    const [tasksData, locationsData] = await Promise.all([api.getWeeklyTasks(), api.getLocations()]);
+    setTasks(tasksData);
+    setLocations(locationsData);
   }, []);
 
   const onSubmit = async (event) => {
     event.preventDefault();
     setSaving(true);
     setError('');
+    setSuccess('');
 
     try {
       await api.createWeeklyTask({
@@ -60,6 +51,7 @@ function WeeklyTasksPage() {
         due_date: ''
       });
 
+      setSuccess('Tarea creada.');
       await load();
     } catch (err) {
       setError(err.message);
@@ -69,6 +61,10 @@ function WeeklyTasksPage() {
   };
 
   const onStatusChange = async (task, status) => {
+    setUpdatingTaskId(task.id);
+    setError('');
+    setSuccess('');
+
     try {
       await api.updateWeeklyTask(task.id, {
         location_id: task.location_id,
@@ -79,9 +75,31 @@ function WeeklyTasksPage() {
         due_date: task.due_date
       });
 
+      setSuccess(`Estado de tarea #${task.id} actualizado.`);
       await load();
     } catch (err) {
       setError(err.message);
+    } finally {
+      setUpdatingTaskId(null);
+    }
+  };
+
+  const onDelete = async (task) => {
+    const ok = window.confirm(`Eliminar la tarea "${task.title}"?`);
+    if (!ok) return;
+
+    setDeletingTaskId(task.id);
+    setError('');
+    setSuccess('');
+
+    try {
+      await api.deleteWeeklyTask(task.id);
+      setSuccess(`Tarea #${task.id} eliminada.`);
+      await load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDeletingTaskId(null);
     }
   };
 
@@ -92,6 +110,7 @@ function WeeklyTasksPage() {
       <section className="section-card">
         <h2>Alta rapida de tarea semanal</h2>
         <InlineError message={error} />
+        <InlineSuccess message={success} />
 
         <form onSubmit={onSubmit} className="form-grid">
           <label>
@@ -181,6 +200,7 @@ function WeeklyTasksPage() {
               <th>Prioridad</th>
               <th>Estado</th>
               <th>Vence</th>
+              <th>Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -197,6 +217,7 @@ function WeeklyTasksPage() {
                       className="input status-select"
                       value={task.status}
                       onChange={(event) => onStatusChange(task, event.target.value)}
+                      disabled={updatingTaskId === task.id}
                     >
                       {enums.taskStatus.map((status) => (
                         <option key={status} value={status}>{status}</option>
@@ -204,10 +225,19 @@ function WeeklyTasksPage() {
                     </select>
                   </td>
                   <td>{task.due_date || '-'}</td>
+                  <td>
+                    <button
+                      className="btn-danger"
+                      onClick={() => onDelete(task)}
+                      disabled={deletingTaskId === task.id}
+                    >
+                      {deletingTaskId === task.id ? 'Eliminando...' : 'Eliminar'}
+                    </button>
+                  </td>
                 </tr>
               );
             })}
-            {tasks.length === 0 && <tr><td colSpan="6" className="empty-row">Sin tareas</td></tr>}
+            {tasks.length === 0 && <tr><td colSpan="7" className="empty-row">Sin tareas</td></tr>}
           </tbody>
         </table>
       </section>

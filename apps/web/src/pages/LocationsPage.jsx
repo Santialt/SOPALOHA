@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import InlineError from '../components/InlineError';
+import InlineSuccess from '../components/InlineSuccess';
 import LoadingBlock from '../components/LoadingBlock';
+import { useDataLoader } from '../hooks/useDataLoader';
 import { api, enums } from '../services/api';
 
 const initialForm = {
@@ -15,29 +17,16 @@ const initialForm = {
 function LocationsPage() {
   const navigate = useNavigate();
   const [locations, setLocations] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+  const [success, setSuccess] = useState('');
   const [form, setForm] = useState(initialForm);
   const [editingId, setEditingId] = useState(null);
 
-  const loadLocations = async () => {
-    setLoading(true);
-    setError('');
-
-    try {
-      const data = await api.getLocations();
-      setLocations(data);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadLocations();
+  const { load: loadLocations, loading, error, setError } = useDataLoader(async () => {
+    const data = await api.getLocations();
+    setLocations(data);
   }, []);
 
   const filtered = useMemo(() => {
@@ -58,12 +47,15 @@ function LocationsPage() {
 
     setSaving(true);
     setError('');
+    setSuccess('');
 
     try {
       if (editingId) {
         await api.updateLocation(editingId, form);
+        setSuccess(`Local #${editingId} actualizado.`);
       } else {
         await api.createLocation(form);
+        setSuccess('Local creado.');
       }
 
       setForm(initialForm);
@@ -78,6 +70,7 @@ function LocationsPage() {
 
   const onEdit = (location, event) => {
     event.stopPropagation();
+    setSuccess('');
     setEditingId(location.id);
     setForm({
       name: location.name || '',
@@ -86,6 +79,30 @@ function LocationsPage() {
       status: location.status || 'active',
       phone: location.phone || ''
     });
+  };
+
+  const onDelete = async (location, event) => {
+    event.stopPropagation();
+    const ok = window.confirm(`Eliminar el local "${location.name}"?`);
+    if (!ok) return;
+
+    setDeletingId(location.id);
+    setError('');
+    setSuccess('');
+
+    try {
+      await api.deleteLocation(location.id);
+      setSuccess(`Local #${location.id} eliminado.`);
+      if (editingId === location.id) {
+        setEditingId(null);
+        setForm(initialForm);
+      }
+      await loadLocations();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   if (loading) return <LoadingBlock label="Cargando locales..." />;
@@ -104,6 +121,7 @@ function LocationsPage() {
         </div>
 
         <InlineError message={error} />
+        <InlineSuccess message={success} />
 
         <table className="table">
           <thead>
@@ -125,7 +143,18 @@ function LocationsPage() {
                 <td>{location.city || '-'}</td>
                 <td><span className={`badge ${location.status}`}>{location.status}</span></td>
                 <td>
-                  <button className="btn-small" onClick={(event) => onEdit(location, event)}>Editar</button>
+                  <div className="form-actions">
+                    <button className="btn-small" onClick={(event) => onEdit(location, event)}>
+                      Editar
+                    </button>
+                    <button
+                      className="btn-danger"
+                      onClick={(event) => onDelete(location, event)}
+                      disabled={deletingId === location.id}
+                    >
+                      {deletingId === location.id ? 'Eliminando...' : 'Eliminar'}
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -203,6 +232,7 @@ function LocationsPage() {
                 onClick={() => {
                   setEditingId(null);
                   setForm(initialForm);
+                  setSuccess('');
                 }}
               >
                 Cancelar

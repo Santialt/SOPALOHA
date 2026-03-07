@@ -1,50 +1,42 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import InlineError from '../components/InlineError';
+import InlineSuccess from '../components/InlineSuccess';
 import LoadingBlock from '../components/LoadingBlock';
+import { useDataLoader } from '../hooks/useDataLoader';
 import { api, enums } from '../services/api';
 
+const initialForm = {
+  location_id: '',
+  device_id: '',
+  incident_date: new Date().toISOString().slice(0, 10),
+  title: '',
+  description: '',
+  category: 'other',
+  status: 'open'
+};
+
 function IncidentsPage() {
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   const [locations, setLocations] = useState([]);
   const [devices, setDevices] = useState([]);
   const [incidents, setIncidents] = useState([]);
 
   const [filters, setFilters] = useState({ status: '', category: '' });
-  const [form, setForm] = useState({
-    location_id: '',
-    device_id: '',
-    incident_date: new Date().toISOString().slice(0, 10),
-    title: '',
-    description: '',
-    category: 'other',
-    status: 'open'
-  });
+  const [form, setForm] = useState(initialForm);
+  const [updatingIncidentId, setUpdatingIncidentId] = useState(null);
+  const [deletingIncidentId, setDeletingIncidentId] = useState(null);
 
-  const load = async () => {
-    setLoading(true);
-    setError('');
-
-    try {
-      const [incidentsData, locationsData, devicesData] = await Promise.all([
-        api.getIncidents(),
-        api.getLocations(),
-        api.getDevices()
-      ]);
-      setIncidents(incidentsData);
-      setLocations(locationsData);
-      setDevices(devicesData);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    load();
+  const { load, loading, error, setError } = useDataLoader(async () => {
+    const [incidentsData, locationsData, devicesData] = await Promise.all([
+      api.getIncidents(),
+      api.getLocations(),
+      api.getDevices()
+    ]);
+    setIncidents(incidentsData);
+    setLocations(locationsData);
+    setDevices(devicesData);
   }, []);
 
   const filteredIncidents = useMemo(() => {
@@ -59,6 +51,7 @@ function IncidentsPage() {
     event.preventDefault();
     setSaving(true);
     setError('');
+    setSuccess('');
 
     try {
       await api.createIncident({
@@ -67,20 +60,51 @@ function IncidentsPage() {
         device_id: form.device_id ? Number(form.device_id) : null
       });
 
-      setForm({
-        location_id: '',
-        device_id: '',
-        incident_date: new Date().toISOString().slice(0, 10),
-        title: '',
-        description: '',
-        category: 'other',
-        status: 'open'
-      });
+      setForm(initialForm);
+      setSuccess('Incidente creado.');
       await load();
     } catch (err) {
       setError(err.message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const onChangeStatus = async (incident, status) => {
+    setUpdatingIncidentId(incident.id);
+    setError('');
+    setSuccess('');
+
+    try {
+      await api.updateIncident(incident.id, {
+        ...incident,
+        status
+      });
+      setSuccess(`Estado del incidente #${incident.id} actualizado.`);
+      await load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setUpdatingIncidentId(null);
+    }
+  };
+
+  const onDelete = async (incident) => {
+    const ok = window.confirm(`Eliminar el incidente "${incident.title}"?`);
+    if (!ok) return;
+
+    setDeletingIncidentId(incident.id);
+    setError('');
+    setSuccess('');
+
+    try {
+      await api.deleteIncident(incident.id);
+      setSuccess(`Incidente #${incident.id} eliminado.`);
+      await load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDeletingIncidentId(null);
     }
   };
 
@@ -91,6 +115,7 @@ function IncidentsPage() {
       <section className="section-card">
         <h2>Alta rapida de incidente</h2>
         <InlineError message={error} />
+        <InlineSuccess message={success} />
 
         <form onSubmit={onSubmit} className="form-grid">
           <label>
@@ -98,7 +123,7 @@ function IncidentsPage() {
             <select
               className="input"
               value={form.location_id}
-              onChange={(event) => setForm({ ...form, location_id: event.target.value })}
+              onChange={(event) => setForm({ ...form, location_id: event.target.value, device_id: '' })}
               required
             >
               <option value="">Seleccionar</option>
@@ -223,6 +248,7 @@ function IncidentsPage() {
               <th>Titulo</th>
               <th>Categoria</th>
               <th>Estado</th>
+              <th>Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -234,13 +260,33 @@ function IncidentsPage() {
                   <td>{location?.name || `#${incident.location_id}`}</td>
                   <td>{incident.title}</td>
                   <td>{incident.category}</td>
-                  <td><span className={`badge ${incident.status}`}>{incident.status}</span></td>
+                  <td>
+                    <select
+                      className="input status-select"
+                      value={incident.status}
+                      onChange={(event) => onChangeStatus(incident, event.target.value)}
+                      disabled={updatingIncidentId === incident.id}
+                    >
+                      {enums.incidentStatus.map((status) => (
+                        <option key={status} value={status}>{status}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td>
+                    <button
+                      className="btn-danger"
+                      onClick={() => onDelete(incident)}
+                      disabled={deletingIncidentId === incident.id}
+                    >
+                      {deletingIncidentId === incident.id ? 'Eliminando...' : 'Eliminar'}
+                    </button>
+                  </td>
                 </tr>
               );
             })}
             {filteredIncidents.length === 0 && (
               <tr>
-                <td colSpan="5" className="empty-row">Sin incidentes</td>
+                <td colSpan="6" className="empty-row">Sin incidentes</td>
               </tr>
             )}
           </tbody>

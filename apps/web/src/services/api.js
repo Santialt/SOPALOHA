@@ -36,18 +36,24 @@ export const api = {
   getLocationById: (id) => request(`/locations/${id}`),
   createLocation: (payload) => request('/locations', { method: 'POST', body: JSON.stringify(payload) }),
   updateLocation: (id, payload) => request(`/locations/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  deleteLocation: (id) => request(`/locations/${id}`, { method: 'DELETE' }),
 
   getDevices: () => request('/devices'),
   createDevice: (payload) => request('/devices', { method: 'POST', body: JSON.stringify(payload) }),
+  updateDevice: (id, payload) => request(`/devices/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  deleteDevice: (id) => request(`/devices/${id}`, { method: 'DELETE' }),
 
   getIncidents: () => request('/incidents'),
   createIncident: (payload) => request('/incidents', { method: 'POST', body: JSON.stringify(payload) }),
   updateIncident: (id, payload) => request(`/incidents/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  deleteIncident: (id) => request(`/incidents/${id}`, { method: 'DELETE' }),
 
   getWeeklyTasks: () => request('/weekly-tasks'),
   createWeeklyTask: (payload) => request('/weekly-tasks', { method: 'POST', body: JSON.stringify(payload) }),
   updateWeeklyTask: (id, payload) => request(`/weekly-tasks/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  deleteWeeklyTask: (id) => request(`/weekly-tasks/${id}`, { method: 'DELETE' }),
 
   getLocationNotes: () => request('/location-notes'),
-  createLocationNote: (payload) => request('/location-notes', { method: 'POST', body: JSON.stringify(payload) })
+  createLocationNote: (payload) => request('/location-notes', { method: 'POST', body: JSON.stringify(payload) }),
+  deleteLocationNote: (id) => request(`/location-notes/${id}`, { method: 'DELETE' })
 };

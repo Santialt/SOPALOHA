@@ -1,13 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useMemo, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
 import InlineError from '../components/InlineError';
+import InlineSuccess from '../components/InlineSuccess';
 import LoadingBlock from '../components/LoadingBlock';
+import { useDataLoader } from '../hooks/useDataLoader';
 import { api, enums } from '../services/api';
 
 function LocationDetailPage() {
   const { id } = useParams();
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [location, setLocation] = useState(null);
   const [devices, setDevices] = useState([]);
   const [incidents, setIncidents] = useState([]);
@@ -15,54 +15,60 @@ function LocationDetailPage() {
   const [tasks, setTasks] = useState([]);
 
   const [deviceForm, setDeviceForm] = useState({ name: '', type: 'pos_terminal' });
+  const [editingDeviceId, setEditingDeviceId] = useState(null);
   const [noteText, setNoteText] = useState('');
   const [savingDevice, setSavingDevice] = useState(false);
   const [savingNote, setSavingNote] = useState(false);
+  const [deletingDeviceId, setDeletingDeviceId] = useState(null);
+  const [deletingNoteId, setDeletingNoteId] = useState(null);
+  const [success, setSuccess] = useState('');
 
-  const load = async () => {
-    setLoading(true);
-    setError('');
+  const { load, loading, error, setError } = useDataLoader(async () => {
+    const [locationData, allDevices, allIncidents, allNotes, allTasks] = await Promise.all([
+      api.getLocationById(id),
+      api.getDevices(),
+      api.getIncidents(),
+      api.getLocationNotes(),
+      api.getWeeklyTasks()
+    ]);
 
-    try {
-      const [locationData, allDevices, allIncidents, allNotes, allTasks] = await Promise.all([
-        api.getLocationById(id),
-        api.getDevices(),
-        api.getIncidents(),
-        api.getLocationNotes(),
-        api.getWeeklyTasks()
-      ]);
-
-      const numericId = Number(id);
-      setLocation(locationData);
-      setDevices(allDevices.filter((item) => item.location_id === numericId));
-      setIncidents(allIncidents.filter((item) => item.location_id === numericId));
-      setNotes(allNotes.filter((item) => item.location_id === numericId));
-      setTasks(allTasks.filter((item) => item.location_id === numericId));
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    load();
+    const numericId = Number(id);
+    setLocation(locationData);
+    setDevices(allDevices.filter((item) => item.location_id === numericId));
+    setIncidents(allIncidents.filter((item) => item.location_id === numericId));
+    setNotes(allNotes.filter((item) => item.location_id === numericId));
+    setTasks(allTasks.filter((item) => item.location_id === numericId));
   }, [id]);
 
   const lastIncidents = useMemo(() => incidents.slice(0, 8), [incidents]);
 
-  const onCreateDevice = async (event) => {
+  const onCreateOrUpdateDevice = async (event) => {
     event.preventDefault();
     setSavingDevice(true);
     setError('');
+    setSuccess('');
 
     try {
-      await api.createDevice({
-        location_id: Number(id),
-        name: deviceForm.name,
-        type: deviceForm.type
-      });
+      if (editingDeviceId) {
+        const current = devices.find((item) => item.id === editingDeviceId);
+        await api.updateDevice(editingDeviceId, {
+          ...current,
+          name: deviceForm.name,
+          type: deviceForm.type,
+          location_id: Number(id)
+        });
+        setSuccess(`Dispositivo #${editingDeviceId} actualizado.`);
+      } else {
+        await api.createDevice({
+          location_id: Number(id),
+          name: deviceForm.name,
+          type: deviceForm.type
+        });
+        setSuccess('Dispositivo agregado.');
+      }
+
       setDeviceForm({ name: '', type: 'pos_terminal' });
+      setEditingDeviceId(null);
       await load();
     } catch (err) {
       setError(err.message);
@@ -71,19 +77,72 @@ function LocationDetailPage() {
     }
   };
 
+  const onEditDevice = (device) => {
+    setSuccess('');
+    setEditingDeviceId(device.id);
+    setDeviceForm({
+      name: device.name || '',
+      type: device.type || 'pos_terminal'
+    });
+  };
+
+  const onDeleteDevice = async (device) => {
+    const ok = window.confirm(`Eliminar el dispositivo "${device.name}"?`);
+    if (!ok) return;
+
+    setDeletingDeviceId(device.id);
+    setError('');
+    setSuccess('');
+
+    try {
+      await api.deleteDevice(device.id);
+      setSuccess(`Dispositivo #${device.id} eliminado.`);
+      if (editingDeviceId === device.id) {
+        setEditingDeviceId(null);
+        setDeviceForm({ name: '', type: 'pos_terminal' });
+      }
+      await load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDeletingDeviceId(null);
+    }
+  };
+
   const onCreateNote = async (event) => {
     event.preventDefault();
     setSavingNote(true);
     setError('');
+    setSuccess('');
 
     try {
       await api.createLocationNote({ location_id: Number(id), note: noteText });
       setNoteText('');
+      setSuccess('Nota creada.');
       await load();
     } catch (err) {
       setError(err.message);
     } finally {
       setSavingNote(false);
+    }
+  };
+
+  const onDeleteNote = async (note) => {
+    const ok = window.confirm('Eliminar esta nota tecnica?');
+    if (!ok) return;
+
+    setDeletingNoteId(note.id);
+    setError('');
+    setSuccess('');
+
+    try {
+      await api.deleteLocationNote(note.id);
+      setSuccess('Nota eliminada.');
+      await load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDeletingNoteId(null);
     }
   };
 
@@ -96,6 +155,7 @@ function LocationDetailPage() {
   return (
     <div className="detail-grid">
       <InlineError message={error} />
+      <InlineSuccess message={success} />
 
       <section className="section-card full-width">
         <h2>{location.name}</h2>
@@ -111,8 +171,9 @@ function LocationDetailPage() {
       </section>
 
       <section className="section-card">
-        <div className="section-head">
+        <div className="section-head wrap">
           <h3>Dispositivos ({devices.length})</h3>
+          <Link to="/incidents" className="btn-link">Crear incidente</Link>
         </div>
         <table className="table compact">
           <thead>
@@ -121,6 +182,7 @@ function LocationDetailPage() {
               <th>Nombre</th>
               <th>Tipo</th>
               <th>IP</th>
+              <th>Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -130,13 +192,25 @@ function LocationDetailPage() {
                 <td>{device.name}</td>
                 <td>{device.type}</td>
                 <td>{device.ip_address || '-'}</td>
+                <td>
+                  <div className="form-actions">
+                    <button className="btn-small" onClick={() => onEditDevice(device)}>Editar</button>
+                    <button
+                      className="btn-danger"
+                      onClick={() => onDeleteDevice(device)}
+                      disabled={deletingDeviceId === device.id}
+                    >
+                      {deletingDeviceId === device.id ? 'Eliminando...' : 'Eliminar'}
+                    </button>
+                  </div>
+                </td>
               </tr>
             ))}
-            {devices.length === 0 && <tr><td colSpan="4" className="empty-row">Sin dispositivos</td></tr>}
+            {devices.length === 0 && <tr><td colSpan="5" className="empty-row">Sin dispositivos</td></tr>}
           </tbody>
         </table>
 
-        <form onSubmit={onCreateDevice} className="inline-form">
+        <form onSubmit={onCreateOrUpdateDevice} className="inline-form">
           <input
             className="input"
             value={deviceForm.name}
@@ -154,8 +228,20 @@ function LocationDetailPage() {
             ))}
           </select>
           <button className="btn-primary" type="submit" disabled={savingDevice}>
-            {savingDevice ? 'Guardando...' : 'Agregar'}
+            {savingDevice ? 'Guardando...' : editingDeviceId ? 'Actualizar' : 'Agregar'}
           </button>
+          {editingDeviceId && (
+            <button
+              className="btn-secondary"
+              type="button"
+              onClick={() => {
+                setEditingDeviceId(null);
+                setDeviceForm({ name: '', type: 'pos_terminal' });
+              }}
+            >
+              Cancelar
+            </button>
+          )}
         </form>
       </section>
 
@@ -190,7 +276,16 @@ function LocationDetailPage() {
           {notes.map((note) => (
             <li key={note.id}>
               <div>{note.note}</div>
-              <small>{note.created_at}</small>
+              <div className="form-actions">
+                <small>{note.created_at}</small>
+                <button
+                  className="btn-danger"
+                  onClick={() => onDeleteNote(note)}
+                  disabled={deletingNoteId === note.id}
+                >
+                  {deletingNoteId === note.id ? 'Eliminando...' : 'Eliminar'}
+                </button>
+              </div>
             </li>
           ))}
           {notes.length === 0 && <li className="empty-row">Sin notas</li>}

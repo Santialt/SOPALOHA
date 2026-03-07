@@ -1,48 +1,58 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import InlineError from '../components/InlineError';
+import InlineSuccess from '../components/InlineSuccess';
 import LoadingBlock from '../components/LoadingBlock';
+import { useDataLoader } from '../hooks/useDataLoader';
 import { api } from '../services/api';
 
 function LocationNotesPage() {
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
+  const [deletingNoteId, setDeletingNoteId] = useState(null);
+  const [success, setSuccess] = useState('');
   const [notes, setNotes] = useState([]);
   const [locations, setLocations] = useState([]);
   const [form, setForm] = useState({ location_id: '', note: '' });
 
-  const load = async () => {
-    setLoading(true);
-    setError('');
-
-    try {
-      const [notesData, locationsData] = await Promise.all([api.getLocationNotes(), api.getLocations()]);
-      setNotes(notesData);
-      setLocations(locationsData);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    load();
+  const { load, loading, error, setError } = useDataLoader(async () => {
+    const [notesData, locationsData] = await Promise.all([api.getLocationNotes(), api.getLocations()]);
+    setNotes(notesData);
+    setLocations(locationsData);
   }, []);
 
   const onSubmit = async (event) => {
     event.preventDefault();
     setSaving(true);
     setError('');
+    setSuccess('');
 
     try {
       await api.createLocationNote({ location_id: Number(form.location_id), note: form.note });
       setForm({ location_id: '', note: '' });
+      setSuccess('Nota creada.');
       await load();
     } catch (err) {
       setError(err.message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const onDelete = async (note) => {
+    const ok = window.confirm('Eliminar esta nota tecnica?');
+    if (!ok) return;
+
+    setDeletingNoteId(note.id);
+    setError('');
+    setSuccess('');
+
+    try {
+      await api.deleteLocationNote(note.id);
+      setSuccess('Nota eliminada.');
+      await load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDeletingNoteId(null);
     }
   };
 
@@ -53,6 +63,7 @@ function LocationNotesPage() {
       <section className="section-card">
         <h2>Alta rapida de nota tecnica</h2>
         <InlineError message={error} />
+        <InlineSuccess message={success} />
 
         <form onSubmit={onSubmit} className="form-grid">
           <label>
@@ -95,6 +106,7 @@ function LocationNotesPage() {
               <th>Fecha</th>
               <th>Local</th>
               <th>Nota</th>
+              <th>Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -105,10 +117,19 @@ function LocationNotesPage() {
                   <td>{note.created_at}</td>
                   <td>{location?.name || `#${note.location_id}`}</td>
                   <td>{note.note}</td>
+                  <td>
+                    <button
+                      className="btn-danger"
+                      onClick={() => onDelete(note)}
+                      disabled={deletingNoteId === note.id}
+                    >
+                      {deletingNoteId === note.id ? 'Eliminando...' : 'Eliminar'}
+                    </button>
+                  </td>
                 </tr>
               );
             })}
-            {notes.length === 0 && <tr><td colSpan="3" className="empty-row">Sin notas</td></tr>}
+            {notes.length === 0 && <tr><td colSpan="4" className="empty-row">Sin notas</td></tr>}
           </tbody>
         </table>
       </section>
