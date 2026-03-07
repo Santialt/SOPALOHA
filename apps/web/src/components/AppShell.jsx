@@ -6,6 +6,7 @@ const navItems = [
   { to: '/incidents', label: 'Incidentes' },
   { to: '/weekly-tasks', label: 'Tareas Semanales' },
   { to: '/location-notes', label: 'Notas Tecnicas' },
+  { to: '/teamviewer-explorer', label: 'TeamViewer Explorer' },
   { to: '/teamviewer-import', label: 'TeamViewer Import' }
 ];
 
@@ -15,6 +16,7 @@ const pageTitles = {
   '/incidents': 'Incidentes',
   '/weekly-tasks': 'Tareas Semanales',
   '/location-notes': 'Notas Tecnicas',
+  '/teamviewer-explorer': 'TeamViewer Explorer',
   '/teamviewer-import': 'TeamViewer Import'
 };
 

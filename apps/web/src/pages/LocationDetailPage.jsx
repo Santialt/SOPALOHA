@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import InlineError from '../components/InlineError';
 import InlineSuccess from '../components/InlineSuccess';
@@ -86,6 +86,7 @@ function LocationDetailPage() {
   const [deletingNoteId, setDeletingNoteId] = useState(null);
   const [runningActionKey, setRunningActionKey] = useState('');
   const [success, setSuccess] = useState('');
+  const teamviewerOpenLockRef = useRef(new Map());
 
   const { load, loading, error, setError } = useDataLoader(async () => {
     const [locationData, allDevices, allIncidents, allNotes, allTasks, locationIntegrations] =
@@ -300,29 +301,29 @@ function LocationDetailPage() {
       return;
     }
 
+    const now = Date.now();
+    const lastOpenAt = teamviewerOpenLockRef.current.get(device.id) || 0;
+    if (now - lastOpenAt < 3000) {
+      setError('');
+      setSuccess('Apertura ya solicitada hace unos segundos. Espera un momento.');
+      return;
+    }
+
+    teamviewerOpenLockRef.current.set(device.id, now);
     const actionKey = `tv-${device.id}`;
     setRunningActionKey(actionKey);
     setError('');
     setSuccess('');
 
     try {
-      const protocolUrl = `teamviewer10://control?device=${device.teamviewer_id}`;
-      const popup = window.open(protocolUrl, '_blank', 'noopener,noreferrer');
-
-      if (!popup) {
-        const result = await api.openTeamviewer(device.teamviewer_id);
+      const result = await api.openTeamviewer(device.teamviewer_id);
+      if (result.skipped) {
+        setSuccess('Apertura omitida para evitar doble ejecucion.');
+      } else {
         setSuccess(`TeamViewer lanzado por backend (${result.method}).`);
-        return;
       }
-
-      setSuccess('Intento de apertura de TeamViewer enviado al navegador.');
     } catch (err) {
-      try {
-        const result = await api.openTeamviewer(device.teamviewer_id);
-        setSuccess(`TeamViewer lanzado por backend (${result.method}).`);
-      } catch (fallbackError) {
-        setError(fallbackError.message);
-      }
+      setError(err.message);
     } finally {
       setRunningActionKey('');
     }

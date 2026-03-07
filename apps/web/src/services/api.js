@@ -79,5 +79,8 @@ export const api = {
   runTeamviewerImport: () =>
     request('/teamviewer/import', {
       method: 'POST'
-    })
+    }),
+  getTeamviewerExplorer: () => request('/teamviewer/explorer'),
+  getTeamviewerGroup: (groupId) => request(`/teamviewer/groups/${groupId}`),
+  getTeamviewerDevice: (teamviewerId) => request(`/teamviewer/devices/${teamviewerId}`)
 };

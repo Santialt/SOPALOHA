@@ -413,6 +413,87 @@ button:disabled {
   gap: 8px;
 }
 
+.key-value-inline {
+  display: inline-flex;
+  gap: 10px;
+  color: #64748b;
+}
+
+.teamviewer-explorer-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 360px) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.explorer-tree {
+  min-height: 520px;
+  overflow: auto;
+}
+
+.explorer-detail {
+  min-height: 520px;
+}
+
+.explorer-group-block {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  background: #f8fafc;
+}
+
+.explorer-group-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+  padding: 8px;
+}
+
+.explorer-group-row.selected {
+  background: #dbeafe;
+}
+
+.explorer-group-select {
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  display: grid;
+  gap: 4px;
+}
+
+.explorer-group-select small {
+  color: #475569;
+}
+
+.explorer-device-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 8px 8px 38px;
+  display: grid;
+  gap: 6px;
+}
+
+.explorer-device-row {
+  width: 100%;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  text-align: left;
+  cursor: pointer;
+  padding: 8px;
+  display: grid;
+  gap: 3px;
+}
+
+.explorer-device-row.selected {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.explorer-device-row small {
+  color: #64748b;
+}
+
 .inline-error {
   background: #fef2f2;
   border: 1px solid #fecaca;
@@ -444,7 +525,8 @@ button:disabled {
 
 @media (max-width: 1200px) {
   .grid-two-columns,
-  .detail-grid {
+  .detail-grid,
+  .teamviewer-explorer-layout {
     grid-template-columns: 1fr;
   }
 

@@ -59,7 +59,7 @@ function resolveTeamviewerId(rawDevice) {
 }
 
 function buildExistingLocationsMap() {
-  const rows = db.prepare('SELECT id, name FROM locations').all();
+  const rows = db.prepare('SELECT * FROM locations').all();
   const byName = new Map();
 
   for (const row of rows) {
@@ -72,7 +72,7 @@ function buildExistingLocationsMap() {
 function buildExistingDeviceMaps() {
   const rows = db
     .prepare(
-      `SELECT d.id, d.name, d.teamviewer_id, d.location_id, l.name AS location_name
+      `SELECT d.*, l.name AS location_name
        FROM devices d
        JOIN locations l ON l.id = d.location_id`
     )
@@ -400,6 +400,14 @@ async function runImport() {
 
 module.exports = {
   detectDeviceRole,
+  normalizeString,
+  normalizeKey,
+  resolveTeamviewerId,
+  normalizeDeviceAlias,
+  normalizeDeviceGroupId,
+  loadTeamviewerSnapshot,
+  buildExistingLocationsMap,
+  buildExistingDeviceMaps,
   buildImportPreview,
   runImport
 };

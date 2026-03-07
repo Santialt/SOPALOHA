@@ -56,6 +56,7 @@ function DashboardPage() {
           <Link to="/incidents" className="btn-link">Gestionar incidentes</Link>
           <Link to="/weekly-tasks" className="btn-link">Gestionar tareas</Link>
           <Link to="/location-notes" className="btn-link">Notas tecnicas</Link>
+          <Link to="/teamviewer-explorer" className="btn-link">TeamViewer Explorer</Link>
           <Link to="/teamviewer-import" className="btn-link">TeamViewer Import</Link>
         </div>
       </section>
