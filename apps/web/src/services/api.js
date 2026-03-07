@@ -79,6 +79,7 @@ export const api = {
   getTaskById: (id) => request(`/tasks/${id}`),
   createTask: (payload) => request('/tasks', { method: 'POST', body: JSON.stringify(payload) }),
   updateTask: (id, payload) => request(`/tasks/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  deleteTask: (id) => request(`/tasks/${id}`, { method: 'DELETE' }),
 
   getLocationNotes: () => request('/location-notes'),
   createLocationNote: (payload) => request('/location-notes', { method: 'POST', body: JSON.stringify(payload) }),

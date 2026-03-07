@@ -39,4 +39,15 @@ function updateTask(req, res, next) {
   }
 }
 
-module.exports = { getTasks, getTaskById, createTask, updateTask };
+function deleteTask(req, res, next) {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) throw httpError(400, 'Task id must be an integer');
+    service.deleteTask(id);
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+}
+
+module.exports = { getTasks, getTaskById, createTask, updateTask, deleteTask };

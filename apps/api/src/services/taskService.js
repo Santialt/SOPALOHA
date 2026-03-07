@@ -81,11 +81,17 @@ function updateTask(id, payload) {
   return repository.update(id, normalized);
 }
 
+function deleteTask(id) {
+  const removed = repository.remove(id);
+  if (!removed) throw httpError(404, 'Task not found');
+}
+
 module.exports = {
   allowedStatuses,
   allowedPriorities,
   listTasks,
   getTaskById,
   createTask,
-  updateTask
+  updateTask,
+  deleteTask
 };
