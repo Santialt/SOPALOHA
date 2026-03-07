@@ -339,6 +339,19 @@ button:disabled {
   color: #334155;
 }
 
+.badge.new,
+.badge.reused {
+  background: #dcfce7;
+  border-color: #bbf7d0;
+  color: #14532d;
+}
+
+.badge.duplicate {
+  background: #fee2e2;
+  border-color: #fecaca;
+  color: #7f1d1d;
+}
+
 .badge.low {
   background: #dcfce7;
   border-color: #bbf7d0;

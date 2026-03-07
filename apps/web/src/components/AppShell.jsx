@@ -5,7 +5,8 @@ const navItems = [
   { to: '/locations', label: 'Locales' },
   { to: '/incidents', label: 'Incidentes' },
   { to: '/weekly-tasks', label: 'Tareas Semanales' },
-  { to: '/location-notes', label: 'Notas Tecnicas' }
+  { to: '/location-notes', label: 'Notas Tecnicas' },
+  { to: '/teamviewer-import', label: 'TeamViewer Import' }
 ];
 
 const pageTitles = {
@@ -13,7 +14,8 @@ const pageTitles = {
   '/locations': 'Gestion de Locales',
   '/incidents': 'Incidentes',
   '/weekly-tasks': 'Tareas Semanales',
-  '/location-notes': 'Notas Tecnicas'
+  '/location-notes': 'Notas Tecnicas',
+  '/teamviewer-import': 'TeamViewer Import'
 };
 
 function resolveTitle(pathname) {

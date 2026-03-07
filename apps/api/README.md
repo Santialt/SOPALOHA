@@ -42,6 +42,29 @@ Servidor:
 - `GET|POST|PUT:id|DELETE:id /weekly-tasks`
 - `GET|POST|DELETE:id /location-notes`
 - `GET /teamviewer-connections` (placeholder, responde `501`)
+- `GET /teamviewer/import-preview`
+- `POST /teamviewer/import`
+
+## TeamViewer import (API)
+
+- Requiere `TEAMVIEWER_API_TOKEN` en entorno del backend.
+- `GET /teamviewer/import-preview`:
+  - consulta grupos y dispositivos en TeamViewer
+  - calcula `locations` nuevos/reutilizados por nombre de grupo
+  - calcula `devices` nuevos/duplicados
+  - devuelve resumen + warnings sin escribir en DB
+- `POST /teamviewer/import`:
+  - repite lectura de TeamViewer
+  - ejecuta importacion real en transaccion SQLite
+  - crea primero `locations` faltantes y luego `devices`
+  - evita duplicados y devuelve resumen final
+
+### Decision de teamviewer_id
+
+- `devices.teamviewer_id` usa `remotecontrol_id` como valor operativo principal.
+- Motivo: es el identificador mas util para acciones de control remoto desde TeamViewer.
+- Si `remotecontrol_id` no viene en el payload, se usa `device_id` como fallback.
+- Si tampoco hay ID confiable, la deduplicacion usa fallback por `location + alias`.
 
 ## Campos esperados y enums válidos
 

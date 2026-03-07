@@ -73,5 +73,11 @@ export const api = {
     request('/support-actions/teamviewer/open', {
       method: 'POST',
       body: JSON.stringify({ teamviewer_id: teamviewerId })
+    }),
+
+  getTeamviewerImportPreview: () => request('/teamviewer/import-preview'),
+  runTeamviewerImport: () =>
+    request('/teamviewer/import', {
+      method: 'POST'
     })
 };

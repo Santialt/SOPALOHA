@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const { health } = require('./controllers/healthController');
 const locationRoutes = require('./routes/locationRoutes');
@@ -6,6 +7,7 @@ const incidentRoutes = require('./routes/incidentRoutes');
 const weeklyTaskRoutes = require('./routes/weeklyTaskRoutes');
 const locationNoteRoutes = require('./routes/locationNoteRoutes');
 const teamviewerConnectionRoutes = require('./routes/teamviewerConnectionRoutes');
+const teamviewerRoutes = require('./routes/teamviewerRoutes');
 const supportActionRoutes = require('./routes/supportActionRoutes');
 const { notFound } = require('./middleware/notFound');
 const { errorHandler } = require('./middleware/errorHandler');
@@ -33,6 +35,7 @@ app.use('/incidents', incidentRoutes);
 app.use('/weekly-tasks', weeklyTaskRoutes);
 app.use('/location-notes', locationNoteRoutes);
 app.use('/teamviewer-connections', teamviewerConnectionRoutes);
+app.use('/teamviewer', teamviewerRoutes);
 app.use('/support-actions', supportActionRoutes);
 
 app.use(notFound);
