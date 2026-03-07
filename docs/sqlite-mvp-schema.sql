@@ -233,6 +233,22 @@ CREATE TABLE IF NOT EXISTS tasks (
 );
 
 -- =========================================================
+-- TABLE: on_call_shifts
+-- Operational on-call coverage windows.
+-- =========================================================
+CREATE TABLE IF NOT EXISTS on_call_shifts (
+  id INTEGER PRIMARY KEY,
+  title TEXT NOT NULL,
+  assigned_to TEXT NOT NULL,
+  backup_assigned_to TEXT,
+  start_at TEXT NOT NULL, -- YYYY-MM-DDTHH:MM
+  end_at TEXT NOT NULL,   -- YYYY-MM-DDTHH:MM
+  notes TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- =========================================================
 -- TABLE: location_notes
 -- Quick technical notes per location.
 -- =========================================================
@@ -284,6 +300,13 @@ BEGIN
   UPDATE tasks SET updated_at = datetime('now') WHERE id = NEW.id;
 END;
 
+CREATE TRIGGER IF NOT EXISTS trg_on_call_shifts_updated_at
+AFTER UPDATE ON on_call_shifts
+FOR EACH ROW
+BEGIN
+  UPDATE on_call_shifts SET updated_at = datetime('now') WHERE id = NEW.id;
+END;
+
 -- =========================================================
 -- INDEXES: performance for operational queries.
 -- =========================================================
@@ -324,6 +347,8 @@ CREATE INDEX IF NOT EXISTS idx_tasks_location ON tasks(location_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date);
 CREATE INDEX IF NOT EXISTS idx_tasks_scheduled_for ON tasks(scheduled_for);
 CREATE INDEX IF NOT EXISTS idx_tasks_incident_id ON tasks(incident_id);
+
+CREATE INDEX IF NOT EXISTS idx_on_call_shifts_range ON on_call_shifts(start_at, end_at);
 
 CREATE INDEX IF NOT EXISTS idx_location_notes_location_created
   ON location_notes(location_id, created_at DESC);

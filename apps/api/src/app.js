@@ -10,6 +10,7 @@ const locationNoteRoutes = require('./routes/locationNoteRoutes');
 const teamviewerConnectionRoutes = require('./routes/teamviewerConnectionRoutes');
 const teamviewerRoutes = require('./routes/teamviewerRoutes');
 const supportActionRoutes = require('./routes/supportActionRoutes');
+const onCallShiftRoutes = require('./routes/onCallShiftRoutes');
 const { notFound } = require('./middleware/notFound');
 const { errorHandler } = require('./middleware/errorHandler');
 
@@ -39,6 +40,7 @@ app.use('/location-notes', locationNoteRoutes);
 app.use('/teamviewer-connections', teamviewerConnectionRoutes);
 app.use('/teamviewer', teamviewerRoutes);
 app.use('/support-actions', supportActionRoutes);
+app.use('/on-call-shifts', onCallShiftRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

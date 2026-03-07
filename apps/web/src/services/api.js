@@ -103,5 +103,11 @@ export const api = {
     }),
   getTeamviewerExplorer: () => request('/teamviewer/explorer'),
   getTeamviewerGroup: (groupId) => request(`/teamviewer/groups/${groupId}`),
-  getTeamviewerDevice: (teamviewerId) => request(`/teamviewer/devices/${teamviewerId}`)
+  getTeamviewerDevice: (teamviewerId) => request(`/teamviewer/devices/${teamviewerId}`),
+
+  getOnCallShifts: () => request('/on-call-shifts'),
+  getOnCallShiftById: (id) => request(`/on-call-shifts/${id}`),
+  getCurrentOnCallShift: () => request('/on-call-shifts/current'),
+  createOnCallShift: (payload) => request('/on-call-shifts', { method: 'POST', body: JSON.stringify(payload) }),
+  updateOnCallShift: (id, payload) => request(`/on-call-shifts/${id}`, { method: 'PUT', body: JSON.stringify(payload) })
 };

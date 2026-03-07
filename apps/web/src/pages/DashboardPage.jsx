@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import CurrentOnCallBlock from '../components/CurrentOnCallBlock';
 import InlineError from '../components/InlineError';
 import LoadingBlock from '../components/LoadingBlock';
 import StatCard from '../components/StatCard';
@@ -8,7 +9,9 @@ import { api } from '../services/api';
 function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [onCallError, setOnCallError] = useState('');
   const [stats, setStats] = useState({ locations: 0, incidents: 0, tasks: 0 });
+  const [currentShift, setCurrentShift] = useState(null);
 
   useEffect(() => {
     const load = async () => {
@@ -16,10 +19,14 @@ function DashboardPage() {
       setError('');
 
       try {
-        const [locations, incidents, tasks] = await Promise.all([
+        const [locations, incidents, tasks, currentOnCall] = await Promise.all([
           api.getLocations(),
           api.getIncidents(),
-          api.getTasks()
+          api.getTasks(),
+          api.getCurrentOnCallShift().catch((err) => {
+            setOnCallError(err.message || 'No se pudo cargar la guardia actual');
+            return null;
+          })
         ]);
 
         setStats({
@@ -27,6 +34,7 @@ function DashboardPage() {
           incidents: incidents.length,
           tasks: tasks.length
         });
+        setCurrentShift(currentOnCall);
       } catch (err) {
         setError(err.message);
       } finally {
@@ -49,6 +57,8 @@ function DashboardPage() {
         <StatCard label="Tareas" value={stats.tasks} tone="neutral" />
       </div>
 
+      <CurrentOnCallBlock shift={currentShift} error={onCallError} />
+
       <section className="section-card">
         <div className="section-head">
           <h2>Accesos rapidos</h2>
@@ -58,6 +68,7 @@ function DashboardPage() {
           <Link to="/locations" className="btn-link">Ver locales</Link>
           <Link to="/incidents" className="btn-link">Gestionar incidentes</Link>
           <Link to="/tasks" className="btn-link">Gestionar tareas</Link>
+          <Link to="/on-call" className="btn-link">Gestionar guardias</Link>
           <Link to="/location-notes" className="btn-link">Notas tecnicas</Link>
           <Link to="/teamviewer-explorer" className="btn-link">TeamViewer Explorer</Link>
           <Link to="/teamviewer-import" className="btn-link">TeamViewer Import</Link>

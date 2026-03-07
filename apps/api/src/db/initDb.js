@@ -50,6 +50,29 @@ function runMigrations() {
   if (hasColumn('devices', 'device_role')) {
     db.exec('CREATE INDEX IF NOT EXISTS idx_devices_role ON devices(device_role);');
   }
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS on_call_shifts (
+      id INTEGER PRIMARY KEY,
+      title TEXT NOT NULL,
+      assigned_to TEXT NOT NULL,
+      backup_assigned_to TEXT,
+      start_at TEXT NOT NULL,
+      end_at TEXT NOT NULL,
+      notes TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_on_call_shifts_range ON on_call_shifts(start_at, end_at);
+
+    CREATE TRIGGER IF NOT EXISTS trg_on_call_shifts_updated_at
+    AFTER UPDATE ON on_call_shifts
+    FOR EACH ROW
+    BEGIN
+      UPDATE on_call_shifts SET updated_at = datetime('now') WHERE id = NEW.id;
+    END;
+  `);
 }
 
 function initDatabase() {

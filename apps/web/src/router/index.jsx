@@ -8,6 +8,7 @@ import TasksPage from '../pages/TasksPage';
 import LocationNotesPage from '../pages/LocationNotesPage';
 import TeamViewerImportPage from '../pages/TeamViewerImportPage';
 import TeamViewerExplorerPage from '../pages/TeamViewerExplorerPage';
+import OnCallPage from '../pages/OnCallPage';
 
 export function AppRouter() {
   return (
@@ -20,6 +21,7 @@ export function AppRouter() {
         <Route path="incidents" element={<IncidentsPage />} />
         <Route path="tasks" element={<TasksPage />} />
         <Route path="location-notes" element={<LocationNotesPage />} />
+        <Route path="on-call" element={<OnCallPage />} />
         <Route path="teamviewer-explorer" element={<TeamViewerExplorerPage />} />
         <Route path="teamviewer-import" element={<TeamViewerImportPage />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
