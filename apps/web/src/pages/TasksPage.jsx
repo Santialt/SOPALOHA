@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import InlineError from '../components/InlineError';
 import InlineSuccess from '../components/InlineSuccess';
 import LoadingBlock from '../components/LoadingBlock';
@@ -6,6 +6,21 @@ import { useDataLoader } from '../hooks/useDataLoader';
 import { api, enums } from '../services/api';
 
 const KANBAN_STATUSES = ['pending', 'in_progress', 'blocked', 'done', 'cancelled'];
+const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab', 'Dom'];
+const MONTH_OPTIONS = [
+  { value: 0, label: 'Enero' },
+  { value: 1, label: 'Febrero' },
+  { value: 2, label: 'Marzo' },
+  { value: 3, label: 'Abril' },
+  { value: 4, label: 'Mayo' },
+  { value: 5, label: 'Junio' },
+  { value: 6, label: 'Julio' },
+  { value: 7, label: 'Agosto' },
+  { value: 8, label: 'Septiembre' },
+  { value: 9, label: 'Octubre' },
+  { value: 10, label: 'Noviembre' },
+  { value: 11, label: 'Diciembre' }
+];
 
 const statusLabels = {
   pending: 'Pending',
@@ -14,6 +29,10 @@ const statusLabels = {
   done: 'Done',
   cancelled: 'Cancelled'
 };
+
+const monthFormatter = new Intl.DateTimeFormat('es-AR', { month: 'long', year: 'numeric' });
+const dayFormatter = new Intl.DateTimeFormat('es-AR', { day: '2-digit', month: '2-digit' });
+const timeFormatter = new Intl.DateTimeFormat('es-AR', { hour: '2-digit', minute: '2-digit' });
 
 function emptyForm() {
   return {
@@ -34,6 +53,68 @@ function emptyForm() {
 function normalizeDatetimeInput(value) {
   if (!value) return '';
   return value.replace(' ', 'T').slice(0, 16);
+}
+
+function toDateFromTask(task) {
+  const sourceValue = task.scheduled_for || task.due_date;
+  if (!sourceValue) return null;
+
+  let normalizedValue = String(sourceValue);
+  if (normalizedValue.includes(' ')) {
+    normalizedValue = normalizedValue.replace(' ', 'T');
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(normalizedValue)) {
+    normalizedValue = `${normalizedValue}T00:00:00`;
+  }
+
+  const parsedDate = new Date(normalizedValue);
+  return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
+}
+
+function formatDateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function startOfDay(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function addDays(date, amount) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + amount);
+  return next;
+}
+
+function addMonths(date, amount) {
+  return new Date(date.getFullYear(), date.getMonth() + amount, 1);
+}
+
+function startOfWeek(date) {
+  const day = date.getDay();
+  const mondayOffset = day === 0 ? -6 : 1 - day;
+  return startOfDay(addDays(date, mondayOffset));
+}
+
+function startOfMonthGrid(date) {
+  return startOfWeek(new Date(date.getFullYear(), date.getMonth(), 1));
+}
+
+function endOfMonthGrid(date) {
+  const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+  const day = lastDay.getDay();
+  const sundayOffset = day === 0 ? 0 : 7 - day;
+  return startOfDay(addDays(lastDay, sundayOffset));
+}
+
+function isSameDate(a, b) {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
 }
 
 function buildTaskUpdatePayload(task, nextStatus) {
@@ -61,6 +142,12 @@ function TasksPage() {
   const [dragOverStatus, setDragOverStatus] = useState('');
   const [success, setSuccess] = useState('');
   const [viewMode, setViewMode] = useState('kanban');
+  const [calendarScope, setCalendarScope] = useState('month');
+  const [calendarCursor, setCalendarCursor] = useState(() => startOfDay(new Date()));
+  const [calendarUndatedTasks, setCalendarUndatedTasks] = useState([]);
+  const [draggingUndatedTaskId, setDraggingUndatedTaskId] = useState(null);
+  const [calendarDropDateKey, setCalendarDropDateKey] = useState('');
+  const [movingTaskToCalendarId, setMovingTaskToCalendarId] = useState(null);
 
   const [tasks, setTasks] = useState([]);
   const [locations, setLocations] = useState([]);
@@ -75,17 +162,26 @@ function TasksPage() {
       : filters;
 
   const { load, loading, error, setError } = useDataLoader(async () => {
-    const [tasksData, locationsData, devicesData, incidentsData] = await Promise.all([
+    const requests = [
       api.getTasks(effectiveFilters),
       api.getLocations(),
       api.getDevices(),
       api.getIncidents()
-    ]);
+    ];
+
+    if (viewMode === 'calendar') {
+      requests.push(api.getTasks());
+    }
+
+    const [tasksData, locationsData, devicesData, incidentsData, allTasksData = []] = await Promise.all(requests);
 
     setTasks(tasksData);
     setLocations(locationsData);
     setDevices(devicesData);
     setIncidents(incidentsData);
+    setCalendarUndatedTasks(
+      viewMode === 'calendar' ? allTasksData.filter((task) => !toDateFromTask(task)) : []
+    );
   }, [viewMode, filters.status, filters.priority, filters.location_id]);
 
   const onSubmit = async (event) => {
@@ -222,10 +318,160 @@ function TasksPage() {
     await onQuickStatusChange(task, status);
   };
 
+  const onDragStartUndatedTask = (event, task) => {
+    setDraggingUndatedTaskId(task.id);
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', String(task.id));
+  };
+
+  const onDragEndUndatedTask = () => {
+    setDraggingUndatedTaskId(null);
+    setCalendarDropDateKey('');
+  };
+
+  const onDragOverCalendarDay = (event, dayKey) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    if (calendarDropDateKey !== dayKey) {
+      setCalendarDropDateKey(dayKey);
+    }
+  };
+
+  const onDropUndatedTaskInCalendarDay = async (event, dayKey) => {
+    event.preventDefault();
+    setCalendarDropDateKey('');
+
+    const draggedTaskId = Number(event.dataTransfer.getData('text/plain'));
+    if (!Number.isInteger(draggedTaskId)) return;
+
+    const task = calendarUndatedTasks.find((item) => item.id === draggedTaskId);
+    if (!task) return;
+
+    setMovingTaskToCalendarId(task.id);
+    setError('');
+    setSuccess('');
+
+    try {
+      const payload = buildTaskUpdatePayload(task, task.status || 'pending');
+      payload.due_date = dayKey;
+      payload.scheduled_for = null;
+      await api.updateTask(task.id, payload);
+      setSuccess(`Tarea #${task.id} asignada al ${dayKey}.`);
+      await load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setMovingTaskToCalendarId(null);
+      setDraggingUndatedTaskId(null);
+    }
+  };
+
   const tasksByStatus = KANBAN_STATUSES.reduce((acc, status) => {
     acc[status] = tasks.filter((task) => task.status === status);
     return acc;
   }, {});
+
+  const calendarData = useMemo(() => {
+    const taskEvents = tasks
+      .map((task) => {
+        const date = toDateFromTask(task);
+        return {
+          task,
+          date,
+          source: task.scheduled_for ? 'scheduled_for' : task.due_date ? 'due_date' : null
+        };
+      })
+      .sort((a, b) => {
+        if (!a.date && !b.date) return 0;
+        if (!a.date) return 1;
+        if (!b.date) return -1;
+        return a.date.getTime() - b.date.getTime();
+      });
+
+    const eventsByDay = {};
+
+    for (const item of taskEvents) {
+      if (!item.date) {
+        continue;
+      }
+
+      const key = formatDateKey(item.date);
+      if (!eventsByDay[key]) {
+        eventsByDay[key] = [];
+      }
+      eventsByDay[key].push(item);
+    }
+
+    return {
+      eventsByDay
+    };
+  }, [tasks]);
+
+  const calendarYearOptions = useMemo(() => {
+    const baseYear = calendarCursor.getFullYear();
+    const years = new Set();
+
+    for (let year = baseYear - 5; year <= baseYear + 5; year += 1) {
+      years.add(year);
+    }
+
+    tasks.forEach((task) => {
+      const date = toDateFromTask(task);
+      if (date) years.add(date.getFullYear());
+    });
+    calendarUndatedTasks.forEach((task) => {
+      const date = toDateFromTask(task);
+      if (date) years.add(date.getFullYear());
+    });
+
+    return [...years].sort((a, b) => a - b);
+  }, [calendarCursor, tasks, calendarUndatedTasks]);
+
+  const calendarRange = useMemo(() => {
+    if (calendarScope === 'month') {
+      const start = startOfMonthGrid(calendarCursor);
+      const end = endOfMonthGrid(calendarCursor);
+      const days = [];
+      for (let cursor = start; cursor <= end; cursor = addDays(cursor, 1)) {
+        days.push(new Date(cursor));
+      }
+      return { start, end, days };
+    }
+
+    const start = startOfWeek(calendarCursor);
+    const end = addDays(start, 6);
+    const days = [];
+    for (let cursor = start; cursor <= end; cursor = addDays(cursor, 1)) {
+      days.push(new Date(cursor));
+    }
+
+    return { start, end, days };
+  }, [calendarCursor, calendarScope]);
+
+  const calendarTitle =
+    calendarScope === 'month'
+      ? monthFormatter.format(calendarCursor)
+      : `${dayFormatter.format(calendarRange.start)} - ${dayFormatter.format(calendarRange.end)}`;
+
+  const onMoveCalendar = (direction) => {
+    setCalendarCursor((prev) =>
+      calendarScope === 'month' ? addMonths(prev, direction) : addDays(prev, 7 * direction)
+    );
+  };
+
+  const onGoToday = () => {
+    setCalendarCursor(startOfDay(new Date()));
+  };
+
+  const onSelectCalendarMonth = (event) => {
+    const nextMonth = Number(event.target.value);
+    setCalendarCursor((prev) => new Date(prev.getFullYear(), nextMonth, 1));
+  };
+
+  const onSelectCalendarYear = (event) => {
+    const nextYear = Number(event.target.value);
+    setCalendarCursor((prev) => new Date(nextYear, prev.getMonth(), 1));
+  };
 
   if (loading) return <LoadingBlock label="Cargando tareas operativas..." />;
 
@@ -382,8 +628,17 @@ function TasksPage() {
 
       <section className="section-card">
         <div className="section-head wrap">
-          <h2>{viewMode === 'kanban' ? 'Tablero de tareas' : 'Listado de tareas'}</h2>
+          <h2>
+            {viewMode === 'kanban'
+              ? 'Tablero de tareas'
+              : viewMode === 'calendar'
+                ? 'Calendario de tareas'
+                : 'Listado de tareas'}
+          </h2>
           {viewMode === 'kanban' && <small>Arrastra y suelta tarjetas entre columnas para cambiar estado.</small>}
+          {viewMode === 'calendar' && (
+            <small>Eventos por scheduled_for y fallback a due_date. Click para editar la tarea.</small>
+          )}
           <div className="form-actions">
             <button
               type="button"
@@ -399,9 +654,16 @@ function TasksPage() {
             >
               Tabla
             </button>
+            <button
+              type="button"
+              className={viewMode === 'calendar' ? 'btn-primary' : 'btn-secondary'}
+              onClick={() => setViewMode('calendar')}
+            >
+              Calendario
+            </button>
           </div>
           <div className="filter-row">
-            {viewMode === 'list' && (
+            {viewMode !== 'kanban' && (
               <select
                 className="input"
                 value={filters.status}
@@ -497,6 +759,140 @@ function TasksPage() {
                 </article>
               );
             })}
+          </div>
+        ) : viewMode === 'calendar' ? (
+          <div className="task-calendar-wrap">
+            <div className="task-calendar-toolbar">
+              <div className="form-actions">
+                <button type="button" className="btn-secondary" onClick={() => onMoveCalendar(-1)}>
+                  Anterior
+                </button>
+                <button type="button" className="btn-secondary" onClick={onGoToday}>
+                  Hoy
+                </button>
+                <button type="button" className="btn-secondary" onClick={() => onMoveCalendar(1)}>
+                  Siguiente
+                </button>
+              </div>
+              <strong>{calendarTitle}</strong>
+              {calendarScope === 'month' && (
+                <div className="task-calendar-jump">
+                  <select
+                    className="input"
+                    value={calendarCursor.getMonth()}
+                    onChange={onSelectCalendarMonth}
+                  >
+                    {MONTH_OPTIONS.map((month) => (
+                      <option key={month.value} value={month.value}>{month.label}</option>
+                    ))}
+                  </select>
+                  <select
+                    className="input"
+                    value={calendarCursor.getFullYear()}
+                    onChange={onSelectCalendarYear}
+                  >
+                    {calendarYearOptions.map((year) => (
+                      <option key={year} value={year}>{year}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div className="form-actions">
+                <button
+                  type="button"
+                  className={calendarScope === 'month' ? 'btn-primary' : 'btn-secondary'}
+                  onClick={() => setCalendarScope('month')}
+                >
+                  Mes
+                </button>
+                <button
+                  type="button"
+                  className={calendarScope === 'week' ? 'btn-primary' : 'btn-secondary'}
+                  onClick={() => setCalendarScope('week')}
+                >
+                  Semana
+                </button>
+              </div>
+            </div>
+
+            <div className="task-calendar-scroll">
+              <div className="task-calendar-grid-head">
+                {WEEKDAY_LABELS.map((label) => (
+                  <div key={label}>{label}</div>
+                ))}
+              </div>
+
+              <div className={`task-calendar-grid ${calendarScope === 'week' ? 'week' : 'month'}`}>
+                {calendarRange.days.map((day) => {
+                  const isToday = isSameDate(day, new Date());
+                  const isOutOfMonth = calendarScope === 'month' && day.getMonth() !== calendarCursor.getMonth();
+                  const dayKey = formatDateKey(day);
+                  const dayEvents = calendarData.eventsByDay[dayKey] || [];
+                  const maxEvents = calendarScope === 'month' ? 3 : 12;
+                  const visibleEvents = dayEvents.slice(0, maxEvents);
+                  const hiddenCount = dayEvents.length - visibleEvents.length;
+
+                  return (
+                    <div
+                      key={dayKey}
+                      className={`task-calendar-cell ${isToday ? 'is-today' : ''} ${isOutOfMonth ? 'is-muted' : ''} ${calendarDropDateKey === dayKey ? 'is-drop-target' : ''}`}
+                      onDragOver={(event) => onDragOverCalendarDay(event, dayKey)}
+                      onDrop={(event) => onDropUndatedTaskInCalendarDay(event, dayKey)}
+                    >
+                      <div className="task-calendar-cell-head">
+                        <span>{day.getDate()}</span>
+                        <small>{dayFormatter.format(day)}</small>
+                      </div>
+                      <div className="task-calendar-events">
+                        {visibleEvents.map((eventItem) => (
+                          <button
+                            type="button"
+                            key={`${eventItem.task.id}-${eventItem.source}-${eventItem.task.status}`}
+                            className={`task-calendar-event priority-${eventItem.task.priority || 'medium'} status-${eventItem.task.status || 'pending'}`}
+                            onClick={() => onEdit(eventItem.task)}
+                            title={`#${eventItem.task.id} - ${eventItem.task.title}`}
+                          >
+                            <span className="task-calendar-event-top">
+                              #{eventItem.task.id} {eventItem.source === 'scheduled_for' ? timeFormatter.format(eventItem.date) : 'todo el dia'}
+                            </span>
+                            <span className="task-calendar-event-title">{eventItem.task.title}</span>
+                          </button>
+                        ))}
+                        {hiddenCount > 0 && <div className="task-calendar-more">+{hiddenCount} mas</div>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="task-calendar-undated">
+              <h3>Tareas sin fecha ({calendarUndatedTasks.length})</h3>
+              {calendarUndatedTasks.length === 0 ? (
+                <div className="kanban-empty">No hay tareas sin scheduled_for o due_date.</div>
+              ) : (
+                <div className="task-calendar-undated-list">
+                  {calendarUndatedTasks.map((task) => (
+                    <button
+                      key={task.id}
+                      type="button"
+                      className={`task-calendar-undated-item priority-${task.priority || 'medium'} status-${task.status || 'pending'}`}
+                      draggable
+                      onDragStart={(event) => onDragStartUndatedTask(event, task)}
+                      onDragEnd={onDragEndUndatedTask}
+                      onClick={() => onEdit(task)}
+                      disabled={movingTaskToCalendarId === task.id}
+                      title="Arrastra esta tarea a un dia del calendario para asignarle fecha"
+                    >
+                      <strong>#{task.id}</strong>
+                      <span>{task.title}</span>
+                      <small>{movingTaskToCalendarId === task.id ? 'Asignando fecha...' : draggingUndatedTaskId === task.id ? 'Solta en un dia del calendario' : 'Arrastrar al calendario'}</small>
+                      <span className={`badge ${task.status}`}>{task.status}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         ) : (
           <table className="table compact">
