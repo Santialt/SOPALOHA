@@ -5,6 +5,16 @@ import LoadingBlock from '../components/LoadingBlock';
 import { useDataLoader } from '../hooks/useDataLoader';
 import { api, enums } from '../services/api';
 
+const KANBAN_STATUSES = ['pending', 'in_progress', 'blocked', 'done', 'cancelled'];
+
+const statusLabels = {
+  pending: 'Pending',
+  in_progress: 'In Progress',
+  blocked: 'Blocked',
+  done: 'Done',
+  cancelled: 'Cancelled'
+};
+
 function emptyForm() {
   return {
     title: '',
@@ -26,11 +36,31 @@ function normalizeDatetimeInput(value) {
   return value.replace(' ', 'T').slice(0, 16);
 }
 
+function buildTaskUpdatePayload(task, nextStatus) {
+  return {
+    title: task.title || '',
+    description: task.description || null,
+    location_id: task.location_id ?? null,
+    device_id: task.device_id ?? null,
+    incident_id: task.incident_id ?? null,
+    status: nextStatus,
+    priority: task.priority || 'medium',
+    assigned_to: task.assigned_to || null,
+    due_date: task.due_date || null,
+    scheduled_for: task.scheduled_for || null,
+    task_type: task.task_type || 'general'
+  };
+}
+
 function TasksPage() {
   const [saving, setSaving] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState(null);
   const [deletingTaskId, setDeletingTaskId] = useState(null);
+  const [statusUpdatingTaskId, setStatusUpdatingTaskId] = useState(null);
+  const [draggingTaskId, setDraggingTaskId] = useState(null);
+  const [dragOverStatus, setDragOverStatus] = useState('');
   const [success, setSuccess] = useState('');
+  const [viewMode, setViewMode] = useState('kanban');
 
   const [tasks, setTasks] = useState([]);
   const [locations, setLocations] = useState([]);
@@ -39,10 +69,14 @@ function TasksPage() {
 
   const [filters, setFilters] = useState({ status: '', priority: '', location_id: '' });
   const [form, setForm] = useState(emptyForm());
+  const effectiveFilters =
+    viewMode === 'kanban'
+      ? { priority: filters.priority, location_id: filters.location_id }
+      : filters;
 
   const { load, loading, error, setError } = useDataLoader(async () => {
     const [tasksData, locationsData, devicesData, incidentsData] = await Promise.all([
-      api.getTasks(filters),
+      api.getTasks(effectiveFilters),
       api.getLocations(),
       api.getDevices(),
       api.getIncidents()
@@ -52,7 +86,7 @@ function TasksPage() {
     setLocations(locationsData);
     setDevices(devicesData);
     setIncidents(incidentsData);
-  }, [filters.status, filters.priority, filters.location_id]);
+  }, [viewMode, filters.status, filters.priority, filters.location_id]);
 
   const onSubmit = async (event) => {
     event.preventDefault();
@@ -135,6 +169,63 @@ function TasksPage() {
       setDeletingTaskId(null);
     }
   };
+
+  const onQuickStatusChange = async (task, nextStatus) => {
+    if (!nextStatus || nextStatus === task.status) return;
+
+    setStatusUpdatingTaskId(task.id);
+    setError('');
+    setSuccess('');
+
+    try {
+      await api.updateTask(task.id, buildTaskUpdatePayload(task, nextStatus));
+      setTasks((prevTasks) =>
+        prevTasks.map((item) => (item.id === task.id ? { ...item, status: nextStatus } : item))
+      );
+      setSuccess(`Estado de tarea #${task.id} actualizado a ${nextStatus}.`);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setStatusUpdatingTaskId(null);
+    }
+  };
+
+  const onDragStartTask = (event, task) => {
+    setDraggingTaskId(task.id);
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', String(task.id));
+  };
+
+  const onDragEndTask = () => {
+    setDraggingTaskId(null);
+    setDragOverStatus('');
+  };
+
+  const onDragOverColumn = (event, status) => {
+    event.preventDefault();
+    if (dragOverStatus !== status) {
+      setDragOverStatus(status);
+    }
+    event.dataTransfer.dropEffect = 'move';
+  };
+
+  const onDropInColumn = async (event, status) => {
+    event.preventDefault();
+    setDragOverStatus('');
+
+    const draggedTaskId = Number(event.dataTransfer.getData('text/plain'));
+    if (!Number.isInteger(draggedTaskId)) return;
+
+    const task = tasks.find((item) => item.id === draggedTaskId);
+    if (!task || task.status === status) return;
+
+    await onQuickStatusChange(task, status);
+  };
+
+  const tasksByStatus = KANBAN_STATUSES.reduce((acc, status) => {
+    acc[status] = tasks.filter((task) => task.status === status);
+    return acc;
+  }, {});
 
   if (loading) return <LoadingBlock label="Cargando tareas operativas..." />;
 
@@ -291,18 +382,37 @@ function TasksPage() {
 
       <section className="section-card">
         <div className="section-head wrap">
-          <h2>Listado de tareas</h2>
-          <div className="filter-row">
-            <select
-              className="input"
-              value={filters.status}
-              onChange={(event) => setFilters({ ...filters, status: event.target.value })}
+          <h2>{viewMode === 'kanban' ? 'Tablero de tareas' : 'Listado de tareas'}</h2>
+          {viewMode === 'kanban' && <small>Arrastra y suelta tarjetas entre columnas para cambiar estado.</small>}
+          <div className="form-actions">
+            <button
+              type="button"
+              className={viewMode === 'kanban' ? 'btn-primary' : 'btn-secondary'}
+              onClick={() => setViewMode('kanban')}
             >
-              <option value="">Todos los estados</option>
-              {enums.operationalTaskStatus.map((status) => (
-                <option key={status} value={status}>{status}</option>
-              ))}
-            </select>
+              Kanban
+            </button>
+            <button
+              type="button"
+              className={viewMode === 'list' ? 'btn-primary' : 'btn-secondary'}
+              onClick={() => setViewMode('list')}
+            >
+              Tabla
+            </button>
+          </div>
+          <div className="filter-row">
+            {viewMode === 'list' && (
+              <select
+                className="input"
+                value={filters.status}
+                onChange={(event) => setFilters({ ...filters, status: event.target.value })}
+              >
+                <option value="">Todos los estados</option>
+                {enums.operationalTaskStatus.map((status) => (
+                  <option key={status} value={status}>{status}</option>
+                ))}
+              </select>
+            )}
             <select
               className="input"
               value={filters.priority}
@@ -326,57 +436,121 @@ function TasksPage() {
           </div>
         </div>
 
-        <table className="table compact">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Titulo</th>
-              <th>Local</th>
-              <th>Estado</th>
-              <th>Prioridad</th>
-              <th>Asignado</th>
-              <th>Vence</th>
-              <th>Programada</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {tasks.map((task) => {
-              const location = locations.find((item) => item.id === task.location_id);
+        {viewMode === 'kanban' ? (
+          <div className="kanban-board">
+            {KANBAN_STATUSES.map((status) => {
+              const columnTasks = tasksByStatus[status] || [];
               return (
-                <tr key={task.id}>
-                  <td>{task.id}</td>
-                  <td>{task.title}</td>
-                  <td>{location?.name || '-'}</td>
-                  <td><span className={`badge ${task.status}`}>{task.status}</span></td>
-                  <td><span className={`badge ${task.priority}`}>{task.priority}</span></td>
-                  <td>{task.assigned_to || '-'}</td>
-                  <td>{task.due_date || '-'}</td>
-                  <td>{normalizeDatetimeInput(task.scheduled_for) || '-'}</td>
-                  <td>
-                    <div className="form-actions">
-                      <button className="btn-secondary" onClick={() => onEdit(task)}>
-                        Editar
-                      </button>
-                      <button
-                        className="btn-danger"
-                        onClick={() => onDelete(task)}
-                        disabled={deletingTaskId === task.id}
-                      >
-                        {deletingTaskId === task.id ? 'Eliminando...' : 'Eliminar'}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+                <article key={status} className={`kanban-column ${dragOverStatus === status ? 'is-drop-target' : ''}`}>
+                  <header className="kanban-column-head">
+                    <h3>{statusLabels[status] || status}</h3>
+                    <span className={`badge ${status}`}>{columnTasks.length}</span>
+                  </header>
+
+                  <div
+                    className="kanban-column-body"
+                    onDragOver={(event) => onDragOverColumn(event, status)}
+                    onDrop={(event) => onDropInColumn(event, status)}
+                  >
+                    {columnTasks.map((task) => {
+                      const location = locations.find((item) => item.id === task.location_id);
+                      return (
+                        <div
+                          key={task.id}
+                          className={`kanban-card ${draggingTaskId === task.id ? 'is-dragging' : ''}`}
+                          draggable
+                          onDragStart={(event) => onDragStartTask(event, task)}
+                          onDragEnd={onDragEndTask}
+                        >
+                          <div className="kanban-card-title">
+                            #{task.id} - {task.title}
+                          </div>
+                          <div className="kanban-card-meta">
+                            <span className={`badge ${task.priority}`}>{task.priority}</span>
+                            <span>{location?.name || 'Sin local'}</span>
+                          </div>
+                          <div className="kanban-card-meta">
+                            <span>Asignado: {task.assigned_to || '-'}</span>
+                            <span>Vence: {task.due_date || '-'}</span>
+                          </div>
+                          <div className="kanban-card-actions">
+                            <span className={`badge ${task.status}`}>{task.status}</span>
+                            <button className="btn-secondary" onClick={() => onEdit(task)}>
+                              Editar
+                            </button>
+                            <button
+                              className="btn-danger"
+                              onClick={() => onDelete(task)}
+                              disabled={deletingTaskId === task.id || statusUpdatingTaskId === task.id}
+                            >
+                              {deletingTaskId === task.id ? 'Eliminando...' : 'Eliminar'}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {columnTasks.length === 0 && (
+                      <div className="kanban-empty">Sin tareas en esta columna</div>
+                    )}
+                  </div>
+                </article>
               );
             })}
-            {tasks.length === 0 && (
+          </div>
+        ) : (
+          <table className="table compact">
+            <thead>
               <tr>
-                <td colSpan="9" className="empty-row">Sin tareas</td>
+                <th>ID</th>
+                <th>Titulo</th>
+                <th>Local</th>
+                <th>Estado</th>
+                <th>Prioridad</th>
+                <th>Asignado</th>
+                <th>Vence</th>
+                <th>Programada</th>
+                <th>Acciones</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {tasks.map((task) => {
+                const location = locations.find((item) => item.id === task.location_id);
+                return (
+                  <tr key={task.id}>
+                    <td>{task.id}</td>
+                    <td>{task.title}</td>
+                    <td>{location?.name || '-'}</td>
+                    <td><span className={`badge ${task.status}`}>{task.status}</span></td>
+                    <td><span className={`badge ${task.priority}`}>{task.priority}</span></td>
+                    <td>{task.assigned_to || '-'}</td>
+                    <td>{task.due_date || '-'}</td>
+                    <td>{normalizeDatetimeInput(task.scheduled_for) || '-'}</td>
+                    <td>
+                      <div className="form-actions">
+                        <button className="btn-secondary" onClick={() => onEdit(task)}>
+                          Editar
+                        </button>
+                        <button
+                          className="btn-danger"
+                          onClick={() => onDelete(task)}
+                          disabled={deletingTaskId === task.id}
+                        >
+                          {deletingTaskId === task.id ? 'Eliminando...' : 'Eliminar'}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+              {tasks.length === 0 && (
+                <tr>
+                  <td colSpan="9" className="empty-row">Sin tareas</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        )}
       </section>
     </div>
   );
