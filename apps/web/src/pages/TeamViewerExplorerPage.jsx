@@ -182,8 +182,10 @@ function TeamViewerExplorerPage() {
 
   return (
     <div className="teamviewer-explorer-page">
-      <InlineError message={error} />
-      <InlineSuccess message={success} />
+      <div className="teamviewer-explorer-messages">
+        <InlineError message={error} />
+        <InlineSuccess message={success} />
+      </div>
 
       <section className="section-card">
         <div className="section-head">
