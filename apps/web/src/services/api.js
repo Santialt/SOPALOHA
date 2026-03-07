@@ -22,6 +22,19 @@ async function request(path, options = {}) {
   return data;
 }
 
+function buildQuery(params = {}) {
+  const query = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && String(value).trim() !== '') {
+      query.set(key, String(value));
+    }
+  }
+
+  const queryString = query.toString();
+  return queryString ? `?${queryString}` : '';
+}
+
 export const enums = {
   locationStatus: ['active', 'inactive'],
   deviceTypes: ['server', 'pos_terminal', 'fiscal_printer', 'kitchen_printer', 'pinpad', 'router', 'switch', 'other'],
@@ -29,7 +42,9 @@ export const enums = {
   incidentCategories: ['network', 'sql', 'aloha', 'printer', 'fiscal', 'hardware', 'other'],
   incidentStatus: ['open', 'closed'],
   taskPriority: ['low', 'medium', 'high', 'urgent'],
-  taskStatus: ['todo', 'in_progress', 'blocked', 'done']
+  taskStatus: ['todo', 'in_progress', 'blocked', 'done'],
+  operationalTaskPriority: ['low', 'medium', 'high', 'critical'],
+  operationalTaskStatus: ['pending', 'in_progress', 'blocked', 'done', 'cancelled']
 };
 
 export const api = {
@@ -59,6 +74,11 @@ export const api = {
   createWeeklyTask: (payload) => request('/weekly-tasks', { method: 'POST', body: JSON.stringify(payload) }),
   updateWeeklyTask: (id, payload) => request(`/weekly-tasks/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
   deleteWeeklyTask: (id) => request(`/weekly-tasks/${id}`, { method: 'DELETE' }),
+
+  getTasks: (filters = {}) => request(`/tasks${buildQuery(filters)}`),
+  getTaskById: (id) => request(`/tasks/${id}`),
+  createTask: (payload) => request('/tasks', { method: 'POST', body: JSON.stringify(payload) }),
+  updateTask: (id, payload) => request(`/tasks/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
 
   getLocationNotes: () => request('/location-notes'),
   createLocationNote: (payload) => request('/location-notes', { method: 'POST', body: JSON.stringify(payload) }),

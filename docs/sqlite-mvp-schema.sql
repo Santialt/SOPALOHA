@@ -201,6 +201,38 @@ CREATE TABLE IF NOT EXISTS weekly_tasks (
 );
 
 -- =========================================================
+-- TABLE: tasks
+-- Operational support tasks (base for future kanban/calendar views).
+-- =========================================================
+CREATE TABLE IF NOT EXISTS tasks (
+  id INTEGER PRIMARY KEY,
+  title TEXT NOT NULL,
+  description TEXT,
+  location_id INTEGER,
+  device_id INTEGER,
+  incident_id INTEGER,
+  status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'in_progress', 'blocked', 'done', 'cancelled')),
+  priority TEXT NOT NULL DEFAULT 'medium'
+    CHECK (priority IN ('low', 'medium', 'high', 'critical')),
+  assigned_to TEXT,
+  due_date TEXT,      -- YYYY-MM-DD
+  scheduled_for TEXT, -- YYYY-MM-DDTHH:MM
+  task_type TEXT NOT NULL DEFAULT 'general',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (location_id) REFERENCES locations(id)
+    ON UPDATE CASCADE
+    ON DELETE SET NULL,
+  FOREIGN KEY (device_id) REFERENCES devices(id)
+    ON UPDATE CASCADE
+    ON DELETE SET NULL,
+  FOREIGN KEY (incident_id) REFERENCES incidents(id)
+    ON UPDATE CASCADE
+    ON DELETE SET NULL
+);
+
+-- =========================================================
 -- TABLE: location_notes
 -- Quick technical notes per location.
 -- =========================================================
@@ -245,6 +277,13 @@ BEGIN
   UPDATE weekly_tasks SET updated_at = datetime('now') WHERE id = NEW.id;
 END;
 
+CREATE TRIGGER IF NOT EXISTS trg_tasks_updated_at
+AFTER UPDATE ON tasks
+FOR EACH ROW
+BEGIN
+  UPDATE tasks SET updated_at = datetime('now') WHERE id = NEW.id;
+END;
+
 -- =========================================================
 -- INDEXES: performance for operational queries.
 -- =========================================================
@@ -279,6 +318,12 @@ CREATE INDEX IF NOT EXISTS idx_tv_conn_matched_device ON teamviewer_connections(
 CREATE INDEX IF NOT EXISTS idx_weekly_tasks_status_due ON weekly_tasks(status, due_date);
 CREATE INDEX IF NOT EXISTS idx_weekly_tasks_location ON weekly_tasks(location_id);
 CREATE INDEX IF NOT EXISTS idx_weekly_tasks_priority ON weekly_tasks(priority);
+
+CREATE INDEX IF NOT EXISTS idx_tasks_status_priority ON tasks(status, priority);
+CREATE INDEX IF NOT EXISTS idx_tasks_location ON tasks(location_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date);
+CREATE INDEX IF NOT EXISTS idx_tasks_scheduled_for ON tasks(scheduled_for);
+CREATE INDEX IF NOT EXISTS idx_tasks_incident_id ON tasks(incident_id);
 
 CREATE INDEX IF NOT EXISTS idx_location_notes_location_created
   ON location_notes(location_id, created_at DESC);

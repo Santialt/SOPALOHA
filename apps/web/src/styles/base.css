@@ -521,7 +521,8 @@ button:disabled {
 
 .badge.inactive,
 .badge.closed,
-.badge.done {
+.badge.done,
+.badge.cancelled {
   background: var(--color-bg-secondary);
   border-color: var(--color-border);
   color: var(--color-text-muted);
@@ -544,10 +545,17 @@ button:disabled {
 
 .badge.high,
 .badge.blocked,
-.badge.duplicate {
+.badge.duplicate,
+.badge.critical {
   background: color-mix(in srgb, var(--color-danger) 17%, transparent);
   border-color: color-mix(in srgb, var(--color-danger) 42%, transparent);
   color: color-mix(in srgb, var(--color-danger) 86%, white 4%);
+}
+
+.badge.pending {
+  background: color-mix(in srgb, var(--color-primary) 17%, transparent);
+  border-color: color-mix(in srgb, var(--color-primary) 45%, transparent);
+  color: color-mix(in srgb, var(--color-primary) 85%, white 5%);
 }
 
 .badge.urgent {
