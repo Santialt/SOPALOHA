@@ -43,4 +43,33 @@ function deleteLocation(req, res, next) {
   }
 }
 
-module.exports = { getLocations, getLocationById, createLocation, updateLocation, deleteLocation };
+function getLocationIntegrations(req, res, next) {
+  try {
+    const integrations = service.listLocationIntegrations(Number(req.params.id));
+    res.json(integrations);
+  } catch (error) {
+    next(error);
+  }
+}
+
+function putLocationIntegrations(req, res, next) {
+  try {
+    const integrations = service.replaceLocationIntegrations(
+      Number(req.params.id),
+      req.body.integrations
+    );
+    res.json(integrations);
+  } catch (error) {
+    next(error);
+  }
+}
+
+module.exports = {
+  getLocations,
+  getLocationById,
+  createLocation,
+  updateLocation,
+  deleteLocation,
+  getLocationIntegrations,
+  putLocationIntegrations
+};

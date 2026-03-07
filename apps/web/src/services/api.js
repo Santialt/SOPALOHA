@@ -25,6 +25,7 @@ async function request(path, options = {}) {
 export const enums = {
   locationStatus: ['active', 'inactive'],
   deviceTypes: ['server', 'pos_terminal', 'fiscal_printer', 'kitchen_printer', 'pinpad', 'router', 'switch', 'other'],
+  deviceRoles: ['server', 'pos', 'kitchen_display', 'kitchen_printer', 'fiscal_printer', 'router', 'switch', 'other'],
   incidentCategories: ['network', 'sql', 'aloha', 'printer', 'fiscal', 'hardware', 'other'],
   incidentStatus: ['open', 'closed'],
   taskPriority: ['low', 'medium', 'high', 'urgent'],
@@ -36,6 +37,12 @@ export const api = {
   getLocationById: (id) => request(`/locations/${id}`),
   createLocation: (payload) => request('/locations', { method: 'POST', body: JSON.stringify(payload) }),
   updateLocation: (id, payload) => request(`/locations/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  getLocationIntegrations: (id) => request(`/locations/${id}/integrations`),
+  replaceLocationIntegrations: (id, integrations) =>
+    request(`/locations/${id}/integrations`, {
+      method: 'PUT',
+      body: JSON.stringify({ integrations })
+    }),
   deleteLocation: (id) => request(`/locations/${id}`, { method: 'DELETE' }),
 
   getDevices: () => request('/devices'),

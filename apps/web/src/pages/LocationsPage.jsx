@@ -9,6 +9,13 @@ import { api, enums } from '../services/api';
 const initialForm = {
   name: '',
   company_name: '',
+  razon_social: '',
+  cuit: '',
+  llave_aloha: '',
+  version_aloha: '',
+  version_modulo_fiscal: '',
+  usa_nbo: false,
+  network_notes: '',
   city: '',
   status: 'active',
   phone: ''
@@ -34,7 +41,16 @@ function LocationsPage() {
     if (!term) return locations;
 
     return locations.filter((location) => {
-      return [location.name, location.company_name, location.city, location.phone]
+      return [
+        location.name,
+        location.company_name,
+        location.razon_social,
+        location.cuit,
+        location.llave_aloha,
+        location.version_aloha,
+        location.city,
+        location.phone
+      ]
         .filter(Boolean)
         .join(' ')
         .toLowerCase()
@@ -75,6 +91,13 @@ function LocationsPage() {
     setForm({
       name: location.name || '',
       company_name: location.company_name || '',
+      razon_social: location.razon_social || '',
+      cuit: location.cuit || '',
+      llave_aloha: location.llave_aloha || '',
+      version_aloha: location.version_aloha || '',
+      version_modulo_fiscal: location.version_modulo_fiscal || '',
+      usa_nbo: Boolean(location.usa_nbo),
+      network_notes: location.network_notes || '',
       city: location.city || '',
       status: location.status || 'active',
       phone: location.phone || ''
@@ -115,7 +138,7 @@ function LocationsPage() {
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Buscar por nombre, empresa, ciudad o telefono"
+            placeholder="Buscar por nombre, CUIT, llave Aloha, ciudad o telefono"
             className="input"
           />
         </div>
@@ -129,6 +152,8 @@ function LocationsPage() {
               <th>ID</th>
               <th>Nombre</th>
               <th>Empresa</th>
+              <th>CUIT</th>
+              <th>Aloha</th>
               <th>Ciudad</th>
               <th>Estado</th>
               <th>Acciones</th>
@@ -140,6 +165,8 @@ function LocationsPage() {
                 <td>{location.id}</td>
                 <td>{location.name}</td>
                 <td>{location.company_name || '-'}</td>
+                <td>{location.cuit || '-'}</td>
+                <td>{location.version_aloha || '-'}</td>
                 <td>{location.city || '-'}</td>
                 <td><span className={`badge ${location.status}`}>{location.status}</span></td>
                 <td>
@@ -160,7 +187,7 @@ function LocationsPage() {
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan="6" className="empty-row">Sin resultados</td>
+                <td colSpan="8" className="empty-row">Sin resultados</td>
               </tr>
             )}
           </tbody>
@@ -191,6 +218,51 @@ function LocationsPage() {
           </label>
 
           <label>
+            Razon social
+            <input
+              className="input"
+              value={form.razon_social}
+              onChange={(event) => setForm({ ...form, razon_social: event.target.value })}
+            />
+          </label>
+
+          <label>
+            CUIT
+            <input
+              className="input"
+              value={form.cuit}
+              onChange={(event) => setForm({ ...form, cuit: event.target.value })}
+            />
+          </label>
+
+          <label>
+            Llave Aloha
+            <input
+              className="input"
+              value={form.llave_aloha}
+              onChange={(event) => setForm({ ...form, llave_aloha: event.target.value })}
+            />
+          </label>
+
+          <label>
+            Version Aloha
+            <input
+              className="input"
+              value={form.version_aloha}
+              onChange={(event) => setForm({ ...form, version_aloha: event.target.value })}
+            />
+          </label>
+
+          <label>
+            Version modulo fiscal
+            <input
+              className="input"
+              value={form.version_modulo_fiscal}
+              onChange={(event) => setForm({ ...form, version_modulo_fiscal: event.target.value })}
+            />
+          </label>
+
+          <label>
             Ciudad
             <input
               className="input"
@@ -209,6 +281,15 @@ function LocationsPage() {
           </label>
 
           <label>
+            <span>Usa NBO</span>
+            <input
+              type="checkbox"
+              checked={form.usa_nbo}
+              onChange={(event) => setForm({ ...form, usa_nbo: event.target.checked })}
+            />
+          </label>
+
+          <label>
             Estado
             <select
               className="input"
@@ -219,6 +300,16 @@ function LocationsPage() {
                 <option key={status} value={status}>{status}</option>
               ))}
             </select>
+          </label>
+
+          <label className="full-row">
+            Notas de red
+            <textarea
+              className="input"
+              rows="3"
+              value={form.network_notes}
+              onChange={(event) => setForm({ ...form, network_notes: event.target.value })}
+            />
           </label>
 
           <div className="form-actions">

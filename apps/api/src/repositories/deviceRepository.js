@@ -11,19 +11,24 @@ function findById(id) {
 function create(payload) {
   const stmt = db.prepare(`
     INSERT INTO devices (
-      location_id, name, type, ip_address, teamviewer_id, username, password,
-      operating_system, sql_version, sql_instance, aloha_path, brand, model, notes
+      location_id, name, type, device_role, ip_address, teamviewer_id, windows_version, ram_gb, cpu,
+      disk_type, username, password, operating_system, sql_version, sql_instance, aloha_path, brand, model, notes
     ) VALUES (
-      @location_id, @name, @type, @ip_address, @teamviewer_id, @username, @password,
-      @operating_system, @sql_version, @sql_instance, @aloha_path, @brand, @model, @notes
+      @location_id, @name, @type, @device_role, @ip_address, @teamviewer_id, @windows_version, @ram_gb, @cpu,
+      @disk_type, @username, @password, @operating_system, @sql_version, @sql_instance, @aloha_path, @brand, @model, @notes
     )
   `);
   const result = stmt.run({
     location_id: payload.location_id,
     name: payload.name,
     type: payload.type,
+    device_role: payload.device_role || 'other',
     ip_address: payload.ip_address || null,
     teamviewer_id: payload.teamviewer_id || null,
+    windows_version: payload.windows_version || null,
+    ram_gb: payload.ram_gb ?? null,
+    cpu: payload.cpu || null,
+    disk_type: payload.disk_type || null,
     username: payload.username || null,
     password: payload.password || null,
     operating_system: payload.operating_system || null,
@@ -44,8 +49,13 @@ function update(id, payload) {
       location_id = @location_id,
       name = @name,
       type = @type,
+      device_role = @device_role,
       ip_address = @ip_address,
       teamviewer_id = @teamviewer_id,
+      windows_version = @windows_version,
+      ram_gb = @ram_gb,
+      cpu = @cpu,
+      disk_type = @disk_type,
       username = @username,
       password = @password,
       operating_system = @operating_system,
@@ -63,8 +73,13 @@ function update(id, payload) {
     location_id: payload.location_id,
     name: payload.name,
     type: payload.type,
+    device_role: payload.device_role || 'other',
     ip_address: payload.ip_address || null,
     teamviewer_id: payload.teamviewer_id || null,
+    windows_version: payload.windows_version || null,
+    ram_gb: payload.ram_gb ?? null,
+    cpu: payload.cpu || null,
+    disk_type: payload.disk_type || null,
     username: payload.username || null,
     password: payload.password || null,
     operating_system: payload.operating_system || null,

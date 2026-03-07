@@ -15,10 +15,23 @@ const deviceTypeValues = [
   'other'
 ];
 
+const deviceRoleValues = [
+  'server',
+  'pos',
+  'kitchen_display',
+  'kitchen_printer',
+  'fiscal_printer',
+  'router',
+  'switch',
+  'other'
+];
+
 const deviceRules = [
   { field: 'location_id', required: true, type: 'integer' },
   { field: 'name', required: true },
-  { field: 'type', required: true, allowedValues: deviceTypeValues }
+  { field: 'type', allowedValues: deviceTypeValues },
+  { field: 'device_role', allowedValues: deviceRoleValues },
+  { field: 'ram_gb', type: 'number' }
 ];
 
 router.get('/', controller.getDevices);

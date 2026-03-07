@@ -6,15 +6,78 @@ import LoadingBlock from '../components/LoadingBlock';
 import { useDataLoader } from '../hooks/useDataLoader';
 import { api, enums } from '../services/api';
 
+const defaultLocationForm = {
+  name: '',
+  company_name: '',
+  razon_social: '',
+  cuit: '',
+  llave_aloha: '',
+  version_aloha: '',
+  version_modulo_fiscal: '',
+  usa_nbo: false,
+  network_notes: '',
+  address: '',
+  city: '',
+  province: '',
+  phone: '',
+  main_contact: '',
+  status: 'active',
+  notes: ''
+};
+
+const defaultDeviceForm = {
+  name: '',
+  device_role: 'pos',
+  ip_address: '',
+  teamviewer_id: '',
+  windows_version: '',
+  ram_gb: '',
+  cpu: '',
+  disk_type: '',
+  notes: ''
+};
+
+const suggestedIntegrations = ['mercado_pago', 'bancard', 'pedidos_ya', 'rappi', 'modo'];
+
+function mapLocationToForm(location) {
+  return {
+    ...defaultLocationForm,
+    ...location,
+    usa_nbo: Boolean(location.usa_nbo)
+  };
+}
+
+function mapDeviceToForm(device) {
+  return {
+    ...defaultDeviceForm,
+    name: device.name || '',
+    device_role: device.device_role || 'other',
+    ip_address: device.ip_address || '',
+    teamviewer_id: device.teamviewer_id || '',
+    windows_version: device.windows_version || '',
+    ram_gb: device.ram_gb ?? '',
+    cpu: device.cpu || '',
+    disk_type: device.disk_type || '',
+    notes: device.notes || ''
+  };
+}
+
 function LocationDetailPage() {
   const { id } = useParams();
+  const numericLocationId = Number(id);
+
   const [location, setLocation] = useState(null);
+  const [locationForm, setLocationForm] = useState(defaultLocationForm);
+  const [savingLocation, setSavingLocation] = useState(false);
   const [devices, setDevices] = useState([]);
   const [incidents, setIncidents] = useState([]);
   const [notes, setNotes] = useState([]);
   const [tasks, setTasks] = useState([]);
+  const [integrations, setIntegrations] = useState([]);
+  const [customIntegration, setCustomIntegration] = useState('');
+  const [savingIntegrations, setSavingIntegrations] = useState(false);
 
-  const [deviceForm, setDeviceForm] = useState({ name: '', type: 'pos_terminal' });
+  const [deviceForm, setDeviceForm] = useState(defaultDeviceForm);
   const [editingDeviceId, setEditingDeviceId] = useState(null);
   const [noteText, setNoteText] = useState('');
   const [savingDevice, setSavingDevice] = useState(false);
@@ -24,23 +87,80 @@ function LocationDetailPage() {
   const [success, setSuccess] = useState('');
 
   const { load, loading, error, setError } = useDataLoader(async () => {
-    const [locationData, allDevices, allIncidents, allNotes, allTasks] = await Promise.all([
-      api.getLocationById(id),
-      api.getDevices(),
-      api.getIncidents(),
-      api.getLocationNotes(),
-      api.getWeeklyTasks()
-    ]);
+    const [locationData, allDevices, allIncidents, allNotes, allTasks, locationIntegrations] =
+      await Promise.all([
+        api.getLocationById(id),
+        api.getDevices(),
+        api.getIncidents(),
+        api.getLocationNotes(),
+        api.getWeeklyTasks(),
+        api.getLocationIntegrations(id)
+      ]);
 
-    const numericId = Number(id);
     setLocation(locationData);
-    setDevices(allDevices.filter((item) => item.location_id === numericId));
-    setIncidents(allIncidents.filter((item) => item.location_id === numericId));
-    setNotes(allNotes.filter((item) => item.location_id === numericId));
-    setTasks(allTasks.filter((item) => item.location_id === numericId));
-  }, [id]);
+    setLocationForm(mapLocationToForm(locationData));
+    setDevices(allDevices.filter((item) => item.location_id === numericLocationId));
+    setIncidents(allIncidents.filter((item) => item.location_id === numericLocationId));
+    setNotes(allNotes.filter((item) => item.location_id === numericLocationId));
+    setTasks(allTasks.filter((item) => item.location_id === numericLocationId));
+    setIntegrations(locationIntegrations.map((item) => item.integration_name));
+  }, [id, numericLocationId]);
 
   const lastIncidents = useMemo(() => incidents.slice(0, 8), [incidents]);
+
+  const onSaveLocation = async (event) => {
+    event.preventDefault();
+    setSavingLocation(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const updated = await api.updateLocation(id, locationForm);
+      setLocation(updated);
+      setLocationForm(mapLocationToForm(updated));
+      setSuccess('Ficha tecnica actualizada.');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSavingLocation(false);
+    }
+  };
+
+  const onSaveIntegrations = async () => {
+    setSavingIntegrations(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const updated = await api.replaceLocationIntegrations(id, integrations);
+      setIntegrations(updated.map((item) => item.integration_name));
+      setSuccess('Integraciones actualizadas.');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSavingIntegrations(false);
+    }
+  };
+
+  const onAddIntegration = () => {
+    const value = customIntegration.trim();
+    if (!value) return;
+    if (integrations.includes(value)) return;
+    setIntegrations([...integrations, value]);
+    setCustomIntegration('');
+  };
+
+  const onToggleSuggestedIntegration = (integrationName) => {
+    if (integrations.includes(integrationName)) {
+      setIntegrations(integrations.filter((item) => item !== integrationName));
+    } else {
+      setIntegrations([...integrations, integrationName]);
+    }
+  };
+
+  const onRemoveIntegration = (integrationName) => {
+    setIntegrations(integrations.filter((item) => item !== integrationName));
+  };
 
   const onCreateOrUpdateDevice = async (event) => {
     event.preventDefault();
@@ -49,25 +169,21 @@ function LocationDetailPage() {
     setSuccess('');
 
     try {
+      const payload = {
+        location_id: numericLocationId,
+        ...deviceForm
+      };
+
       if (editingDeviceId) {
         const current = devices.find((item) => item.id === editingDeviceId);
-        await api.updateDevice(editingDeviceId, {
-          ...current,
-          name: deviceForm.name,
-          type: deviceForm.type,
-          location_id: Number(id)
-        });
+        await api.updateDevice(editingDeviceId, { ...current, ...payload });
         setSuccess(`Dispositivo #${editingDeviceId} actualizado.`);
       } else {
-        await api.createDevice({
-          location_id: Number(id),
-          name: deviceForm.name,
-          type: deviceForm.type
-        });
+        await api.createDevice(payload);
         setSuccess('Dispositivo agregado.');
       }
 
-      setDeviceForm({ name: '', type: 'pos_terminal' });
+      setDeviceForm(defaultDeviceForm);
       setEditingDeviceId(null);
       await load();
     } catch (err) {
@@ -80,10 +196,7 @@ function LocationDetailPage() {
   const onEditDevice = (device) => {
     setSuccess('');
     setEditingDeviceId(device.id);
-    setDeviceForm({
-      name: device.name || '',
-      type: device.type || 'pos_terminal'
-    });
+    setDeviceForm(mapDeviceToForm(device));
   };
 
   const onDeleteDevice = async (device) => {
@@ -99,7 +212,7 @@ function LocationDetailPage() {
       setSuccess(`Dispositivo #${device.id} eliminado.`);
       if (editingDeviceId === device.id) {
         setEditingDeviceId(null);
-        setDeviceForm({ name: '', type: 'pos_terminal' });
+        setDeviceForm(defaultDeviceForm);
       }
       await load();
     } catch (err) {
@@ -116,7 +229,7 @@ function LocationDetailPage() {
     setSuccess('');
 
     try {
-      await api.createLocationNote({ location_id: Number(id), note: noteText });
+      await api.createLocationNote({ location_id: numericLocationId, note: noteText });
       setNoteText('');
       setSuccess('Nota creada.');
       await load();
@@ -158,30 +271,206 @@ function LocationDetailPage() {
       <InlineSuccess message={success} />
 
       <section className="section-card full-width">
-        <h2>{location.name}</h2>
-        <div className="key-value-grid">
-          <div><strong>ID:</strong> {location.id}</div>
-          <div><strong>Empresa:</strong> {location.company_name || '-'}</div>
-          <div><strong>Ciudad:</strong> {location.city || '-'}</div>
-          <div><strong>Provincia:</strong> {location.province || '-'}</div>
-          <div><strong>Telefono:</strong> {location.phone || '-'}</div>
-          <div><strong>Contacto:</strong> {location.main_contact || '-'}</div>
-          <div><strong>Estado:</strong> {location.status}</div>
+        <h2>Ficha tecnica: {location.name}</h2>
+        <form onSubmit={onSaveLocation} className="form-grid form-grid-3">
+          <label>
+            Nombre *
+            <input
+              className="input"
+              value={locationForm.name}
+              onChange={(event) => setLocationForm({ ...locationForm, name: event.target.value })}
+              required
+            />
+          </label>
+          <label>
+            Empresa
+            <input
+              className="input"
+              value={locationForm.company_name || ''}
+              onChange={(event) => setLocationForm({ ...locationForm, company_name: event.target.value })}
+            />
+          </label>
+          <label>
+            Razon social
+            <input
+              className="input"
+              value={locationForm.razon_social || ''}
+              onChange={(event) => setLocationForm({ ...locationForm, razon_social: event.target.value })}
+            />
+          </label>
+          <label>
+            CUIT
+            <input
+              className="input"
+              value={locationForm.cuit || ''}
+              onChange={(event) => setLocationForm({ ...locationForm, cuit: event.target.value })}
+            />
+          </label>
+          <label>
+            Llave Aloha
+            <input
+              className="input"
+              value={locationForm.llave_aloha || ''}
+              onChange={(event) => setLocationForm({ ...locationForm, llave_aloha: event.target.value })}
+            />
+          </label>
+          <label>
+            Version Aloha
+            <input
+              className="input"
+              value={locationForm.version_aloha || ''}
+              onChange={(event) => setLocationForm({ ...locationForm, version_aloha: event.target.value })}
+            />
+          </label>
+          <label>
+            Version modulo fiscal
+            <input
+              className="input"
+              value={locationForm.version_modulo_fiscal || ''}
+              onChange={(event) =>
+                setLocationForm({ ...locationForm, version_modulo_fiscal: event.target.value })
+              }
+            />
+          </label>
+          <label>
+            Ciudad
+            <input
+              className="input"
+              value={locationForm.city || ''}
+              onChange={(event) => setLocationForm({ ...locationForm, city: event.target.value })}
+            />
+          </label>
+          <label>
+            Provincia
+            <input
+              className="input"
+              value={locationForm.province || ''}
+              onChange={(event) => setLocationForm({ ...locationForm, province: event.target.value })}
+            />
+          </label>
+          <label>
+            Telefono
+            <input
+              className="input"
+              value={locationForm.phone || ''}
+              onChange={(event) => setLocationForm({ ...locationForm, phone: event.target.value })}
+            />
+          </label>
+          <label>
+            Contacto principal
+            <input
+              className="input"
+              value={locationForm.main_contact || ''}
+              onChange={(event) => setLocationForm({ ...locationForm, main_contact: event.target.value })}
+            />
+          </label>
+          <label>
+            Estado
+            <select
+              className="input"
+              value={locationForm.status || 'active'}
+              onChange={(event) => setLocationForm({ ...locationForm, status: event.target.value })}
+            >
+              {enums.locationStatus.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Usa NBO</span>
+            <input
+              type="checkbox"
+              checked={Boolean(locationForm.usa_nbo)}
+              onChange={(event) => setLocationForm({ ...locationForm, usa_nbo: event.target.checked })}
+            />
+          </label>
+          <label className="full-row">
+            Notas de red
+            <textarea
+              className="input"
+              rows="3"
+              value={locationForm.network_notes || ''}
+              onChange={(event) => setLocationForm({ ...locationForm, network_notes: event.target.value })}
+            />
+          </label>
+          <label className="full-row">
+            Notas generales
+            <textarea
+              className="input"
+              rows="2"
+              value={locationForm.notes || ''}
+              onChange={(event) => setLocationForm({ ...locationForm, notes: event.target.value })}
+            />
+          </label>
+          <div className="form-actions">
+            <button className="btn-primary" type="submit" disabled={savingLocation}>
+              {savingLocation ? 'Guardando...' : 'Guardar ficha tecnica'}
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section className="section-card">
+        <h3>Integraciones ({integrations.length})</h3>
+        <div className="quick-links">
+          {suggestedIntegrations.map((integrationName) => (
+            <button
+              type="button"
+              key={integrationName}
+              className={integrations.includes(integrationName) ? 'btn-primary' : 'btn-secondary'}
+              onClick={() => onToggleSuggestedIntegration(integrationName)}
+            >
+              {integrationName}
+            </button>
+          ))}
+        </div>
+
+        <div className="inline-form">
+          <input
+            className="input"
+            value={customIntegration}
+            onChange={(event) => setCustomIntegration(event.target.value)}
+            placeholder="Nueva integracion"
+          />
+          <button type="button" className="btn-secondary" onClick={onAddIntegration}>
+            Agregar
+          </button>
+          <button type="button" className="btn-primary" onClick={onSaveIntegrations} disabled={savingIntegrations}>
+            {savingIntegrations ? 'Guardando...' : 'Guardar'}
+          </button>
+        </div>
+
+        <div className="chip-list">
+          {integrations.map((integrationName) => (
+            <span key={integrationName} className="chip">
+              {integrationName}
+              <button type="button" className="chip-remove" onClick={() => onRemoveIntegration(integrationName)}>
+                x
+              </button>
+            </span>
+          ))}
+          {integrations.length === 0 && <small>Sin integraciones cargadas.</small>}
         </div>
       </section>
 
       <section className="section-card">
         <div className="section-head wrap">
           <h3>Dispositivos ({devices.length})</h3>
-          <Link to="/incidents" className="btn-link">Crear incidente</Link>
+          <Link to="/incidents" className="btn-link">
+            Crear incidente
+          </Link>
         </div>
         <table className="table compact">
           <thead>
             <tr>
               <th>ID</th>
               <th>Nombre</th>
-              <th>Tipo</th>
+              <th>Rol</th>
               <th>IP</th>
+              <th>TeamViewer</th>
+              <th>Windows</th>
               <th>Acciones</th>
             </tr>
           </thead>
@@ -190,11 +479,15 @@ function LocationDetailPage() {
               <tr key={device.id}>
                 <td>{device.id}</td>
                 <td>{device.name}</td>
-                <td>{device.type}</td>
+                <td>{device.device_role || '-'}</td>
                 <td>{device.ip_address || '-'}</td>
+                <td>{device.teamviewer_id || '-'}</td>
+                <td>{device.windows_version || '-'}</td>
                 <td>
                   <div className="form-actions">
-                    <button className="btn-small" onClick={() => onEditDevice(device)}>Editar</button>
+                    <button className="btn-small" onClick={() => onEditDevice(device)}>
+                      Editar
+                    </button>
                     <button
                       className="btn-danger"
                       onClick={() => onDeleteDevice(device)}
@@ -206,42 +499,117 @@ function LocationDetailPage() {
                 </td>
               </tr>
             ))}
-            {devices.length === 0 && <tr><td colSpan="5" className="empty-row">Sin dispositivos</td></tr>}
+            {devices.length === 0 && (
+              <tr>
+                <td colSpan="7" className="empty-row">
+                  Sin dispositivos
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
 
-        <form onSubmit={onCreateOrUpdateDevice} className="inline-form">
-          <input
-            className="input"
-            value={deviceForm.name}
-            onChange={(event) => setDeviceForm({ ...deviceForm, name: event.target.value })}
-            placeholder="Nombre de dispositivo"
-            required
-          />
-          <select
-            className="input"
-            value={deviceForm.type}
-            onChange={(event) => setDeviceForm({ ...deviceForm, type: event.target.value })}
-          >
-            {enums.deviceTypes.map((type) => (
-              <option key={type} value={type}>{type}</option>
-            ))}
-          </select>
-          <button className="btn-primary" type="submit" disabled={savingDevice}>
-            {savingDevice ? 'Guardando...' : editingDeviceId ? 'Actualizar' : 'Agregar'}
-          </button>
-          {editingDeviceId && (
-            <button
-              className="btn-secondary"
-              type="button"
-              onClick={() => {
-                setEditingDeviceId(null);
-                setDeviceForm({ name: '', type: 'pos_terminal' });
-              }}
+        <form onSubmit={onCreateOrUpdateDevice} className="form-grid form-grid-3">
+          <label>
+            Nombre *
+            <input
+              className="input"
+              value={deviceForm.name}
+              onChange={(event) => setDeviceForm({ ...deviceForm, name: event.target.value })}
+              required
+            />
+          </label>
+          <label>
+            Rol
+            <select
+              className="input"
+              value={deviceForm.device_role}
+              onChange={(event) => setDeviceForm({ ...deviceForm, device_role: event.target.value })}
             >
-              Cancelar
+              {enums.deviceRoles.map((role) => (
+                <option key={role} value={role}>
+                  {role}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            IP
+            <input
+              className="input"
+              value={deviceForm.ip_address}
+              onChange={(event) => setDeviceForm({ ...deviceForm, ip_address: event.target.value })}
+            />
+          </label>
+          <label>
+            TeamViewer ID
+            <input
+              className="input"
+              value={deviceForm.teamviewer_id}
+              onChange={(event) => setDeviceForm({ ...deviceForm, teamviewer_id: event.target.value })}
+            />
+          </label>
+          <label>
+            Version Windows
+            <input
+              className="input"
+              value={deviceForm.windows_version}
+              onChange={(event) => setDeviceForm({ ...deviceForm, windows_version: event.target.value })}
+            />
+          </label>
+          <label>
+            RAM (GB)
+            <input
+              className="input"
+              type="number"
+              min="0"
+              step="0.5"
+              value={deviceForm.ram_gb}
+              onChange={(event) => setDeviceForm({ ...deviceForm, ram_gb: event.target.value })}
+            />
+          </label>
+          <label>
+            CPU
+            <input
+              className="input"
+              value={deviceForm.cpu}
+              onChange={(event) => setDeviceForm({ ...deviceForm, cpu: event.target.value })}
+            />
+          </label>
+          <label>
+            Tipo de disco
+            <input
+              className="input"
+              value={deviceForm.disk_type}
+              onChange={(event) => setDeviceForm({ ...deviceForm, disk_type: event.target.value })}
+            />
+          </label>
+          <label className="full-row">
+            Notas
+            <textarea
+              className="input"
+              rows="2"
+              value={deviceForm.notes}
+              onChange={(event) => setDeviceForm({ ...deviceForm, notes: event.target.value })}
+            />
+          </label>
+          <div className="form-actions">
+            <button className="btn-primary" type="submit" disabled={savingDevice}>
+              {savingDevice ? 'Guardando...' : editingDeviceId ? 'Actualizar' : 'Agregar'}
             </button>
-          )}
+            {editingDeviceId && (
+              <button
+                className="btn-secondary"
+                type="button"
+                onClick={() => {
+                  setEditingDeviceId(null);
+                  setDeviceForm(defaultDeviceForm);
+                }}
+              >
+                Cancelar
+              </button>
+            )}
+          </div>
         </form>
       </section>
 
@@ -265,7 +633,13 @@ function LocationDetailPage() {
                 <td>{incident.category}</td>
               </tr>
             ))}
-            {incidents.length === 0 && <tr><td colSpan="4" className="empty-row">Sin incidentes</td></tr>}
+            {incidents.length === 0 && (
+              <tr>
+                <td colSpan="4" className="empty-row">
+                  Sin incidentes
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </section>
@@ -322,12 +696,20 @@ function LocationDetailPage() {
               <tr key={task.id}>
                 <td>{task.id}</td>
                 <td>{task.title}</td>
-                <td><span className={`badge ${task.priority}`}>{task.priority}</span></td>
+                <td>
+                  <span className={`badge ${task.priority}`}>{task.priority}</span>
+                </td>
                 <td>{task.status}</td>
                 <td>{task.due_date || '-'}</td>
               </tr>
             ))}
-            {tasks.length === 0 && <tr><td colSpan="5" className="empty-row">Sin tareas</td></tr>}
+            {tasks.length === 0 && (
+              <tr>
+                <td colSpan="5" className="empty-row">
+                  Sin tareas
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </section>

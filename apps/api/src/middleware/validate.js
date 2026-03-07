@@ -21,6 +21,29 @@ function validateBody(rules) {
         continue;
       }
 
+      if (!isBlank(value) && rule.type === 'number' && Number.isNaN(Number(value))) {
+        errors.push(`Field '${rule.field}' must be a number`);
+        continue;
+      }
+
+      if (!isBlank(value) && rule.type === 'boolean') {
+        const normalized = String(value).toLowerCase();
+        const isBooleanLike =
+          value === true ||
+          value === false ||
+          value === 1 ||
+          value === 0 ||
+          normalized === 'true' ||
+          normalized === 'false' ||
+          normalized === '1' ||
+          normalized === '0';
+
+        if (!isBooleanLike) {
+          errors.push(`Field '${rule.field}' must be a boolean`);
+          continue;
+        }
+      }
+
       if (!isBlank(value) && rule.pattern && !rule.pattern.test(String(value))) {
         const expected = rule.patternDescription ? ` Expected: ${rule.patternDescription}` : '';
         errors.push(`Field '${rule.field}' has invalid format.${expected}`);

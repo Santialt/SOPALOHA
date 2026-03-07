@@ -192,6 +192,10 @@ h1, h2, h3 {
   gap: 10px;
 }
 
+.form-grid-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .form-grid .full-row {
   grid-column: 1 / -1;
 }
@@ -279,6 +283,33 @@ button:disabled {
   gap: 8px;
   flex-wrap: wrap;
   margin-top: 10px;
+}
+
+.chip-list {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.chip-remove {
+  border: 0;
+  background: transparent;
+  color: #991b1b;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
 }
 
 .badge {
@@ -403,6 +434,10 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
+  .form-grid-3 {
+    grid-template-columns: 1fr 1fr;
+  }
+
   .key-value-grid {
     grid-template-columns: 1fr 1fr;
   }
@@ -423,6 +458,10 @@ button:disabled {
   }
 
   .card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-grid-3 {
     grid-template-columns: 1fr;
   }
 

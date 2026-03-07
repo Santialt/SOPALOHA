@@ -8,6 +8,13 @@ CREATE TABLE IF NOT EXISTS locations (
   id INTEGER PRIMARY KEY,
   name TEXT NOT NULL,
   company_name TEXT,
+  razon_social TEXT,
+  cuit TEXT,
+  llave_aloha TEXT,
+  version_aloha TEXT,
+  version_modulo_fiscal TEXT,
+  usa_nbo INTEGER NOT NULL DEFAULT 0 CHECK (usa_nbo IN (0, 1)),
+  network_notes TEXT,
   address TEXT,
   city TEXT,
   province TEXT,
@@ -42,6 +49,22 @@ CREATE TABLE IF NOT EXISTS devices (
   ),
   ip_address TEXT,
   teamviewer_id TEXT,
+  windows_version TEXT,
+  ram_gb REAL,
+  cpu TEXT,
+  disk_type TEXT,
+  device_role TEXT NOT NULL DEFAULT 'other' CHECK (
+    device_role IN (
+      'server',
+      'pos',
+      'kitchen_display',
+      'kitchen_printer',
+      'fiscal_printer',
+      'router',
+      'switch',
+      'other'
+    )
+  ),
   username TEXT,
   password TEXT,
   operating_system TEXT,
@@ -58,6 +81,22 @@ CREATE TABLE IF NOT EXISTS devices (
     ON DELETE CASCADE,
   CHECK (ip_address IS NULL OR length(trim(ip_address)) > 0),
   CHECK (teamviewer_id IS NULL OR length(trim(teamviewer_id)) > 0)
+);
+
+-- =========================================================
+-- TABLE: location_integrations
+-- Flexible integrations enabled per location.
+-- =========================================================
+CREATE TABLE IF NOT EXISTS location_integrations (
+  id INTEGER PRIMARY KEY,
+  location_id INTEGER NOT NULL,
+  integration_name TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (location_id) REFERENCES locations(id)
+    ON UPDATE CASCADE
+    ON DELETE CASCADE,
+  CHECK (length(trim(integration_name)) > 0),
+  UNIQUE (location_id, integration_name)
 );
 
 -- =========================================================
@@ -217,6 +256,9 @@ CREATE INDEX IF NOT EXISTS idx_devices_location_id ON devices(location_id);
 CREATE INDEX IF NOT EXISTS idx_devices_type ON devices(type);
 CREATE INDEX IF NOT EXISTS idx_devices_teamviewer_id ON devices(teamviewer_id);
 CREATE INDEX IF NOT EXISTS idx_devices_name_lower ON devices(lower(name));
+
+CREATE INDEX IF NOT EXISTS idx_location_integrations_location_id
+  ON location_integrations(location_id);
 
 CREATE INDEX IF NOT EXISTS idx_device_aliases_device_id ON device_aliases(device_id);
 CREATE INDEX IF NOT EXISTS idx_device_aliases_norm_alias ON device_aliases(normalized_alias);
