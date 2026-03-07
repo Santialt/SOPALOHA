@@ -44,13 +44,16 @@ function DashboardPage() {
       <InlineError message={error} />
 
       <div className="card-grid">
-        <StatCard label="Locales" value={stats.locations} />
-        <StatCard label="Incidentes" value={stats.incidents} />
-        <StatCard label="Tareas Semanales" value={stats.tasks} />
+        <StatCard label="Locales" value={stats.locations} tone="primary" />
+        <StatCard label="Incidentes" value={stats.incidents} tone="warning" />
+        <StatCard label="Tareas Semanales" value={stats.tasks} tone="neutral" />
       </div>
 
       <section className="section-card">
-        <h2>Accesos rapidos</h2>
+        <div className="section-head">
+          <h2>Accesos rapidos</h2>
+          <small className="panel-caption">Flujos operativos frecuentes</small>
+        </div>
         <div className="quick-links">
           <Link to="/locations" className="btn-link">Ver locales</Link>
           <Link to="/incidents" className="btn-link">Gestionar incidentes</Link>

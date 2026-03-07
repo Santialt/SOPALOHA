@@ -1,4 +1,6 @@
+import { useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { applyTheme, getPreferredTheme } from '../theme';
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard' },
@@ -30,11 +32,19 @@ function resolveTitle(pathname) {
 
 function AppShell() {
   const { pathname } = useLocation();
+  const [theme, setTheme] = useState(() => getPreferredTheme());
+  const headerTitle = useMemo(() => resolveTitle(pathname), [pathname]);
+
+  const onToggleTheme = () => {
+    const nextTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(applyTheme(nextTheme));
+  };
 
   return (
     <div className="app-shell">
       <aside className="sidebar">
         <div className="sidebar-brand">SOPALOHA</div>
+        <div className="sidebar-subtitle">OPS Console / Aloha POS</div>
         <nav className="sidebar-nav">
           {navItems.map((item) => (
             <NavLink
@@ -50,8 +60,13 @@ function AppShell() {
 
       <main className="main-content">
         <header className="main-header">
-          <h1>{resolveTitle(pathname)}</h1>
-          <div className="header-subtitle">Mesa interna de soporte POS / Aloha</div>
+          <div>
+            <h1>{headerTitle}</h1>
+            <div className="header-subtitle">Mesa interna de soporte POS / Aloha</div>
+          </div>
+          <button type="button" className="theme-toggle" onClick={onToggleTheme}>
+            Tema: {theme === 'dark' ? 'Oscuro' : 'Claro'}
+          </button>
         </header>
 
         <section className="page-body">
