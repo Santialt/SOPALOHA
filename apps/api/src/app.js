@@ -11,6 +11,8 @@ const teamviewerConnectionRoutes = require('./routes/teamviewerConnectionRoutes'
 const teamviewerRoutes = require('./routes/teamviewerRoutes');
 const supportActionRoutes = require('./routes/supportActionRoutes');
 const onCallShiftRoutes = require('./routes/onCallShiftRoutes');
+const onCallTemplateRoutes = require('./routes/onCallTemplateRoutes');
+const onCallTechnicianRoutes = require('./routes/onCallTechnicianRoutes');
 const { notFound } = require('./middleware/notFound');
 const { errorHandler } = require('./middleware/errorHandler');
 
@@ -41,6 +43,8 @@ app.use('/teamviewer-connections', teamviewerConnectionRoutes);
 app.use('/teamviewer', teamviewerRoutes);
 app.use('/support-actions', supportActionRoutes);
 app.use('/on-call-shifts', onCallShiftRoutes);
+app.use('/on-call-templates', onCallTemplateRoutes);
+app.use('/on-call-technicians', onCallTechnicianRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

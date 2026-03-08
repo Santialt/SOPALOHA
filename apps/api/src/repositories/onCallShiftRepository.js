@@ -73,4 +73,9 @@ function update(id, payload) {
   return findById(id);
 }
 
-module.exports = { findAll, findById, create, update };
+function remove(id) {
+  const result = db.prepare('DELETE FROM on_call_shifts WHERE id = ?').run(id);
+  return result.changes > 0;
+}
+
+module.exports = { findAll, findById, create, update, remove };

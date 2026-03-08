@@ -249,6 +249,34 @@ CREATE TABLE IF NOT EXISTS on_call_shifts (
 );
 
 -- =========================================================
+-- TABLE: on_call_templates
+-- Reusable shift templates (AM/Office/PM/custom).
+-- =========================================================
+CREATE TABLE IF NOT EXISTS on_call_templates (
+  id INTEGER PRIMARY KEY,
+  title TEXT NOT NULL,
+  start_time TEXT NOT NULL, -- HH:MM
+  end_time TEXT NOT NULL,   -- HH:MM
+  crosses_to_next_day INTEGER NOT NULL DEFAULT 0 CHECK (crosses_to_next_day IN (0, 1)),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- =========================================================
+-- TABLE: on_call_technicians
+-- Predefined technicians for shift assignment.
+-- =========================================================
+CREATE TABLE IF NOT EXISTS on_call_technicians (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL,
+  is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+  notes TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (name)
+);
+
+-- =========================================================
 -- TABLE: location_notes
 -- Quick technical notes per location.
 -- =========================================================
@@ -307,6 +335,20 @@ BEGIN
   UPDATE on_call_shifts SET updated_at = datetime('now') WHERE id = NEW.id;
 END;
 
+CREATE TRIGGER IF NOT EXISTS trg_on_call_templates_updated_at
+AFTER UPDATE ON on_call_templates
+FOR EACH ROW
+BEGIN
+  UPDATE on_call_templates SET updated_at = datetime('now') WHERE id = NEW.id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_on_call_technicians_updated_at
+AFTER UPDATE ON on_call_technicians
+FOR EACH ROW
+BEGIN
+  UPDATE on_call_technicians SET updated_at = datetime('now') WHERE id = NEW.id;
+END;
+
 -- =========================================================
 -- INDEXES: performance for operational queries.
 -- =========================================================
@@ -349,6 +391,8 @@ CREATE INDEX IF NOT EXISTS idx_tasks_scheduled_for ON tasks(scheduled_for);
 CREATE INDEX IF NOT EXISTS idx_tasks_incident_id ON tasks(incident_id);
 
 CREATE INDEX IF NOT EXISTS idx_on_call_shifts_range ON on_call_shifts(start_at, end_at);
+CREATE INDEX IF NOT EXISTS idx_on_call_templates_title ON on_call_templates(title);
+CREATE INDEX IF NOT EXISTS idx_on_call_technicians_active ON on_call_technicians(is_active);
 
 CREATE INDEX IF NOT EXISTS idx_location_notes_location_created
   ON location_notes(location_id, created_at DESC);

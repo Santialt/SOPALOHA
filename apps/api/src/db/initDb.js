@@ -72,7 +72,65 @@ function runMigrations() {
     BEGIN
       UPDATE on_call_shifts SET updated_at = datetime('now') WHERE id = NEW.id;
     END;
+
+    CREATE TABLE IF NOT EXISTS on_call_templates (
+      id INTEGER PRIMARY KEY,
+      title TEXT NOT NULL,
+      start_time TEXT NOT NULL,
+      end_time TEXT NOT NULL,
+      crosses_to_next_day INTEGER NOT NULL DEFAULT 0 CHECK (crosses_to_next_day IN (0, 1)),
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_on_call_templates_title ON on_call_templates(title);
+
+    CREATE TRIGGER IF NOT EXISTS trg_on_call_templates_updated_at
+    AFTER UPDATE ON on_call_templates
+    FOR EACH ROW
+    BEGIN
+      UPDATE on_call_templates SET updated_at = datetime('now') WHERE id = NEW.id;
+    END;
+
+    CREATE TABLE IF NOT EXISTS on_call_technicians (
+      id INTEGER PRIMARY KEY,
+      name TEXT NOT NULL,
+      is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+      notes TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE (name)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_on_call_technicians_active ON on_call_technicians(is_active);
+
+    CREATE TRIGGER IF NOT EXISTS trg_on_call_technicians_updated_at
+    AFTER UPDATE ON on_call_technicians
+    FOR EACH ROW
+    BEGIN
+      UPDATE on_call_technicians SET updated_at = datetime('now') WHERE id = NEW.id;
+    END;
   `);
+
+  const templateCount = db.prepare('SELECT COUNT(*) AS total FROM on_call_templates').get().total;
+  if (templateCount === 0) {
+    db.exec(`
+      INSERT INTO on_call_templates (title, start_time, end_time, crosses_to_next_day) VALUES
+      ('Turno AM', '03:00', '09:00', 0),
+      ('Turno Oficina', '09:00', '18:00', 0),
+      ('Turno PM', '18:00', '03:00', 1);
+    `);
+  }
+
+  const techniciansCount = db.prepare('SELECT COUNT(*) AS total FROM on_call_technicians').get().total;
+  if (techniciansCount === 0) {
+    db.exec(`
+      INSERT INTO on_call_technicians (name, is_active) VALUES
+      ('Tecnico 1', 1),
+      ('Tecnico 2', 1),
+      ('Tecnico 3', 1);
+    `);
+  }
 }
 
 function initDatabase() {

@@ -47,10 +47,22 @@ function updateShift(req, res, next) {
   }
 }
 
+function deleteShift(req, res, next) {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) throw httpError(400, 'Shift id must be an integer');
+    service.deleteShift(id);
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   getShifts,
   getShiftById,
   getCurrentShift,
   createShift,
-  updateShift
+  updateShift,
+  deleteShift
 };

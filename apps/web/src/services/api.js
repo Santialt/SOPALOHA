@@ -109,5 +109,20 @@ export const api = {
   getOnCallShiftById: (id) => request(`/on-call-shifts/${id}`),
   getCurrentOnCallShift: () => request('/on-call-shifts/current'),
   createOnCallShift: (payload) => request('/on-call-shifts', { method: 'POST', body: JSON.stringify(payload) }),
-  updateOnCallShift: (id, payload) => request(`/on-call-shifts/${id}`, { method: 'PUT', body: JSON.stringify(payload) })
+  updateOnCallShift: (id, payload) => request(`/on-call-shifts/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  deleteOnCallShift: (id) => request(`/on-call-shifts/${id}`, { method: 'DELETE' }),
+
+  getOnCallTemplates: () => request('/on-call-templates'),
+  getOnCallTemplateById: (id) => request(`/on-call-templates/${id}`),
+  createOnCallTemplate: (payload) =>
+    request('/on-call-templates', { method: 'POST', body: JSON.stringify(payload) }),
+  updateOnCallTemplate: (id, payload) =>
+    request(`/on-call-templates/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+
+  getOnCallTechnicians: () => request('/on-call-technicians'),
+  getOnCallTechnicianById: (id) => request(`/on-call-technicians/${id}`),
+  createOnCallTechnician: (payload) =>
+    request('/on-call-technicians', { method: 'POST', body: JSON.stringify(payload) }),
+  updateOnCallTechnician: (id, payload) =>
+    request(`/on-call-technicians/${id}`, { method: 'PUT', body: JSON.stringify(payload) })
 };

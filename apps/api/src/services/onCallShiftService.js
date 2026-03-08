@@ -77,6 +77,11 @@ function updateShift(id, payload) {
   return repository.update(id, normalized);
 }
 
+function deleteShift(id) {
+  const removed = repository.remove(id);
+  if (!removed) throw httpError(404, 'On-call shift not found');
+}
+
 function getCurrentShift(nowValue = new Date()) {
   const now = nowValue.getTime();
 
@@ -99,5 +104,6 @@ module.exports = {
   getShiftById,
   createShift,
   updateShift,
+  deleteShift,
   getCurrentShift
 };
