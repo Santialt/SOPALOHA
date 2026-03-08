@@ -112,6 +112,11 @@ small {
 }
 
 .sidebar {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
+  overflow-y: auto;
   background: linear-gradient(180deg, rgba(59, 130, 246, 0.08) 0, transparent 220px), var(--sidebar-bg);
   color: var(--sidebar-text);
   border-right: 1px solid var(--sidebar-border);
@@ -1220,6 +1225,9 @@ button:disabled {
   }
 
   .sidebar {
+    position: static;
+    height: auto;
+    overflow: visible;
     padding: 10px;
     border-right: 0;
     border-bottom: 1px solid var(--sidebar-border);

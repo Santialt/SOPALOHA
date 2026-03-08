@@ -1,4 +1,5 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const express = require('express');
 const { health } = require('./controllers/healthController');
 const locationRoutes = require('./routes/locationRoutes');

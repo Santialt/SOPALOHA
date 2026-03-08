@@ -180,6 +180,36 @@ CREATE TABLE IF NOT EXISTS teamviewer_connections (
 );
 
 -- =========================================================
+-- TABLE: teamviewer_imported_cases
+-- Imported external support cases from TeamViewer connections reports.
+-- =========================================================
+CREATE TABLE IF NOT EXISTS teamviewer_imported_cases (
+  id INTEGER PRIMARY KEY,
+  external_connection_id TEXT NOT NULL UNIQUE,
+  started_at TEXT NOT NULL,
+  ended_at TEXT,
+  duration_seconds INTEGER CHECK (duration_seconds IS NULL OR duration_seconds >= 0),
+  technician_username TEXT,
+  technician_display_name TEXT,
+  teamviewer_group_name TEXT NOT NULL,
+  note_raw TEXT NOT NULL,
+  problem_description TEXT NOT NULL,
+  requested_by TEXT NOT NULL,
+  location_id INTEGER,
+  linked_incident_id INTEGER,
+  raw_payload_json TEXT,
+  imported_at TEXT NOT NULL DEFAULT (datetime('now')),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (location_id) REFERENCES locations(id)
+    ON UPDATE CASCADE
+    ON DELETE SET NULL,
+  FOREIGN KEY (linked_incident_id) REFERENCES incidents(id)
+    ON UPDATE CASCADE
+    ON DELETE SET NULL
+);
+
+-- =========================================================
 -- TABLE: weekly_tasks
 -- Weekly planning and pending items.
 -- =========================================================
@@ -314,6 +344,13 @@ BEGIN
   UPDATE incidents SET updated_at = datetime('now') WHERE id = NEW.id;
 END;
 
+CREATE TRIGGER IF NOT EXISTS trg_teamviewer_imported_cases_updated_at
+AFTER UPDATE ON teamviewer_imported_cases
+FOR EACH ROW
+BEGIN
+  UPDATE teamviewer_imported_cases SET updated_at = datetime('now') WHERE id = NEW.id;
+END;
+
 CREATE TRIGGER IF NOT EXISTS trg_weekly_tasks_updated_at
 AFTER UPDATE ON weekly_tasks
 FOR EACH ROW
@@ -379,6 +416,13 @@ CREATE INDEX IF NOT EXISTS idx_tv_conn_remote_name_lower ON teamviewer_connectio
 CREATE INDEX IF NOT EXISTS idx_tv_conn_match_status ON teamviewer_connections(match_status);
 CREATE INDEX IF NOT EXISTS idx_tv_conn_matched_location ON teamviewer_connections(matched_location_id);
 CREATE INDEX IF NOT EXISTS idx_tv_conn_matched_device ON teamviewer_connections(matched_device_id);
+
+CREATE INDEX IF NOT EXISTS idx_tv_imported_cases_started_at
+  ON teamviewer_imported_cases(started_at);
+CREATE INDEX IF NOT EXISTS idx_tv_imported_cases_group
+  ON teamviewer_imported_cases(teamviewer_group_name);
+CREATE INDEX IF NOT EXISTS idx_tv_imported_cases_technician
+  ON teamviewer_imported_cases(technician_username, technician_display_name);
 
 CREATE INDEX IF NOT EXISTS idx_weekly_tasks_status_due ON weekly_tasks(status, due_date);
 CREATE INDEX IF NOT EXISTS idx_weekly_tasks_location ON weekly_tasks(location_id);

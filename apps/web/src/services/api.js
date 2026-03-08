@@ -101,6 +101,19 @@ export const api = {
     request('/teamviewer/import', {
       method: 'POST'
     }),
+  importTeamviewerCases: (payload) =>
+    request('/teamviewer/import-cases', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    }),
+  getTeamviewerImportedCases: (filters = {}) => request(`/teamviewer/imported-cases${buildQuery(filters)}`),
+  getTeamviewerImportedCaseById: (id) => request(`/teamviewer/imported-cases/${id}`),
+  createTeamviewerImportedCase: (payload) =>
+    request('/teamviewer/imported-cases', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    }),
+  deleteTeamviewerImportedCase: (id) => request(`/teamviewer/imported-cases/${id}`, { method: 'DELETE' }),
   getTeamviewerExplorer: () => request('/teamviewer/explorer'),
   getTeamviewerGroup: (groupId) => request(`/teamviewer/groups/${groupId}`),
   getTeamviewerDevice: (teamviewerId) => request(`/teamviewer/devices/${teamviewerId}`),

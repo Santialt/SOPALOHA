@@ -72,6 +72,7 @@ function DashboardPage() {
           <Link to="/location-notes" className="btn-link">Notas tecnicas</Link>
           <Link to="/teamviewer-explorer" className="btn-link">TeamViewer Explorer</Link>
           <Link to="/teamviewer-import" className="btn-link">TeamViewer Import</Link>
+          <Link to="/incidents" className="btn-link">Incidentes + TV Casos</Link>
         </div>
       </section>
     </div>

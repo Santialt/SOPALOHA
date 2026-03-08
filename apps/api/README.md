@@ -48,6 +48,8 @@ Servidor:
 ## TeamViewer import (API)
 
 - Requiere `TEAMVIEWER_API_TOKEN` en entorno del backend.
+- Para reportes de conexiones (casos importados) se puede usar `TEAMVIEWER_REPORTS_API_TOKEN`.
+  - Si no se define, se usa `TEAMVIEWER_API_TOKEN` como fallback.
 - `GET /teamviewer/import-preview`:
   - consulta grupos y dispositivos en TeamViewer
   - calcula `locations` nuevos/reutilizados por nombre de grupo
