@@ -66,7 +66,6 @@ CREATE TABLE IF NOT EXISTS devices (
     )
   ),
   username TEXT,
-  password TEXT,
   operating_system TEXT,
   sql_version TEXT,
   sql_instance TEXT,

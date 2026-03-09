@@ -1,13 +1,27 @@
 const { execFile } = require('child_process');
 const { promisify } = require('util');
 const { httpError } = require('../utils/httpError');
+const { isPrivateIpv4 } = require('../middleware/security');
 
 const execFileAsync = promisify(execFile);
 const TEAMVIEWER_OPEN_LOCK_MS = 3000;
 const teamviewerOpenLocks = new Map();
 
-function isSafeHost(value) {
-  return typeof value === 'string' && /^[a-zA-Z0-9.\-:]+$/.test(value.trim());
+function isInternalPingTarget(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+
+  if (normalized === 'localhost') {
+    return true;
+  }
+
+  if (isPrivateIpv4(normalized)) {
+    return true;
+  }
+
+  return /^[a-z0-9-]+(?:\.(?:local|lan|internal))?$/i.test(normalized);
 }
 
 function normalizeTeamviewerId(value) {
@@ -21,8 +35,8 @@ async function pingDevice(req, res, next) {
     return next(httpError(400, "Field 'ip' is required"));
   }
 
-  if (!isSafeHost(ipOrHost)) {
-    return next(httpError(400, "Field 'ip' has invalid characters"));
+  if (!isInternalPingTarget(ipOrHost)) {
+    return next(httpError(400, "Field 'ip' must be a private IPv4 or internal hostname"));
   }
 
   try {
@@ -35,7 +49,7 @@ async function pingDevice(req, res, next) {
     return res.json({
       success,
       ip: ipOrHost,
-      output: stdout
+      output: String(stdout).split(/\r?\n/).slice(0, 12).join('\n')
     });
   } catch (error) {
     if (typeof error?.stdout === 'string' && error.stdout.length > 0) {
@@ -44,7 +58,7 @@ async function pingDevice(req, res, next) {
       return res.json({
         success,
         ip: ipOrHost,
-        output: stdout
+        output: String(stdout).split(/\r?\n/).slice(0, 12).join('\n')
       });
     }
 

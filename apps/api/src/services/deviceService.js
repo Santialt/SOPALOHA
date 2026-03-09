@@ -1,5 +1,6 @@
 const repository = require('../repositories/deviceRepository');
 const { httpError } = require('../utils/httpError');
+const { sanitizeDevice, sanitizeDeviceList } = require('../utils/sanitizeDevice');
 
 const DEVICE_ROLE_VALUES = new Set([
   'server',
@@ -52,22 +53,22 @@ function normalizeDevicePayload(payload) {
 }
 
 function listDevices() {
-  return repository.findAll();
+  return sanitizeDeviceList(repository.findAll());
 }
 
 function getDevice(id) {
   const row = repository.findById(id);
   if (!row) throw httpError(404, 'Device not found');
-  return row;
+  return sanitizeDevice(row);
 }
 
 function createDevice(payload) {
-  return repository.create(normalizeDevicePayload(payload));
+  return sanitizeDevice(repository.create(normalizeDevicePayload(payload)));
 }
 
 function updateDevice(id, payload) {
   getDevice(id);
-  return repository.update(id, normalizeDevicePayload(payload));
+  return sanitizeDevice(repository.update(id, normalizeDevicePayload(payload)));
 }
 
 function deleteDevice(id) {

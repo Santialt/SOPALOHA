@@ -14,26 +14,23 @@ const supportActionRoutes = require('./routes/supportActionRoutes');
 const onCallShiftRoutes = require('./routes/onCallShiftRoutes');
 const onCallTemplateRoutes = require('./routes/onCallTemplateRoutes');
 const onCallTechnicianRoutes = require('./routes/onCallTechnicianRoutes');
+const {
+  corsMiddleware,
+  requireInternalAccess,
+  setSecurityHeaders
+} = require('./middleware/security');
 const { notFound } = require('./middleware/notFound');
 const { errorHandler } = require('./middleware/errorHandler');
 
 const app = express();
 
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(204);
-  }
-
-  return next();
-});
-
-app.use(express.json());
+app.disable('x-powered-by');
+app.use(setSecurityHeaders);
+app.use(corsMiddleware());
+app.use(express.json({ limit: '250kb' }));
 
 app.get('/health', health);
+app.use(requireInternalAccess);
 app.use('/locations', locationRoutes);
 app.use('/devices', deviceRoutes);
 app.use('/incidents', incidentRoutes);

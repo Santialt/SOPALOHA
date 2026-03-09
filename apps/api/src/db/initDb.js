@@ -47,6 +47,16 @@ function runMigrations() {
     CREATE INDEX IF NOT EXISTS idx_location_integrations_location_id ON location_integrations(location_id);
   `);
 
+  if (hasColumn('devices', 'password')) {
+    const scrubbedPasswords = db
+      .prepare("UPDATE devices SET password = NULL WHERE password IS NOT NULL AND trim(password) <> ''")
+      .run().changes;
+
+    if (scrubbedPasswords > 0) {
+      console.warn(`[Security] Removed ${scrubbedPasswords} plaintext device password(s) from SQLite.`);
+    }
+  }
+
   if (hasColumn('devices', 'device_role')) {
     db.exec('CREATE INDEX IF NOT EXISTS idx_devices_role ON devices(device_role);');
   }

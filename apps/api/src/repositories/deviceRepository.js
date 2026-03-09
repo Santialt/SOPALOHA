@@ -12,10 +12,10 @@ function create(payload) {
   const stmt = db.prepare(`
     INSERT INTO devices (
       location_id, name, type, device_role, ip_address, teamviewer_id, windows_version, ram_gb, cpu,
-      disk_type, username, password, operating_system, sql_version, sql_instance, aloha_path, brand, model, notes
+      disk_type, username, operating_system, sql_version, sql_instance, aloha_path, brand, model, notes
     ) VALUES (
       @location_id, @name, @type, @device_role, @ip_address, @teamviewer_id, @windows_version, @ram_gb, @cpu,
-      @disk_type, @username, @password, @operating_system, @sql_version, @sql_instance, @aloha_path, @brand, @model, @notes
+      @disk_type, @username, @operating_system, @sql_version, @sql_instance, @aloha_path, @brand, @model, @notes
     )
   `);
   const result = stmt.run({
@@ -30,7 +30,6 @@ function create(payload) {
     cpu: payload.cpu || null,
     disk_type: payload.disk_type || null,
     username: payload.username || null,
-    password: payload.password || null,
     operating_system: payload.operating_system || null,
     sql_version: payload.sql_version || null,
     sql_instance: payload.sql_instance || null,
@@ -57,7 +56,6 @@ function update(id, payload) {
       cpu = @cpu,
       disk_type = @disk_type,
       username = @username,
-      password = @password,
       operating_system = @operating_system,
       sql_version = @sql_version,
       sql_instance = @sql_instance,
@@ -81,7 +79,6 @@ function update(id, payload) {
     cpu: payload.cpu || null,
     disk_type: payload.disk_type || null,
     username: payload.username || null,
-    password: payload.password || null,
     operating_system: payload.operating_system || null,
     sql_version: payload.sql_version || null,
     sql_instance: payload.sql_instance || null,

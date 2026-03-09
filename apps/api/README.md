@@ -20,6 +20,15 @@ apps/api/
     utils/
 ```
 
+## Hardening interno
+
+- `GET /health` sigue abierto.
+- El resto de la API acepta solo origenes `localhost` o los definidos en `CORS_ALLOWED_ORIGINS`.
+- Sin `INTERNAL_API_KEY`, la API queda limitada a loopback y red privada.
+- Con `INTERNAL_API_KEY`, la API exige `X-Internal-Api-Key` o `Authorization: Bearer`.
+- `POST /support-actions/ping` y `POST /support-actions/teamviewer/open` requieren red interna y, si existe, API key valida.
+- `devices.password` queda deprecado: ya no se devuelve ni se persiste, y los valores legados se limpian al iniciar la API.
+
 ## Cómo correr
 
 Desde `apps/api`:

@@ -1,9 +1,11 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+const INTERNAL_API_KEY = import.meta.env.VITE_INTERNAL_API_KEY || '';
 
 async function request(path, options = {}) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     headers: {
       'Content-Type': 'application/json',
+      ...(INTERNAL_API_KEY ? { 'X-Internal-Api-Key': INTERNAL_API_KEY } : {}),
       ...(options.headers || {})
     },
     ...options
