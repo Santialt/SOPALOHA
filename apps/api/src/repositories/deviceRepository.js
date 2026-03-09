@@ -1,7 +1,35 @@
 const db = require('../db/connection');
 
-function findAll() {
-  return db.prepare('SELECT * FROM devices ORDER BY id DESC').all();
+function findAll(filters = {}) {
+  const where = [];
+  const params = {};
+
+  if (filters.location_id) {
+    where.push('location_id = @location_id');
+    params.location_id = filters.location_id;
+  }
+
+  const limit = Number.isInteger(filters.limit) ? filters.limit : null;
+  const offset = Number.isInteger(filters.offset) ? filters.offset : 0;
+  const whereSql = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
+  const limitSql = limit ? 'LIMIT @limit OFFSET @offset' : '';
+
+  if (limit) {
+    params.limit = limit;
+    params.offset = offset;
+  }
+
+  return db
+    .prepare(
+      `
+      SELECT *
+      FROM devices
+      ${whereSql}
+      ORDER BY id DESC
+      ${limitSql}
+    `
+    )
+    .all(params);
 }
 
 function findById(id) {

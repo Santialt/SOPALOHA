@@ -62,6 +62,15 @@ function runMigrations() {
   }
 
   db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_devices_location_id ON devices(location_id);
+    CREATE INDEX IF NOT EXISTS idx_incidents_location_date ON incidents(location_id, incident_date DESC, id DESC);
+    CREATE INDEX IF NOT EXISTS idx_tasks_location_status ON tasks(location_id, status);
+    CREATE INDEX IF NOT EXISTS idx_location_notes_location_created ON location_notes(location_id, created_at DESC, id DESC);
+    CREATE INDEX IF NOT EXISTS idx_teamviewer_imported_cases_started_at ON teamviewer_imported_cases(started_at DESC, id DESC);
+    CREATE INDEX IF NOT EXISTS idx_teamviewer_imported_cases_location_started ON teamviewer_imported_cases(location_id, started_at DESC, id DESC);
+  `);
+
+  db.exec(`
     CREATE TABLE IF NOT EXISTS on_call_shifts (
       id INTEGER PRIMARY KEY,
       title TEXT NOT NULL,

@@ -89,22 +89,22 @@ function LocationDetailPage() {
   const teamviewerOpenLockRef = useRef(new Map());
 
   const { load, loading, error, setError } = useDataLoader(async () => {
-    const [locationData, allDevices, allIncidents, allNotes, allTasks, locationIntegrations] =
+    const [locationData, locationDevices, locationIncidents, locationNotes, locationTasks, locationIntegrations] =
       await Promise.all([
         api.getLocationById(id),
-        api.getDevices(),
-        api.getIncidents(),
-        api.getLocationNotes(),
-        api.getTasks(),
+        api.getLocationDevices(id),
+        api.getLocationIncidents(id, { limit: 8 }),
+        api.getLocationNotesByLocation(id),
+        api.getLocationTasks(id, { limit: 20 }),
         api.getLocationIntegrations(id)
       ]);
 
     setLocation(locationData);
     setLocationForm(mapLocationToForm(locationData));
-    setDevices(allDevices.filter((item) => item.location_id === numericLocationId));
-    setIncidents(allIncidents.filter((item) => item.location_id === numericLocationId));
-    setNotes(allNotes.filter((item) => item.location_id === numericLocationId));
-    setTasks(allTasks.filter((item) => item.location_id === numericLocationId));
+    setDevices(locationDevices);
+    setIncidents(locationIncidents);
+    setNotes(locationNotes);
+    setTasks(locationTasks);
     setIntegrations(locationIntegrations.map((item) => item.integration_name));
   }, [id, numericLocationId]);
 

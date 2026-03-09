@@ -112,8 +112,10 @@ function normalizeListFilters(filters = {}) {
   const normalized = {
     from_date: null,
     to_date: null,
+    location_id: null,
     group: isBlank(filters.group) ? null : String(filters.group).trim(),
-    technician: isBlank(filters.technician) ? null : String(filters.technician).trim()
+    technician: isBlank(filters.technician) ? null : String(filters.technician).trim(),
+    keyword: isBlank(filters.keyword) ? null : String(filters.keyword).trim()
   };
 
   if (!isBlank(filters.from_date)) {
@@ -130,6 +132,30 @@ function normalizeListFilters(filters = {}) {
       throw httpError(400, 'Invalid to_date filter');
     }
     normalized.to_date = toDate.toISOString();
+  }
+
+  if (!isBlank(filters.location_id)) {
+    const locationId = Number(filters.location_id);
+    if (!Number.isInteger(locationId)) {
+      throw httpError(400, 'location_id filter must be an integer');
+    }
+    normalized.location_id = locationId;
+  }
+
+  if (!isBlank(filters.limit)) {
+    const limit = Number(filters.limit);
+    if (!Number.isInteger(limit) || limit <= 0) {
+      throw httpError(400, 'limit filter must be a positive integer');
+    }
+    normalized.limit = Math.min(limit, 200);
+  }
+
+  if (!isBlank(filters.offset)) {
+    const offset = Number(filters.offset);
+    if (!Number.isInteger(offset) || offset < 0) {
+      throw httpError(400, 'offset filter must be a non-negative integer');
+    }
+    normalized.offset = offset;
   }
 
   return normalized;

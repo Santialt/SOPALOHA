@@ -2,7 +2,7 @@ const service = require('../services/deviceService');
 
 function getDevices(req, res, next) {
   try {
-    res.json(service.listDevices());
+    res.json(service.listDevices(req.query || {}));
   } catch (error) {
     next(error);
   }

@@ -2,7 +2,7 @@ const service = require('../services/locationNoteService');
 
 function getLocationNotes(req, res, next) {
   try {
-    res.json(service.listLocationNotes());
+    res.json(service.listLocationNotes(req.query || {}));
   } catch (error) {
     next(error);
   }

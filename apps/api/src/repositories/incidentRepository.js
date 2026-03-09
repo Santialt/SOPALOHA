@@ -1,7 +1,70 @@
 const db = require('../db/connection');
 
-function findAll() {
-  return db.prepare('SELECT * FROM incidents ORDER BY incident_date DESC, id DESC').all();
+function buildListQuery(filters = {}) {
+  const where = [];
+  const params = {};
+
+  if (filters.location_id) {
+    where.push('location_id = @location_id');
+    params.location_id = filters.location_id;
+  }
+
+  if (filters.device_id) {
+    where.push('device_id = @device_id');
+    params.device_id = filters.device_id;
+  }
+
+  if (filters.status) {
+    where.push('status = @status');
+    params.status = filters.status;
+  }
+
+  if (filters.from_date) {
+    where.push('incident_date >= @from_date');
+    params.from_date = filters.from_date;
+  }
+
+  if (filters.to_date) {
+    where.push('incident_date <= @to_date');
+    params.to_date = filters.to_date;
+  }
+
+  if (filters.search) {
+    where.push("(lower(coalesce(title, '')) LIKE lower(@search) OR lower(coalesce(description, '')) LIKE lower(@search) OR lower(coalesce(solution, '')) LIKE lower(@search))");
+    params.search = `%${filters.search}%`;
+  }
+
+  const limit = Number.isInteger(filters.limit) ? filters.limit : null;
+  const offset = Number.isInteger(filters.offset) ? filters.offset : 0;
+  const whereSql = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
+  const limitSql = limit ? 'LIMIT @limit OFFSET @offset' : '';
+
+  if (limit) {
+    params.limit = limit;
+    params.offset = offset;
+  }
+
+  return { whereSql, limitSql, params };
+}
+
+function findAll(filters = {}) {
+  const { whereSql, limitSql, params } = buildListQuery(filters);
+  return db
+    .prepare(
+      `
+      SELECT *
+      FROM incidents
+      ${whereSql}
+      ORDER BY incident_date DESC, id DESC
+      ${limitSql}
+    `
+    )
+    .all(params);
+}
+
+function countAll(filters = {}) {
+  const { whereSql, params } = buildListQuery(filters);
+  return db.prepare(`SELECT COUNT(*) AS total FROM incidents ${whereSql}`).get(params).total;
 }
 
 function findById(id) {
@@ -74,4 +137,4 @@ function remove(id) {
   return result.changes > 0;
 }
 
-module.exports = { findAll, findById, create, update, remove };
+module.exports = { findAll, countAll, findById, create, update, remove };

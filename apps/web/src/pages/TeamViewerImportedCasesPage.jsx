@@ -4,6 +4,8 @@ import InlineSuccess from '../components/InlineSuccess';
 import LoadingBlock from '../components/LoadingBlock';
 import { api } from '../services/api';
 
+const PAGE_SIZE = 50;
+
 function toDateInputValue(date) {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 }
@@ -17,12 +19,6 @@ function formatDateTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString('es-AR');
-}
-
-function normalizeDateKey(value) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toISOString().slice(0, 10);
 }
 
 function resolveTechnicianFromCase(row) {
@@ -53,6 +49,7 @@ function TeamViewerImportedCasesPage() {
   const [discarded, setDiscarded] = useState([]);
   const [rows, setRows] = useState([]);
   const [locations, setLocations] = useState([]);
+  const [pageOffset, setPageOffset] = useState(0);
 
   const [importRange, setImportRange] = useState(() => {
     const now = new Date();
@@ -64,11 +61,18 @@ function TeamViewerImportedCasesPage() {
     };
   });
 
-  const [listFilters, setListFilters] = useState({
-    location_key: '',
-    date_key: '',
-    technician: '',
-    keyword: ''
+  const [listFilters, setListFilters] = useState(() => {
+    const now = new Date();
+    const from = new Date(now);
+    from.setDate(now.getDate() - 30);
+    return {
+      location_id: '',
+      from_date: toDateInputValue(from),
+      to_date: toDateInputValue(now),
+      technician: '',
+      group: '',
+      keyword: ''
+    };
   });
 
   const [manualForm, setManualForm] = useState(() => {
@@ -82,55 +86,21 @@ function TeamViewerImportedCasesPage() {
     };
   });
 
-  const loadRows = async () => {
+  const loadRows = async (offset = pageOffset) => {
     setLoading(true);
     setError('');
 
     try {
-      const [casesData, incidentsData, locationsData] = await Promise.all([
-        api.getTeamviewerImportedCases(),
-        api.getIncidents(),
+      const [casesData, locationsData] = await Promise.all([
+        api.getTeamviewerImportedCases({
+          ...listFilters,
+          limit: PAGE_SIZE,
+          offset
+        }),
         api.getLocations()
       ]);
+      setRows(casesData);
       setLocations(locationsData);
-
-      const locationsById = new Map(locationsData.map((location) => [location.id, location]));
-
-      const importedCaseRows = casesData.map((row) => {
-        const location = row.location_id ? locationsById.get(row.location_id) : null;
-        return {
-          key: `tv-${row.id}`,
-          source: 'teamviewer_case',
-          source_id: row.id,
-          linked_incident_id: row.linked_incident_id || null,
-          location_id: row.location_id || null,
-          local_label: location?.name || row.teamviewer_group_name || '-',
-          started_at: row.started_at,
-          ended_at: row.ended_at,
-          technician: resolveTechnicianFromCase(row),
-          requested_by: row.requested_by || '-',
-          problem_description: row.problem_description || '-'
-        };
-      });
-
-      const incidentRows = incidentsData.map((row) => {
-        const location = row.location_id ? locationsById.get(row.location_id) : null;
-        return {
-          key: `incident-${row.id}`,
-          source: 'incident',
-          source_id: row.id,
-          linked_incident_id: row.id,
-          location_id: row.location_id || null,
-          local_label: location?.name || `Local #${row.location_id || '-'}`,
-          started_at: row.incident_date,
-          ended_at: null,
-          technician: '-',
-          requested_by: '-',
-          problem_description: row.description || row.title || '-'
-        };
-      });
-
-      setRows([...importedCaseRows, ...incidentRows]);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -139,55 +109,16 @@ function TeamViewerImportedCasesPage() {
   };
 
   useEffect(() => {
-    loadRows();
+    loadRows(pageOffset);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [pageOffset]);
 
-  const locationOptions = useMemo(() => {
-    const map = new Map();
-    for (const row of rows) {
-      const key = row.location_id ? `id:${row.location_id}` : `name:${row.local_label}`;
-      if (!map.has(key)) {
-        map.set(key, { key, label: row.local_label });
-      }
-    }
-    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label, 'es', { sensitivity: 'base' }));
-  }, [rows]);
+  const locationOptions = useMemo(
+    () => [...locations].sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' })),
+    [locations]
+  );
 
-  const dateOptions = useMemo(() => {
-    const set = new Set();
-    for (const row of rows) {
-      const dateKey = normalizeDateKey(row.started_at);
-      if (dateKey) set.add(dateKey);
-    }
-    return Array.from(set).sort((a, b) => b.localeCompare(a));
-  }, [rows]);
-
-  const technicianOptions = useMemo(() => {
-    const set = new Set();
-    for (const row of rows) {
-      if (row.technician && row.technician !== '-') set.add(row.technician);
-    }
-    return Array.from(set).sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
-  }, [rows]);
-
-  const filteredRows = useMemo(() => {
-    const keyword = listFilters.keyword.trim().toLowerCase();
-    const sorted = [...rows].sort((a, b) => {
-      const dateA = new Date(a.started_at).getTime();
-      const dateB = new Date(b.started_at).getTime();
-      return dateB - dateA;
-    });
-
-    return sorted.filter((row) => {
-      const rowLocationKey = row.location_id ? `id:${row.location_id}` : `name:${row.local_label}`;
-      const byLocation = !listFilters.location_key || listFilters.location_key === rowLocationKey;
-      const byDate = !listFilters.date_key || normalizeDateKey(row.started_at) === listFilters.date_key;
-      const byTechnician = !listFilters.technician || row.technician === listFilters.technician;
-      const byKeyword = !keyword || row.problem_description.toLowerCase().includes(keyword);
-      return byLocation && byDate && byTechnician && byKeyword;
-    });
-  }, [rows, listFilters]);
+  const hasMore = rows.length === PAGE_SIZE;
 
   const onImport = async () => {
     setImporting(true);
@@ -198,7 +129,8 @@ function TeamViewerImportedCasesPage() {
       const result = await api.importTeamviewerCases(importRange);
       setSummary(result.summary);
       setDiscarded(Array.isArray(result.discarded) ? result.discarded : []);
-      await loadRows();
+      setPageOffset(0);
+      await loadRows(0);
       setSuccess('Importacion de casos finalizada.');
     } catch (err) {
       setError(err.message);
@@ -223,7 +155,8 @@ function TeamViewerImportedCasesPage() {
       });
       setSuccess('Caso manual creado.');
       setManualForm((prev) => ({ ...prev, teamviewer_group_name: '', note_raw: '', technician_display_name: '' }));
-      await loadRows();
+      setPageOffset(0);
+      await loadRows(0);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -232,16 +165,16 @@ function TeamViewerImportedCasesPage() {
   };
 
   const onDeleteCase = async (row) => {
-    const ok = window.confirm(`Eliminar caso importado #${row.source_id}?`);
+    const ok = window.confirm(`Eliminar caso importado #${row.id}?`);
     if (!ok) return;
-    setRunningActionCaseId(row.source_id);
+    setRunningActionCaseId(row.id);
     setError('');
     setSuccess('');
 
     try {
-      await api.deleteTeamviewerImportedCase(row.source_id);
-      setSuccess(`Caso #${row.source_id} eliminado.`);
-      await loadRows();
+      await api.deleteTeamviewerImportedCase(row.id);
+      setSuccess(`Caso #${row.id} eliminado.`);
+      await loadRows(pageOffset);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -249,26 +182,13 @@ function TeamViewerImportedCasesPage() {
     }
   };
 
-  const onDeleteIncident = async (row) => {
-    const ok = window.confirm(`Eliminar incidente #${row.source_id}?`);
-    if (!ok) return;
-    setRunningActionCaseId(row.source_id);
-    setError('');
-    setSuccess('');
-
-    try {
-      await api.deleteIncident(row.source_id);
-      setSuccess(`Incidente #${row.source_id} eliminado.`);
-      await loadRows();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setRunningActionCaseId(null);
-    }
+  const onApplyFilters = async () => {
+    setPageOffset(0);
+    await loadRows(0);
   };
 
   if (loading && rows.length === 0) {
-    return <LoadingBlock label="Cargando casos e incidentes..." />;
+    return <LoadingBlock label="Cargando casos TeamViewer..." />;
   }
 
   return (
@@ -398,123 +318,150 @@ function TeamViewerImportedCasesPage() {
       )}
 
       <section className="section-card">
-        <h2>Listado unificado (Incidentes + Casos importados)</h2>
+        <div className="section-head">
+          <h2>Casos importados</h2>
+          <small>{rows.length} cargados en esta pagina</small>
+        </div>
+
         <div className="form-grid form-grid-3">
           <label>
             Local
             <select
               className="input"
-              value={listFilters.location_key}
-              onChange={(event) => setListFilters((prev) => ({ ...prev, location_key: event.target.value }))}
+              value={listFilters.location_id}
+              onChange={(event) => setListFilters((prev) => ({ ...prev, location_id: event.target.value }))}
             >
               <option value="">Todos</option>
-              {locationOptions.map((option) => (
-                <option key={option.key} value={option.key}>
-                  {option.label}
+              {locationOptions.map((location) => (
+                <option key={location.id} value={location.id}>
+                  {location.name}
                 </option>
               ))}
             </select>
           </label>
           <label>
-            Fecha
-            <select
+            Fecha desde
+            <input
               className="input"
-              value={listFilters.date_key}
-              onChange={(event) => setListFilters((prev) => ({ ...prev, date_key: event.target.value }))}
-            >
-              <option value="">Todas</option>
-              {dateOptions.map((value) => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
-              ))}
-            </select>
+              type="date"
+              value={listFilters.from_date}
+              onChange={(event) => setListFilters((prev) => ({ ...prev, from_date: event.target.value }))}
+            />
+          </label>
+          <label>
+            Fecha hasta
+            <input
+              className="input"
+              type="date"
+              value={listFilters.to_date}
+              onChange={(event) => setListFilters((prev) => ({ ...prev, to_date: event.target.value }))}
+            />
           </label>
           <label>
             Tecnico
-            <select
+            <input
               className="input"
               value={listFilters.technician}
               onChange={(event) => setListFilters((prev) => ({ ...prev, technician: event.target.value }))}
-            >
-              <option value="">Todos</option>
-              {technicianOptions.map((value) => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
-              ))}
-            </select>
+              placeholder="Nombre o username"
+            />
           </label>
-          <label className="full-row">
-            Descripcion del problema (palabra/frase)
+          <label>
+            Grupo TeamViewer
+            <input
+              className="input"
+              value={listFilters.group}
+              onChange={(event) => setListFilters((prev) => ({ ...prev, group: event.target.value }))}
+              placeholder="Grupo"
+            />
+          </label>
+          <label>
+            Texto
             <input
               className="input"
               value={listFilters.keyword}
               onChange={(event) => setListFilters((prev) => ({ ...prev, keyword: event.target.value }))}
-              placeholder="Buscar por texto en la descripcion"
+              placeholder="Problema, solicitante o nota"
             />
           </label>
         </div>
 
-        <div className="section-head">
-          <small>{filteredRows.length} registros</small>
+        <div className="form-actions">
+          <button type="button" className="btn-primary" onClick={onApplyFilters} disabled={loading}>
+            Aplicar filtros
+          </button>
         </div>
 
-        <table className="table compact">
-          <thead>
-            <tr>
-              <th>Fecha inicio</th>
-              <th>Fecha fin</th>
-              <th>Tecnico</th>
-              <th>Local</th>
-              <th>Solicitante</th>
-              <th>Descripcion del problema</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredRows.map((row) => (
-              <tr key={row.key}>
-                <td>{formatDateTime(row.started_at)}</td>
-                <td>{formatDateTime(row.ended_at)}</td>
-                <td>{row.technician}</td>
-                <td>{row.local_label}</td>
-                <td>{row.requested_by}</td>
-                <td>{row.problem_description}</td>
-                {row.source === 'teamviewer_case' ? (
-                  <td>
-                    <button
-                      type="button"
-                      className="btn-danger"
-                      onClick={() => onDeleteCase(row)}
-                      disabled={runningActionCaseId === row.source_id}
-                    >
-                      Eliminar
-                    </button>
-                  </td>
-                ) : (
-                  <td>
-                    <div className="form-actions">
-                      <span>{`Incidente #${row.source_id}`}</span>
-                      <button
-                        type="button"
-                        className="btn-danger"
-                        onClick={() => onDeleteIncident(row)}
-                        disabled={runningActionCaseId === row.source_id}
-                      >
-                        Eliminar
-                      </button>
-                    </div>
-                  </td>
+        {loading ? (
+          <LoadingBlock label="Actualizando casos..." />
+        ) : (
+          <>
+            <table className="table compact">
+              <thead>
+                <tr>
+                  <th>Fecha inicio</th>
+                  <th>Fecha fin</th>
+                  <th>Tecnico</th>
+                  <th>Grupo</th>
+                  <th>Local</th>
+                  <th>Solicitante</th>
+                  <th>Descripcion del problema</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => {
+                  const location = row.location_id ? locations.find((item) => item.id === row.location_id) : null;
+                  return (
+                    <tr key={row.id}>
+                      <td>{formatDateTime(row.started_at)}</td>
+                      <td>{formatDateTime(row.ended_at)}</td>
+                      <td>{resolveTechnicianFromCase(row)}</td>
+                      <td>{row.teamviewer_group_name || '-'}</td>
+                      <td>{location?.name || '-'}</td>
+                      <td>{row.requested_by || '-'}</td>
+                      <td>{row.problem_description || '-'}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn-danger"
+                          onClick={() => onDeleteCase(row)}
+                          disabled={runningActionCaseId === row.id}
+                        >
+                          Eliminar
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {rows.length === 0 && (
+                  <tr>
+                    <td colSpan="8" className="empty-row">Sin resultados para los filtros actuales.</td>
+                  </tr>
                 )}
-              </tr>
-            ))}
-            {filteredRows.length === 0 && (
-              <tr>
-                <td colSpan="7" className="empty-row">Sin resultados para los filtros actuales.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+              </tbody>
+            </table>
+
+            <div className="form-actions">
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setPageOffset((prev) => Math.max(prev - PAGE_SIZE, 0))}
+                disabled={loading || pageOffset === 0}
+              >
+                Pagina anterior
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setPageOffset((prev) => prev + PAGE_SIZE)}
+                disabled={loading || !hasMore}
+              >
+                Pagina siguiente
+              </button>
+            </div>
+          </>
+        )}
       </section>
     </div>
   );

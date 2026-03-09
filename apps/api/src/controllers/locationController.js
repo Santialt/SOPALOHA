@@ -64,6 +64,38 @@ function putLocationIntegrations(req, res, next) {
   }
 }
 
+function getLocationDevices(req, res, next) {
+  try {
+    res.json(service.listLocationDevices(Number(req.params.id), req.query || {}));
+  } catch (error) {
+    next(error);
+  }
+}
+
+function getLocationIncidents(req, res, next) {
+  try {
+    res.json(service.listLocationIncidents(Number(req.params.id), req.query || {}));
+  } catch (error) {
+    next(error);
+  }
+}
+
+function getLocationTasks(req, res, next) {
+  try {
+    res.json(service.listLocationTasks(Number(req.params.id), req.query || {}));
+  } catch (error) {
+    next(error);
+  }
+}
+
+function getLocationNotes(req, res, next) {
+  try {
+    res.json(service.listLocationNotes(Number(req.params.id), req.query || {}));
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   getLocations,
   getLocationById,
@@ -71,5 +103,9 @@ module.exports = {
   updateLocation,
   deleteLocation,
   getLocationIntegrations,
-  putLocationIntegrations
+  putLocationIntegrations,
+  getLocationDevices,
+  getLocationIncidents,
+  getLocationTasks,
+  getLocationNotes
 };

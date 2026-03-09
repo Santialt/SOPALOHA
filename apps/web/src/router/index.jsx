@@ -1,5 +1,7 @@
+import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import AppShell from '../components/AppShell';
+import LoadingBlock from '../components/LoadingBlock';
 import DashboardPage from '../pages/DashboardPage';
 import LocationsPage from '../pages/LocationsPage';
 import LocationDetailPage from '../pages/LocationDetailPage';
@@ -8,8 +10,9 @@ import TasksPage from '../pages/TasksPage';
 import LocationNotesPage from '../pages/LocationNotesPage';
 import TeamViewerImportPage from '../pages/TeamViewerImportPage';
 import TeamViewerExplorerPage from '../pages/TeamViewerExplorerPage';
-import TeamViewerImportedCasesPage from '../pages/TeamViewerImportedCasesPage';
 import OnCallPage from '../pages/OnCallPage';
+
+const TeamViewerImportedCasesPage = lazy(() => import('../pages/TeamViewerImportedCasesPage'));
 
 export function AppRouter() {
   return (
@@ -25,7 +28,14 @@ export function AppRouter() {
         <Route path="on-call" element={<OnCallPage />} />
         <Route path="teamviewer-explorer" element={<TeamViewerExplorerPage />} />
         <Route path="teamviewer-import" element={<TeamViewerImportPage />} />
-        <Route path="teamviewer-imported-cases" element={<TeamViewerImportedCasesPage />} />
+        <Route
+          path="teamviewer-imported-cases"
+          element={
+            <Suspense fallback={<LoadingBlock label="Cargando casos TeamViewer..." />}>
+              <TeamViewerImportedCasesPage />
+            </Suspense>
+          }
+        />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Route>
     </Routes>

@@ -2,7 +2,7 @@ const service = require('../services/incidentService');
 
 function getIncidents(req, res, next) {
   try {
-    res.json(service.listIncidents());
+    res.json(service.listIncidents(req.query || {}));
   } catch (error) {
     next(error);
   }

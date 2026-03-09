@@ -42,12 +42,38 @@ function validateFilters(filters) {
   if (!isBlank(filters.location_id) && !Number.isInteger(Number(filters.location_id))) {
     throw httpError(400, 'location_id filter must be an integer');
   }
+
+  if (!isBlank(filters.limit)) {
+    const limit = Number(filters.limit);
+    if (!Number.isInteger(limit) || limit <= 0) {
+      throw httpError(400, 'limit filter must be a positive integer');
+    }
+  }
+
+  if (!isBlank(filters.offset)) {
+    const offset = Number(filters.offset);
+    if (!Number.isInteger(offset) || offset < 0) {
+      throw httpError(400, 'offset filter must be a non-negative integer');
+    }
+  }
 }
 
 function listTasks(filters = {}) {
   validateFilters(filters);
 
   return repository.findAll({
+    status: filters.status || null,
+    priority: filters.priority || null,
+    location_id: isBlank(filters.location_id) ? null : Number(filters.location_id),
+    limit: isBlank(filters.limit) ? null : Math.min(Number(filters.limit), 200),
+    offset: isBlank(filters.offset) ? 0 : Number(filters.offset)
+  });
+}
+
+function countTasks(filters = {}) {
+  validateFilters(filters);
+
+  return repository.countAll({
     status: filters.status || null,
     priority: filters.priority || null,
     location_id: isBlank(filters.location_id) ? null : Number(filters.location_id)
@@ -90,6 +116,7 @@ module.exports = {
   allowedStatuses,
   allowedPriorities,
   listTasks,
+  countTasks,
   getTaskById,
   createTask,
   updateTask,

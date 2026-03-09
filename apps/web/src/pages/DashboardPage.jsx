@@ -19,21 +19,15 @@ function DashboardPage() {
       setError('');
 
       try {
-        const [locations, incidents, tasks, currentOnCall] = await Promise.all([
-          api.getLocations(),
-          api.getIncidents(),
-          api.getTasks(),
+        const [summary, currentOnCall] = await Promise.all([
+          api.getDashboardSummary(),
           api.getCurrentOnCallShift().catch((err) => {
             setOnCallError(err.message || 'No se pudo cargar la guardia actual');
             return null;
           })
         ]);
 
-        setStats({
-          locations: locations.length,
-          incidents: incidents.length,
-          tasks: tasks.length
-        });
+        setStats(summary);
         setCurrentShift(currentOnCall);
       } catch (err) {
         setError(err.message);
@@ -72,7 +66,7 @@ function DashboardPage() {
           <Link to="/location-notes" className="btn-link">Notas tecnicas</Link>
           <Link to="/teamviewer-explorer" className="btn-link">TeamViewer Explorer</Link>
           <Link to="/teamviewer-import" className="btn-link">TeamViewer Import</Link>
-          <Link to="/incidents" className="btn-link">Incidentes + TV Casos</Link>
+          <Link to="/incidents?view=teamviewer" className="btn-link">Casos TeamViewer</Link>
         </div>
       </section>
     </div>

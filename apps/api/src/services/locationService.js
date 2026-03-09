@@ -1,5 +1,9 @@
 const repository = require('../repositories/locationRepository');
 const { httpError } = require('../utils/httpError');
+const deviceService = require('./deviceService');
+const incidentService = require('./incidentService');
+const taskService = require('./taskService');
+const locationNoteService = require('./locationNoteService');
 
 function toBoolean(value) {
   if (value === true || value === 1 || value === '1' || value === 'true') return true;
@@ -51,6 +55,26 @@ function replaceLocationIntegrations(locationId, integrationNames) {
   return repository.replaceIntegrations(locationId, integrationNames);
 }
 
+function listLocationDevices(locationId, filters = {}) {
+  getLocation(locationId);
+  return deviceService.listDevices({ ...filters, location_id: locationId });
+}
+
+function listLocationIncidents(locationId, filters = {}) {
+  getLocation(locationId);
+  return incidentService.listIncidents({ ...filters, location_id: locationId });
+}
+
+function listLocationTasks(locationId, filters = {}) {
+  getLocation(locationId);
+  return taskService.listTasks({ ...filters, location_id: locationId });
+}
+
+function listLocationNotes(locationId, filters = {}) {
+  getLocation(locationId);
+  return locationNoteService.listLocationNotes({ ...filters, location_id: locationId });
+}
+
 module.exports = {
   listLocations,
   getLocation,
@@ -58,5 +82,9 @@ module.exports = {
   updateLocation,
   deleteLocation,
   listLocationIntegrations,
-  replaceLocationIntegrations
+  replaceLocationIntegrations,
+  listLocationDevices,
+  listLocationIncidents,
+  listLocationTasks,
+  listLocationNotes
 };

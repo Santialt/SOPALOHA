@@ -14,6 +14,11 @@ function findAll(filters = {}) {
     params.to_date = filters.to_date;
   }
 
+  if (filters.location_id) {
+    where.push('location_id = @location_id');
+    params.location_id = filters.location_id;
+  }
+
   if (filters.group) {
     where.push('lower(teamviewer_group_name) LIKE lower(@group_like)');
     params.group_like = `%${filters.group}%`;
@@ -26,7 +31,20 @@ function findAll(filters = {}) {
     params.technician_like = `%${filters.technician}%`;
   }
 
+  if (filters.keyword) {
+    where.push("(lower(coalesce(problem_description, '')) LIKE lower(@keyword_like) OR lower(coalesce(requested_by, '')) LIKE lower(@keyword_like) OR lower(coalesce(note_raw, '')) LIKE lower(@keyword_like))");
+    params.keyword_like = `%${filters.keyword}%`;
+  }
+
   const whereSql = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
+  const limit = Number.isInteger(filters.limit) ? filters.limit : null;
+  const offset = Number.isInteger(filters.offset) ? filters.offset : 0;
+
+  if (limit) {
+    params.limit = limit;
+    params.offset = offset;
+  }
+
   return db
     .prepare(
       `
@@ -34,6 +52,7 @@ function findAll(filters = {}) {
       FROM teamviewer_imported_cases
       ${whereSql}
       ORDER BY started_at DESC, id DESC
+      ${limit ? 'LIMIT @limit OFFSET @offset' : ''}
     `
     )
     .all(params);

@@ -52,6 +52,10 @@ export const enums = {
 export const api = {
   getLocations: () => request('/locations'),
   getLocationById: (id) => request(`/locations/${id}`),
+  getLocationDevices: (id, filters = {}) => request(`/locations/${id}/devices${buildQuery(filters)}`),
+  getLocationIncidents: (id, filters = {}) => request(`/locations/${id}/incidents${buildQuery(filters)}`),
+  getLocationTasks: (id, filters = {}) => request(`/locations/${id}/tasks${buildQuery(filters)}`),
+  getLocationNotesByLocation: (id, filters = {}) => request(`/locations/${id}/notes${buildQuery(filters)}`),
   createLocation: (payload) => request('/locations', { method: 'POST', body: JSON.stringify(payload) }),
   updateLocation: (id, payload) => request(`/locations/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
   getLocationIntegrations: (id) => request(`/locations/${id}/integrations`),
@@ -62,12 +66,12 @@ export const api = {
     }),
   deleteLocation: (id) => request(`/locations/${id}`, { method: 'DELETE' }),
 
-  getDevices: () => request('/devices'),
+  getDevices: (filters = {}) => request(`/devices${buildQuery(filters)}`),
   createDevice: (payload) => request('/devices', { method: 'POST', body: JSON.stringify(payload) }),
   updateDevice: (id, payload) => request(`/devices/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
   deleteDevice: (id) => request(`/devices/${id}`, { method: 'DELETE' }),
 
-  getIncidents: () => request('/incidents'),
+  getIncidents: (filters = {}) => request(`/incidents${buildQuery(filters)}`),
   createIncident: (payload) => request('/incidents', { method: 'POST', body: JSON.stringify(payload) }),
   updateIncident: (id, payload) => request(`/incidents/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
   deleteIncident: (id) => request(`/incidents/${id}`, { method: 'DELETE' }),
@@ -83,9 +87,10 @@ export const api = {
   updateTask: (id, payload) => request(`/tasks/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
   deleteTask: (id) => request(`/tasks/${id}`, { method: 'DELETE' }),
 
-  getLocationNotes: () => request('/location-notes'),
+  getLocationNotes: (filters = {}) => request(`/location-notes${buildQuery(filters)}`),
   createLocationNote: (payload) => request('/location-notes', { method: 'POST', body: JSON.stringify(payload) }),
   deleteLocationNote: (id) => request(`/location-notes/${id}`, { method: 'DELETE' }),
+  getDashboardSummary: () => request('/dashboard/summary'),
 
   pingDeviceIp: (ip) =>
     request('/support-actions/ping', {

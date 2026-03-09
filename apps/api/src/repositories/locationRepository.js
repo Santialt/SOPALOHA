@@ -4,6 +4,10 @@ function findAll() {
   return db.prepare('SELECT * FROM locations ORDER BY name ASC').all();
 }
 
+function countAll() {
+  return db.prepare('SELECT COUNT(*) AS total FROM locations').get().total;
+}
+
 function findById(id) {
   return db.prepare('SELECT * FROM locations WHERE id = ?').get(id);
 }
@@ -116,6 +120,7 @@ function replaceIntegrations(locationId, integrationNames) {
 
 module.exports = {
   findAll,
+  countAll,
   findById,
   create,
   update,

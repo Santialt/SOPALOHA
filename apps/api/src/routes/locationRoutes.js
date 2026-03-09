@@ -13,6 +13,10 @@ const locationRules = [
 router.get('/', controller.getLocations);
 router.post('/', validateBody(locationRules), controller.createLocation);
 router.get('/:id', controller.getLocationById);
+router.get('/:id/devices', controller.getLocationDevices);
+router.get('/:id/incidents', controller.getLocationIncidents);
+router.get('/:id/tasks', controller.getLocationTasks);
+router.get('/:id/notes', controller.getLocationNotes);
 router.put('/:id', validateBody(locationRules), controller.updateLocation);
 router.get('/:id/integrations', controller.getLocationIntegrations);
 router.put('/:id/integrations', controller.putLocationIntegrations);
