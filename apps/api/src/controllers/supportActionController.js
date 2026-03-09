@@ -2,6 +2,7 @@ const { execFile } = require('child_process');
 const { promisify } = require('util');
 const { httpError } = require('../utils/httpError');
 const { isPrivateIpv4 } = require('../middleware/security');
+const { logger } = require('../utils/logger');
 
 const execFileAsync = promisify(execFile);
 const TEAMVIEWER_OPEN_LOCK_MS = 3000;
@@ -84,7 +85,10 @@ async function openTeamviewer(req, res, next) {
   const now = Date.now();
   const lastOpenAt = teamviewerOpenLocks.get(teamviewerId) || 0;
   if (now - lastOpenAt < TEAMVIEWER_OPEN_LOCK_MS) {
-    console.info(`[SupportAction] TeamViewer open throttled teamviewer_id=${teamviewerId}`);
+    logger.info('TeamViewer open throttled', {
+      request_id: req.requestId,
+      teamviewer_id: teamviewerId
+    });
     return res.status(202).json({
       success: true,
       skipped: true,
@@ -94,13 +98,19 @@ async function openTeamviewer(req, res, next) {
   }
 
   teamviewerOpenLocks.set(teamviewerId, now);
-  console.info(`[SupportAction] TeamViewer open requested teamviewer_id=${teamviewerId}`);
+  logger.info('TeamViewer open requested', {
+    request_id: req.requestId,
+    teamviewer_id: teamviewerId
+  });
 
   try {
     await execFileAsync('cmd', ['/c', 'start', '', `teamviewer10://control?device=${teamviewerId}`], {
       windowsHide: true
     });
-    console.info(`[SupportAction] TeamViewer launched via protocol teamviewer_id=${teamviewerId}`);
+    logger.info('TeamViewer launched via protocol', {
+      request_id: req.requestId,
+      teamviewer_id: teamviewerId
+    });
     return res.json({ success: true, method: 'protocol', teamviewer_id: teamviewerId });
   } catch (protocolError) {
     const fallbackExecutables = [
@@ -111,9 +121,11 @@ async function openTeamviewer(req, res, next) {
     for (const executable of fallbackExecutables) {
       try {
         await execFileAsync(executable, ['-i', teamviewerId], { windowsHide: true });
-        console.info(
-          `[SupportAction] TeamViewer launched via executable teamviewer_id=${teamviewerId} executable="${executable}"`
-        );
+        logger.info('TeamViewer launched via executable', {
+          request_id: req.requestId,
+          teamviewer_id: teamviewerId,
+          executable
+        });
         return res.json({
           success: true,
           method: 'executable',
@@ -126,8 +138,12 @@ async function openTeamviewer(req, res, next) {
     }
 
     teamviewerOpenLocks.delete(teamviewerId);
-    console.error(`[SupportAction] TeamViewer launch failed teamviewer_id=${teamviewerId}`);
-    return next(httpError(500, 'Could not launch TeamViewer from this machine'));
+    logger.error('TeamViewer launch failed', {
+      request_id: req.requestId,
+      teamviewer_id: teamviewerId,
+      error: protocolError
+    });
+    return next(httpError(500, 'Could not launch TeamViewer from this machine', { code: 'TEAMVIEWER_LAUNCH_FAILED' }));
   }
 }
 

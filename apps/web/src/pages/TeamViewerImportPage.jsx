@@ -3,6 +3,9 @@ import InlineError from '../components/InlineError';
 import InlineSuccess from '../components/InlineSuccess';
 import { api } from '../services/api';
 
+const PREVIEW_WARNING_MS = 8000;
+const IMPORT_WARNING_MS = 12000;
+
 function TeamViewerImportPage() {
   const [preview, setPreview] = useState(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
@@ -10,11 +13,17 @@ function TeamViewerImportPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [importResult, setImportResult] = useState(null);
+  const [operationNotice, setOperationNotice] = useState('');
 
   const loadPreview = async () => {
     setLoadingPreview(true);
     setError('');
     setSuccess('');
+    setOperationNotice('');
+
+    const noticeTimer = window.setTimeout(() => {
+      setOperationNotice('La vista previa esta tardando mas de lo normal. Esperando respuesta del backend...');
+    }, PREVIEW_WARNING_MS);
 
     try {
       const data = await api.getTeamviewerImportPreview();
@@ -22,6 +31,7 @@ function TeamViewerImportPage() {
     } catch (err) {
       setError(err.message);
     } finally {
+      window.clearTimeout(noticeTimer);
       setLoadingPreview(false);
     }
   };
@@ -30,6 +40,11 @@ function TeamViewerImportPage() {
     setImporting(true);
     setError('');
     setSuccess('');
+    setOperationNotice('');
+
+    const noticeTimer = window.setTimeout(() => {
+      setOperationNotice('La importacion sigue en curso. No cierres la pagina hasta recibir respuesta.');
+    }, IMPORT_WARNING_MS);
 
     try {
       const data = await api.runTeamviewerImport();
@@ -39,6 +54,7 @@ function TeamViewerImportPage() {
     } catch (err) {
       setError(err.message);
     } finally {
+      window.clearTimeout(noticeTimer);
       setImporting(false);
     }
   };
@@ -63,6 +79,7 @@ function TeamViewerImportPage() {
 
       <InlineError message={error} />
       <InlineSuccess message={success} />
+      <InlineSuccess message={operationNotice} />
 
       {preview && (
         <section className="section-card">

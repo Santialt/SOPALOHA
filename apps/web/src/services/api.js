@@ -1,15 +1,40 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
 const INTERNAL_API_KEY = import.meta.env.VITE_INTERNAL_API_KEY || '';
+const DEFAULT_TIMEOUT_MS = 15000;
+
+function buildApiError(data, fallbackMessage) {
+  const baseMessage = data.message || fallbackMessage || 'Error de API';
+  const requestIdSuffix = data.request_id ? ` [req: ${data.request_id}]` : '';
+  const error = new Error(`${baseMessage}${requestIdSuffix}`);
+  error.requestId = data.request_id || null;
+  error.code = data.code || null;
+  return error;
+}
 
 async function request(path, options = {}) {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(INTERNAL_API_KEY ? { 'X-Internal-Api-Key': INTERNAL_API_KEY } : {}),
-      ...(options.headers || {})
-    },
-    ...options
-  });
+  const controller = new AbortController();
+  const timeoutMs = Number(options.timeoutMs || DEFAULT_TIMEOUT_MS);
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(INTERNAL_API_KEY ? { 'X-Internal-Api-Key': INTERNAL_API_KEY } : {}),
+        ...(options.headers || {})
+      },
+      ...options,
+      signal: controller.signal
+    });
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      throw new Error(`La operacion excedio el tiempo esperado (${Math.round(timeoutMs / 1000)}s).`);
+    }
+    throw new Error('No se pudo conectar con el backend.');
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
 
   if (response.status === 204) {
     return null;
@@ -18,7 +43,7 @@ async function request(path, options = {}) {
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(data.message || 'Error de API');
+    throw buildApiError(data, 'Error de API');
   }
 
   return data;
@@ -103,17 +128,20 @@ export const api = {
       body: JSON.stringify({ teamviewer_id: teamviewerId })
     }),
 
-  getTeamviewerImportPreview: () => request('/teamviewer/import-preview'),
+  getTeamviewerImportPreview: () => request('/teamviewer/import-preview', { timeoutMs: 45000 }),
   runTeamviewerImport: () =>
     request('/teamviewer/import', {
-      method: 'POST'
+      method: 'POST',
+      timeoutMs: 60000
     }),
   importTeamviewerCases: (payload) =>
     request('/teamviewer/import-cases', {
       method: 'POST',
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      timeoutMs: 60000
     }),
-  getTeamviewerImportedCases: (filters = {}) => request(`/teamviewer/imported-cases${buildQuery(filters)}`),
+  getTeamviewerImportedCases: (filters = {}) =>
+    request(`/teamviewer/imported-cases${buildQuery(filters)}`, { timeoutMs: 30000 }),
   getTeamviewerImportedCaseById: (id) => request(`/teamviewer/imported-cases/${id}`),
   createTeamviewerImportedCase: (payload) =>
     request('/teamviewer/imported-cases', {
@@ -121,7 +149,7 @@ export const api = {
       body: JSON.stringify(payload)
     }),
   deleteTeamviewerImportedCase: (id) => request(`/teamviewer/imported-cases/${id}`, { method: 'DELETE' }),
-  getTeamviewerExplorer: () => request('/teamviewer/explorer'),
+  getTeamviewerExplorer: () => request('/teamviewer/explorer', { timeoutMs: 30000 }),
   getTeamviewerGroup: (groupId) => request(`/teamviewer/groups/${groupId}`),
   getTeamviewerDevice: (teamviewerId) => request(`/teamviewer/devices/${teamviewerId}`),
 

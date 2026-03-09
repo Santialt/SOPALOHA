@@ -1,3 +1,5 @@
+const { logger } = require('../utils/logger');
+
 function errorHandler(err, req, res, next) {
   if (res.headersSent) {
     return next(err);
@@ -5,20 +7,26 @@ function errorHandler(err, req, res, next) {
 
   const status = Number.isInteger(err.status) ? err.status : err instanceof SyntaxError ? 400 : 500;
   const requestId = req.requestId || 'unknown';
-  const isServerError = status >= 500;
+  const message =
+    status >= 500 && err.expose !== true
+      ? 'Internal server error'
+      : err.message || 'Request could not be processed';
+  const level = status >= 500 ? 'error' : 'warn';
 
-  if (isServerError) {
-    console.error(`[${requestId}]`, err.stack || err.message || err);
-  } else {
-    console.warn(`[${requestId}] ${err.message || 'Request error'}`);
-  }
+  logger[level]('Request failed', {
+    request_id: requestId,
+    method: req.method,
+    path: req.originalUrl || req.url,
+    status,
+    error_code: err.code || null,
+    error_source: err.source || null,
+    error: err
+  });
 
   res.status(status).json({
-    message:
-      status >= 500
-        ? 'Internal server error'
-        : err.message || 'Request could not be processed',
-    request_id: requestId
+    message,
+    request_id: requestId,
+    code: err.code || undefined
   });
 }
 

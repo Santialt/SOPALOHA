@@ -20,6 +20,7 @@ const {
   requireInternalAccess,
   setSecurityHeaders
 } = require('./middleware/security');
+const { requestContext } = require('./middleware/requestContext');
 const { notFound } = require('./middleware/notFound');
 const { errorHandler } = require('./middleware/errorHandler');
 
@@ -27,6 +28,7 @@ const app = express();
 
 app.disable('x-powered-by');
 app.use(setSecurityHeaders);
+app.use(requestContext);
 app.use(corsMiddleware());
 app.use(express.json({ limit: '250kb' }));
 

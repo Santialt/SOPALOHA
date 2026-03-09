@@ -50,7 +50,7 @@ Servidor:
 - `GET|POST|GET:id|PUT:id|DELETE:id /incidents`
 - `GET|POST|PUT:id|DELETE:id /weekly-tasks`
 - `GET|POST|DELETE:id /location-notes`
-- `GET /teamviewer-connections` (placeholder, responde `501`)
+- `GET /teamviewer-connections` (deshabilitado, responde `410`)
 - `GET /teamviewer/import-preview`
 - `POST /teamviewer/import`
 
@@ -69,6 +69,20 @@ Servidor:
   - ejecuta importacion real en transaccion SQLite
   - crea primero `locations` faltantes y luego `devices`
   - evita duplicados y devuelve resumen final
+
+## Operacion minima
+
+- Logs backend:
+  - salida JSON por consola con `request_id`, status, duracion y errores
+- Backup SQLite:
+  - `npm run db:backup`
+- Restore:
+  - detener backend
+  - reemplazar `data/support.db`
+  - borrar `support.db-wal` y `support.db-shm` si existen
+  - volver a iniciar y validar `GET /health`
+- Referencia breve:
+  - ver `docs/internal-operations.md`
 
 ### Decision de teamviewer_id
 

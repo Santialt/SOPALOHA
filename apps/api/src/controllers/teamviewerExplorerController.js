@@ -1,12 +1,15 @@
 const { httpError } = require('../utils/httpError');
 const service = require('../services/teamviewerExplorerService');
+const { logger } = require('../utils/logger');
 
 async function getExplorer(req, res, next) {
   try {
     const payload = await service.buildExplorerData();
-    console.info(
-      `[TeamViewer Explorer] groups=${payload.summary.groups_total} devices=${payload.summary.devices_total}`
-    );
+    logger.info('TeamViewer explorer snapshot generated', {
+      request_id: req.requestId,
+      groups_total: payload.summary.groups_total,
+      devices_total: payload.summary.devices_total
+    });
     return res.json(payload);
   } catch (error) {
     return next(error);
@@ -19,7 +22,10 @@ async function getGroup(req, res, next) {
     if (!payload.group) {
       return next(httpError(404, 'TeamViewer group not found'));
     }
-    console.info(`[TeamViewer Explorer] group requested group_id=${req.params.groupId}`);
+    logger.info('TeamViewer explorer group requested', {
+      request_id: req.requestId,
+      group_id: req.params.groupId
+    });
     return res.json(payload);
   } catch (error) {
     return next(error);
@@ -32,7 +38,10 @@ async function getDevice(req, res, next) {
     if (!payload.device) {
       return next(httpError(404, 'TeamViewer device not found'));
     }
-    console.info(`[TeamViewer Explorer] device requested teamviewer_id=${req.params.teamviewerId}`);
+    logger.info('TeamViewer explorer device requested', {
+      request_id: req.requestId,
+      teamviewer_id: req.params.teamviewerId
+    });
     return res.json(payload);
   } catch (error) {
     return next(error);

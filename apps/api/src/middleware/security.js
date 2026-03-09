@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const { URL } = require('url');
 const { httpError } = require('../utils/httpError');
+const { logger } = require('../utils/logger');
 
 const warnedMissingApiKey = { value: false };
 const DEFAULT_ALLOWED_ORIGINS = [
@@ -118,7 +119,7 @@ function hasValidApiKey(req) {
 
   if (!configuredApiKey) {
     if (!warnedMissingApiKey.value) {
-      console.warn('[Security] INTERNAL_API_KEY is not configured. Falling back to private-network-only access.');
+      logger.warn('INTERNAL_API_KEY is not configured. Falling back to private-network-only access.');
       warnedMissingApiKey.value = true;
     }
 

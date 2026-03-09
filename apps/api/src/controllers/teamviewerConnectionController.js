@@ -1,7 +1,11 @@
-function listTeamviewerConnections(req, res) {
-  res.status(501).json({
-    message: 'TeamViewer connections import/list is not implemented yet in this phase.'
-  });
+const { httpError } = require('../utils/httpError');
+
+function listTeamviewerConnections(req, res, next) {
+  next(
+    httpError(410, 'TeamViewer connections route is disabled in this build. Use /teamviewer/imported-cases instead.', {
+      code: 'FEATURE_DISABLED'
+    })
+  );
 }
 
 module.exports = { listTeamviewerConnections };
