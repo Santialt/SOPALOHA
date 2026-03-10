@@ -1,10 +1,10 @@
 const fs = require('fs');
 const path = require('path');
 const db = require('./connection');
-const { hashPassword } = require('../utils/passwords');
 
 const INITIAL_ADMIN_EMAIL = 'saltamirano@kronsa.com.ar';
-const INITIAL_ADMIN_PASSWORD = 'Akira4574@@';
+const INITIAL_ADMIN_PASSWORD_HASH =
+  'scrypt$16384$8$1$de98d699cb43d0664debb90763b3f9d8$c17a14431a4de9349b7ea9730176097c017d0196bd4531991e5b4ff5b01f7d4ab92f52ec3123cafa2048b19a1f2834973aeab726e50d4a6a4bb8f77fea356fdf';
 
 function hasColumn(tableName, columnName) {
   const columns = db.prepare(`PRAGMA table_info(${tableName})`).all();
@@ -213,8 +213,16 @@ function runMigrations() {
 }
 
 function ensureInitialAdminUser() {
-  const existing = db.prepare('SELECT id FROM users WHERE lower(email) = lower(?)').get(INITIAL_ADMIN_EMAIL);
+  const existing = db
+    .prepare('SELECT id, password_hash FROM users WHERE lower(email) = lower(?)')
+    .get(INITIAL_ADMIN_EMAIL);
   if (existing) {
+    if (!String(existing.password_hash || '').trim()) {
+      db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(
+        INITIAL_ADMIN_PASSWORD_HASH,
+        existing.id
+      );
+    }
     return;
   }
 
@@ -223,7 +231,7 @@ function ensureInitialAdminUser() {
     INSERT INTO users (name, email, password_hash, role, active)
     VALUES (?, ?, ?, 'admin', 1)
   `
-  ).run('Administrador SOPALOHA', INITIAL_ADMIN_EMAIL, hashPassword(INITIAL_ADMIN_PASSWORD));
+  ).run('Administrador SOPALOHA', INITIAL_ADMIN_EMAIL, INITIAL_ADMIN_PASSWORD_HASH);
 }
 
 function initDatabase() {
