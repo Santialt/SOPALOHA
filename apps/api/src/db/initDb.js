@@ -1,6 +1,10 @@
 const fs = require('fs');
 const path = require('path');
 const db = require('./connection');
+const { hashPassword } = require('../utils/passwords');
+
+const INITIAL_ADMIN_EMAIL = 'saltamirano@kronsa.com.ar';
+const INITIAL_ADMIN_PASSWORD = 'Akira4574@@';
 
 function hasColumn(tableName, columnName) {
   const columns = db.prepare(`PRAGMA table_info(${tableName})`).all();
@@ -27,6 +31,62 @@ function runMigrations() {
   ensureColumn('devices', 'cpu', 'TEXT');
   ensureColumn('devices', 'disk_type', 'TEXT');
   ensureColumn('devices', 'device_role', 'TEXT');
+  ensureColumn('incidents', 'created_by', 'INTEGER');
+  ensureColumn('incidents', 'updated_by', 'INTEGER');
+  ensureColumn('tasks', 'created_by', 'INTEGER');
+  ensureColumn('tasks', 'updated_by', 'INTEGER');
+  ensureColumn('tasks', 'assigned_user_id', 'INTEGER');
+  ensureColumn('location_notes', 'created_by', 'INTEGER');
+  ensureColumn('location_notes', 'updated_by', 'INTEGER');
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      role TEXT NOT NULL CHECK (role IN ('admin', 'tech')),
+      active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_users_email ON users(lower(email));
+    CREATE INDEX IF NOT EXISTS idx_users_role_active ON users(role, active);
+
+    CREATE TRIGGER IF NOT EXISTS trg_users_updated_at
+    AFTER UPDATE ON users
+    FOR EACH ROW
+    BEGIN
+      UPDATE users SET updated_at = datetime('now') WHERE id = NEW.id;
+    END;
+
+    CREATE TABLE IF NOT EXISTS comments (
+      id INTEGER PRIMARY KEY,
+      entity_type TEXT NOT NULL CHECK (entity_type IN ('incident', 'task')),
+      entity_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      comment TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_comments_entity ON comments(entity_type, entity_id, created_at, id);
+    CREATE INDEX IF NOT EXISTS idx_tasks_assigned_user_id ON tasks(assigned_user_id);
+    CREATE INDEX IF NOT EXISTS idx_incidents_created_by ON incidents(created_by);
+    CREATE INDEX IF NOT EXISTS idx_tasks_created_by ON tasks(created_by);
+    CREATE INDEX IF NOT EXISTS idx_location_notes_created_by ON location_notes(created_by);
+
+    CREATE TRIGGER IF NOT EXISTS trg_comments_updated_at
+    AFTER UPDATE ON comments
+    FOR EACH ROW
+    BEGIN
+      UPDATE comments SET updated_at = datetime('now') WHERE id = NEW.id;
+    END;
+  `);
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS location_integrations (
@@ -152,6 +212,20 @@ function runMigrations() {
   }
 }
 
+function ensureInitialAdminUser() {
+  const existing = db.prepare('SELECT id FROM users WHERE lower(email) = lower(?)').get(INITIAL_ADMIN_EMAIL);
+  if (existing) {
+    return;
+  }
+
+  db.prepare(
+    `
+    INSERT INTO users (name, email, password_hash, role, active)
+    VALUES (?, ?, ?, 'admin', 1)
+  `
+  ).run('Administrador SOPALOHA', INITIAL_ADMIN_EMAIL, hashPassword(INITIAL_ADMIN_PASSWORD));
+}
+
 function initDatabase() {
   const schemaPath = path.resolve(__dirname, '../../../../docs/sqlite-mvp-schema.sql');
 
@@ -162,6 +236,7 @@ function initDatabase() {
   const sql = fs.readFileSync(schemaPath, 'utf8');
   db.exec(sql);
   runMigrations();
+  ensureInitialAdminUser();
   console.log('Database initialized successfully at data/support.db');
 }
 

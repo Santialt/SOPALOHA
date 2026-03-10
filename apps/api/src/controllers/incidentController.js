@@ -18,7 +18,7 @@ function getIncidentById(req, res, next) {
 
 function createIncident(req, res, next) {
   try {
-    const created = service.createIncident(req.body);
+    const created = service.createIncident(req.body, req.user.id);
     res.status(201).json(created);
   } catch (error) {
     next(error);
@@ -27,7 +27,7 @@ function createIncident(req, res, next) {
 
 function updateIncident(req, res, next) {
   try {
-    const updated = service.updateIncident(Number(req.params.id), req.body);
+    const updated = service.updateIncident(Number(req.params.id), req.body, req.user.id);
     res.json(updated);
   } catch (error) {
     next(error);

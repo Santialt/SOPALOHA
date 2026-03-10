@@ -1,3 +1,4 @@
+const userRepository = require('../repositories/userRepository');
 const repository = require('../repositories/taskRepository');
 const { httpError } = require('../utils/httpError');
 
@@ -15,6 +16,20 @@ function toNullableInteger(value) {
 }
 
 function normalizePayload(payload, existing = {}) {
+  const requestedAssignedUserId = payload.assigned_user_id;
+  const assignedUserId = toNullableInteger(requestedAssignedUserId ?? existing.assigned_user_id);
+  const assignedUser = assignedUserId ? userRepository.findById(assignedUserId) : null;
+
+  if (
+    requestedAssignedUserId !== undefined &&
+    requestedAssignedUserId !== null &&
+    requestedAssignedUserId !== '' &&
+    assignedUserId &&
+    (!assignedUser || !assignedUser.active)
+  ) {
+    throw httpError(400, 'Assigned user is invalid or inactive');
+  }
+
   return {
     title: String(payload.title ?? existing.title ?? '').trim(),
     description: isBlank(payload.description) ? null : String(payload.description),
@@ -23,7 +38,12 @@ function normalizePayload(payload, existing = {}) {
     incident_id: toNullableInteger(payload.incident_id ?? existing.incident_id),
     status: payload.status || existing.status || 'pending',
     priority: payload.priority || existing.priority || 'medium',
-    assigned_to: isBlank(payload.assigned_to) ? null : String(payload.assigned_to).trim(),
+    assigned_to: assignedUser
+      ? assignedUser.name
+      : isBlank(payload.assigned_to)
+        ? existing.assigned_to ?? null
+        : String(payload.assigned_to).trim(),
+    assigned_user_id: assignedUserId,
     due_date: isBlank(payload.due_date) ? null : String(payload.due_date),
     scheduled_for: isBlank(payload.scheduled_for) ? null : String(payload.scheduled_for),
     task_type: isBlank(payload.task_type) ? (existing.task_type || 'general') : String(payload.task_type).trim()
@@ -86,16 +106,16 @@ function getTaskById(id) {
   return task;
 }
 
-function createTask(payload) {
+function createTask(payload, actorId) {
   const normalized = normalizePayload(payload);
   if (!normalized.title) {
     throw httpError(400, 'Field title is required');
   }
 
-  return repository.create(normalized);
+  return repository.create({ ...normalized, created_by: actorId, updated_by: actorId });
 }
 
-function updateTask(id, payload) {
+function updateTask(id, payload, actorId) {
   const existing = repository.findById(id);
   if (!existing) throw httpError(404, 'Task not found');
 
@@ -104,7 +124,7 @@ function updateTask(id, payload) {
     throw httpError(400, 'Field title is required');
   }
 
-  return repository.update(id, normalized);
+  return repository.update(id, { ...normalized, updated_by: actorId });
 }
 
 function deleteTask(id) {

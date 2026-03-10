@@ -21,7 +21,7 @@ function getTaskById(req, res, next) {
 
 function createTask(req, res, next) {
   try {
-    const created = service.createTask(req.body);
+    const created = service.createTask(req.body, req.user.id);
     res.status(201).json(created);
   } catch (error) {
     next(error);
@@ -32,7 +32,7 @@ function updateTask(req, res, next) {
   try {
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) throw httpError(400, 'Task id must be an integer');
-    const updated = service.updateTask(id, req.body);
+    const updated = service.updateTask(id, req.body, req.user.id);
     res.json(updated);
   } catch (error) {
     next(error);

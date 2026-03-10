@@ -2,6 +2,8 @@ const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const express = require('express');
 const { health } = require('./controllers/healthController');
+const authRoutes = require('./routes/authRoutes');
+const userRoutes = require('./routes/userRoutes');
 const locationRoutes = require('./routes/locationRoutes');
 const deviceRoutes = require('./routes/deviceRoutes');
 const incidentRoutes = require('./routes/incidentRoutes');
@@ -20,6 +22,7 @@ const {
   requireInternalAccess,
   setSecurityHeaders
 } = require('./middleware/security');
+const { attachAuth, requireAuth } = require('./middleware/auth');
 const { requestContext } = require('./middleware/requestContext');
 const { notFound } = require('./middleware/notFound');
 const { errorHandler } = require('./middleware/errorHandler');
@@ -34,6 +37,10 @@ app.use(express.json({ limit: '250kb' }));
 
 app.get('/health', health);
 app.use(requireInternalAccess);
+app.use(attachAuth);
+app.use('/auth', authRoutes);
+app.use(requireAuth);
+app.use('/users', userRoutes);
 app.use('/locations', locationRoutes);
 app.use('/devices', deviceRoutes);
 app.use('/incidents', incidentRoutes);

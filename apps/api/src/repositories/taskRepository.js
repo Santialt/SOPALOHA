@@ -31,8 +31,15 @@ function findAll(filters = {}) {
   }
 
   const sql = `
-    SELECT *
+    SELECT
+      tasks.*,
+      creator.name AS created_by_name,
+      updater.name AS updated_by_name,
+      assigned_user.name AS assigned_user_name
     FROM tasks
+    LEFT JOIN users creator ON creator.id = tasks.created_by
+    LEFT JOIN users updater ON updater.id = tasks.updated_by
+    LEFT JOIN users assigned_user ON assigned_user.id = tasks.assigned_user_id
     ${whereSql}
     ORDER BY
       scheduled_for IS NULL,
@@ -70,17 +77,32 @@ function countAll(filters = {}) {
 }
 
 function findById(id) {
-  return db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
+  return db
+    .prepare(
+      `
+      SELECT
+        tasks.*,
+        creator.name AS created_by_name,
+        updater.name AS updated_by_name,
+        assigned_user.name AS assigned_user_name
+      FROM tasks
+      LEFT JOIN users creator ON creator.id = tasks.created_by
+      LEFT JOIN users updater ON updater.id = tasks.updated_by
+      LEFT JOIN users assigned_user ON assigned_user.id = tasks.assigned_user_id
+      WHERE tasks.id = ?
+    `
+    )
+    .get(id);
 }
 
 function create(payload) {
   const stmt = db.prepare(`
     INSERT INTO tasks (
       title, description, location_id, device_id, incident_id,
-      status, priority, assigned_to, due_date, scheduled_for, task_type
+      status, priority, assigned_to, assigned_user_id, due_date, scheduled_for, task_type, created_by, updated_by
     ) VALUES (
       @title, @description, @location_id, @device_id, @incident_id,
-      @status, @priority, @assigned_to, @due_date, @scheduled_for, @task_type
+      @status, @priority, @assigned_to, @assigned_user_id, @due_date, @scheduled_for, @task_type, @created_by, @updated_by
     )
   `);
 
@@ -93,9 +115,12 @@ function create(payload) {
     status: payload.status || 'pending',
     priority: payload.priority || 'medium',
     assigned_to: payload.assigned_to || null,
+    assigned_user_id: payload.assigned_user_id ?? null,
     due_date: payload.due_date || null,
     scheduled_for: payload.scheduled_for || null,
-    task_type: payload.task_type || 'general'
+    task_type: payload.task_type || 'general',
+    created_by: payload.created_by ?? null,
+    updated_by: payload.updated_by ?? payload.created_by ?? null
   });
 
   return findById(result.lastInsertRowid);
@@ -113,9 +138,11 @@ function update(id, payload) {
       status = @status,
       priority = @priority,
       assigned_to = @assigned_to,
+      assigned_user_id = @assigned_user_id,
       due_date = @due_date,
       scheduled_for = @scheduled_for,
-      task_type = @task_type
+      task_type = @task_type,
+      updated_by = @updated_by
     WHERE id = @id
   `);
 
@@ -129,9 +156,11 @@ function update(id, payload) {
     status: payload.status || 'pending',
     priority: payload.priority || 'medium',
     assigned_to: payload.assigned_to || null,
+    assigned_user_id: payload.assigned_user_id ?? null,
     due_date: payload.due_date || null,
     scheduled_for: payload.scheduled_for || null,
-    task_type: payload.task_type || 'general'
+    task_type: payload.task_type || 'general',
+    updated_by: payload.updated_by ?? null
   });
 
   return findById(id);

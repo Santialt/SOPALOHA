@@ -52,8 +52,13 @@ function findAll(filters = {}) {
   return db
     .prepare(
       `
-      SELECT *
+      SELECT
+        incidents.*,
+        creator.name AS created_by_name,
+        updater.name AS updated_by_name
       FROM incidents
+      LEFT JOIN users creator ON creator.id = incidents.created_by
+      LEFT JOIN users updater ON updater.id = incidents.updated_by
       ${whereSql}
       ORDER BY incident_date DESC, id DESC
       ${limitSql}
@@ -68,17 +73,30 @@ function countAll(filters = {}) {
 }
 
 function findById(id) {
-  return db.prepare('SELECT * FROM incidents WHERE id = ?').get(id);
+  return db
+    .prepare(
+      `
+      SELECT
+        incidents.*,
+        creator.name AS created_by_name,
+        updater.name AS updated_by_name
+      FROM incidents
+      LEFT JOIN users creator ON creator.id = incidents.created_by
+      LEFT JOIN users updater ON updater.id = incidents.updated_by
+      WHERE incidents.id = ?
+    `
+    )
+    .get(id);
 }
 
 function create(payload) {
   const stmt = db.prepare(`
     INSERT INTO incidents (
       location_id, device_id, incident_date, title, description, solution,
-      category, time_spent_minutes, status, notes
+      category, time_spent_minutes, status, notes, created_by, updated_by
     ) VALUES (
       @location_id, @device_id, @incident_date, @title, @description, @solution,
-      @category, @time_spent_minutes, @status, @notes
+      @category, @time_spent_minutes, @status, @notes, @created_by, @updated_by
     )
   `);
 
@@ -92,7 +110,9 @@ function create(payload) {
     category: payload.category || 'other',
     time_spent_minutes: payload.time_spent_minutes || 0,
     status: payload.status || 'open',
-    notes: payload.notes || null
+    notes: payload.notes || null,
+    created_by: payload.created_by ?? null,
+    updated_by: payload.updated_by ?? payload.created_by ?? null
   });
 
   return findById(result.lastInsertRowid);
@@ -111,7 +131,8 @@ function update(id, payload) {
       category = @category,
       time_spent_minutes = @time_spent_minutes,
       status = @status,
-      notes = @notes
+      notes = @notes,
+      updated_by = @updated_by
     WHERE id = @id
   `);
 
@@ -126,7 +147,8 @@ function update(id, payload) {
     category: payload.category || 'other',
     time_spent_minutes: payload.time_spent_minutes || 0,
     status: payload.status || 'open',
-    notes: payload.notes || null
+    notes: payload.notes || null,
+    updated_by: payload.updated_by ?? null
   });
 
   return findById(id);

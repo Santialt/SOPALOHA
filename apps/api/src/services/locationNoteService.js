@@ -39,8 +39,8 @@ function listLocationNotes(filters = {}) {
   return repository.findAll(normalizeListFilters(filters));
 }
 
-function createLocationNote(payload) {
-  return repository.create(payload);
+function createLocationNote(payload, actorId) {
+  return repository.create({ ...payload, created_by: actorId, updated_by: actorId });
 }
 
 function deleteLocationNote(id) {

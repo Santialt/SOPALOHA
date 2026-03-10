@@ -8,6 +8,7 @@ function buildApiError(data, fallbackMessage) {
   const error = new Error(`${baseMessage}${requestIdSuffix}`);
   error.requestId = data.request_id || null;
   error.code = data.code || null;
+  error.status = data.status || null;
   return error;
 }
 
@@ -19,6 +20,7 @@ async function request(path, options = {}) {
   let response;
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         ...(INTERNAL_API_KEY ? { 'X-Internal-Api-Key': INTERNAL_API_KEY } : {}),
@@ -43,6 +45,7 @@ async function request(path, options = {}) {
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
+    data.status = response.status;
     throw buildApiError(data, 'Error de API');
   }
 
@@ -76,6 +79,18 @@ export const enums = {
 
 export const api = {
   getLocations: () => request('/locations'),
+  login: (payload) => request('/auth/login', { method: 'POST', body: JSON.stringify(payload) }),
+  logout: () => request('/auth/logout', { method: 'POST' }),
+  getCurrentUser: () => request('/auth/me'),
+
+  getUsers: (filters = {}) => request(`/users${buildQuery(filters)}`),
+  getAssignableUsers: () => request('/users/assignable'),
+  getUserById: (id) => request(`/users/${id}`),
+  createUser: (payload) => request('/users', { method: 'POST', body: JSON.stringify(payload) }),
+  updateUser: (id, payload) => request(`/users/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  updateUserActive: (id, active) =>
+    request(`/users/${id}/active`, { method: 'PATCH', body: JSON.stringify({ active }) }),
+
   getLocationById: (id) => request(`/locations/${id}`),
   getLocationDevices: (id, filters = {}) => request(`/locations/${id}/devices${buildQuery(filters)}`),
   getLocationIncidents: (id, filters = {}) => request(`/locations/${id}/incidents${buildQuery(filters)}`),
@@ -97,7 +112,10 @@ export const api = {
   deleteDevice: (id) => request(`/devices/${id}`, { method: 'DELETE' }),
 
   getIncidents: (filters = {}) => request(`/incidents${buildQuery(filters)}`),
+  getIncidentComments: (id) => request(`/incidents/${id}/comments`),
   createIncident: (payload) => request('/incidents', { method: 'POST', body: JSON.stringify(payload) }),
+  createIncidentComment: (id, payload) =>
+    request(`/incidents/${id}/comments`, { method: 'POST', body: JSON.stringify(payload) }),
   updateIncident: (id, payload) => request(`/incidents/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
   deleteIncident: (id) => request(`/incidents/${id}`, { method: 'DELETE' }),
 
@@ -108,7 +126,10 @@ export const api = {
 
   getTasks: (filters = {}) => request(`/tasks${buildQuery(filters)}`),
   getTaskById: (id) => request(`/tasks/${id}`),
+  getTaskComments: (id) => request(`/tasks/${id}/comments`),
   createTask: (payload) => request('/tasks', { method: 'POST', body: JSON.stringify(payload) }),
+  createTaskComment: (id, payload) =>
+    request(`/tasks/${id}/comments`, { method: 'POST', body: JSON.stringify(payload) }),
   updateTask: (id, payload) => request(`/tasks/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
   deleteTask: (id) => request(`/tasks/${id}`, { method: 'DELETE' }),
 

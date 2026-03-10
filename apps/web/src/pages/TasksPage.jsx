@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import EntityCommentsPanel from '../components/EntityCommentsPanel';
 import InlineError from '../components/InlineError';
 import InlineSuccess from '../components/InlineSuccess';
 import LoadingBlock from '../components/LoadingBlock';
@@ -44,6 +45,7 @@ function emptyForm() {
     status: 'pending',
     priority: 'medium',
     assigned_to: '',
+    assigned_user_id: '',
     due_date: '',
     scheduled_for: '',
     task_type: 'general'
@@ -127,6 +129,7 @@ function buildTaskUpdatePayload(task, nextStatus) {
     status: nextStatus,
     priority: task.priority || 'medium',
     assigned_to: task.assigned_to || null,
+    assigned_user_id: task.assigned_user_id ?? null,
     due_date: task.due_date || null,
     scheduled_for: task.scheduled_for || null,
     task_type: task.task_type || 'general'
@@ -141,6 +144,7 @@ function TasksPage() {
   const [draggingTaskId, setDraggingTaskId] = useState(null);
   const [dragOverStatus, setDragOverStatus] = useState('');
   const [success, setSuccess] = useState('');
+  const [selectedTaskId, setSelectedTaskId] = useState(null);
   const [viewMode, setViewMode] = useState('kanban');
   const [calendarScope, setCalendarScope] = useState('month');
   const [calendarCursor, setCalendarCursor] = useState(() => startOfDay(new Date()));
@@ -153,6 +157,7 @@ function TasksPage() {
   const [locations, setLocations] = useState([]);
   const [devices, setDevices] = useState([]);
   const [incidents, setIncidents] = useState([]);
+  const [users, setUsers] = useState([]);
 
   const [filters, setFilters] = useState({ status: '', priority: '', location_id: '' });
   const [form, setForm] = useState(emptyForm());
@@ -166,19 +171,21 @@ function TasksPage() {
       api.getTasks(effectiveFilters),
       api.getLocations(),
       api.getDevices(),
-      api.getIncidents()
+      api.getIncidents(),
+      api.getAssignableUsers()
     ];
 
     if (viewMode === 'calendar') {
       requests.push(api.getTasks());
     }
 
-    const [tasksData, locationsData, devicesData, incidentsData, allTasksData = []] = await Promise.all(requests);
+    const [tasksData, locationsData, devicesData, incidentsData, usersData, allTasksData = []] = await Promise.all(requests);
 
     setTasks(tasksData);
     setLocations(locationsData);
     setDevices(devicesData);
     setIncidents(incidentsData);
+    setUsers(usersData);
     setCalendarUndatedTasks(
       viewMode === 'calendar' ? allTasksData.filter((task) => !toDateFromTask(task)) : []
     );
@@ -195,6 +202,7 @@ function TasksPage() {
       location_id: form.location_id ? Number(form.location_id) : null,
       device_id: form.device_id ? Number(form.device_id) : null,
       incident_id: form.incident_id ? Number(form.incident_id) : null,
+      assigned_user_id: form.assigned_user_id ? Number(form.assigned_user_id) : null,
       due_date: form.due_date || null,
       scheduled_for: form.scheduled_for || null,
       assigned_to: form.assigned_to || null
@@ -211,6 +219,7 @@ function TasksPage() {
 
       setEditingTaskId(null);
       setForm(emptyForm());
+      setSelectedTaskId(null);
       await load();
     } catch (err) {
       setError(err.message);
@@ -232,10 +241,12 @@ function TasksPage() {
       status: task.status || 'pending',
       priority: task.priority || 'medium',
       assigned_to: task.assigned_to || '',
+      assigned_user_id: task.assigned_user_id ? String(task.assigned_user_id) : '',
       due_date: task.due_date || '',
       scheduled_for: normalizeDatetimeInput(task.scheduled_for),
       task_type: task.task_type || 'general'
     });
+    setSelectedTaskId(task.id);
   };
 
   const onCancelEdit = () => {
@@ -256,6 +267,9 @@ function TasksPage() {
       if (editingTaskId === task.id) {
         setEditingTaskId(null);
         setForm(emptyForm());
+      }
+      if (selectedTaskId === task.id) {
+        setSelectedTaskId(null);
       }
       setSuccess(`Tarea #${task.id} eliminada.`);
       await load();
@@ -576,6 +590,27 @@ function TasksPage() {
 
           <label>
             Asignado a
+            <select
+              className="input"
+              value={form.assigned_user_id}
+              onChange={(event) => {
+                const selectedUser = users.find((item) => item.id === Number(event.target.value));
+                setForm({
+                  ...form,
+                  assigned_user_id: event.target.value,
+                  assigned_to: selectedUser?.name || ''
+                });
+              }}
+            >
+              <option value="">Sin usuario</option>
+              {users.map((user) => (
+                <option key={user.id} value={user.id}>{user.name} ({user.role})</option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            Asignado a (texto legacy)
             <input
               className="input"
               value={form.assigned_to}
@@ -739,6 +774,9 @@ function TasksPage() {
                             <span className={`badge ${task.status}`}>{task.status}</span>
                             <button className="btn-secondary" onClick={() => onEdit(task)}>
                               Editar
+                            </button>
+                            <button className="btn-secondary" onClick={() => setSelectedTaskId(task.id)}>
+                              Comentarios
                             </button>
                             <button
                               className="btn-danger"
@@ -927,6 +965,9 @@ function TasksPage() {
                         <button className="btn-secondary" onClick={() => onEdit(task)}>
                           Editar
                         </button>
+                        <button className="btn-secondary" onClick={() => setSelectedTaskId(task.id)}>
+                          Comentarios
+                        </button>
                         <button
                           className="btn-danger"
                           onClick={() => onDelete(task)}
@@ -948,6 +989,13 @@ function TasksPage() {
           </table>
         )}
       </section>
+
+      <EntityCommentsPanel
+        entityId={selectedTaskId}
+        entityLabel={selectedTaskId ? `de la tarea #${selectedTaskId}` : 'de tarea'}
+        loadComments={api.getTaskComments}
+        createComment={api.createTaskComment}
+      />
     </div>
   );
 }

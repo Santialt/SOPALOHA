@@ -132,12 +132,20 @@ CREATE TABLE IF NOT EXISTS incidents (
   time_spent_minutes INTEGER NOT NULL DEFAULT 0 CHECK (time_spent_minutes >= 0),
   status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'closed')),
   notes TEXT,
+  created_by INTEGER,
+  updated_by INTEGER,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (location_id) REFERENCES locations(id)
     ON UPDATE CASCADE
     ON DELETE RESTRICT,
   FOREIGN KEY (device_id) REFERENCES devices(id)
+    ON UPDATE CASCADE
+    ON DELETE SET NULL,
+  FOREIGN KEY (created_by) REFERENCES users(id)
+    ON UPDATE CASCADE
+    ON DELETE SET NULL,
+  FOREIGN KEY (updated_by) REFERENCES users(id)
     ON UPDATE CASCADE
     ON DELETE SET NULL
 );
@@ -245,9 +253,12 @@ CREATE TABLE IF NOT EXISTS tasks (
   priority TEXT NOT NULL DEFAULT 'medium'
     CHECK (priority IN ('low', 'medium', 'high', 'critical')),
   assigned_to TEXT,
+  assigned_user_id INTEGER,
   due_date TEXT,      -- YYYY-MM-DD
   scheduled_for TEXT, -- YYYY-MM-DDTHH:MM
   task_type TEXT NOT NULL DEFAULT 'general',
+  created_by INTEGER,
+  updated_by INTEGER,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (location_id) REFERENCES locations(id)
@@ -257,6 +268,15 @@ CREATE TABLE IF NOT EXISTS tasks (
     ON UPDATE CASCADE
     ON DELETE SET NULL,
   FOREIGN KEY (incident_id) REFERENCES incidents(id)
+    ON UPDATE CASCADE
+    ON DELETE SET NULL,
+  FOREIGN KEY (assigned_user_id) REFERENCES users(id)
+    ON UPDATE CASCADE
+    ON DELETE SET NULL,
+  FOREIGN KEY (created_by) REFERENCES users(id)
+    ON UPDATE CASCADE
+    ON DELETE SET NULL,
+  FOREIGN KEY (updated_by) REFERENCES users(id)
     ON UPDATE CASCADE
     ON DELETE SET NULL
 );
@@ -313,10 +333,50 @@ CREATE TABLE IF NOT EXISTS location_notes (
   id INTEGER PRIMARY KEY,
   location_id INTEGER NOT NULL,
   note TEXT NOT NULL,
+  created_by INTEGER,
+  updated_by INTEGER,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (location_id) REFERENCES locations(id)
     ON UPDATE CASCADE
-    ON DELETE CASCADE
+    ON DELETE CASCADE,
+  FOREIGN KEY (created_by) REFERENCES users(id)
+    ON UPDATE CASCADE
+    ON DELETE SET NULL,
+  FOREIGN KEY (updated_by) REFERENCES users(id)
+    ON UPDATE CASCADE
+    ON DELETE SET NULL
+);
+
+-- =========================================================
+-- TABLE: users
+-- Basic internal authentication users.
+-- =========================================================
+CREATE TABLE IF NOT EXISTS users (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  role TEXT NOT NULL CHECK (role IN ('admin', 'tech')),
+  active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- =========================================================
+-- TABLE: comments
+-- Basic comments for incidents and tasks.
+-- =========================================================
+CREATE TABLE IF NOT EXISTS comments (
+  id INTEGER PRIMARY KEY,
+  entity_type TEXT NOT NULL CHECK (entity_type IN ('incident', 'task')),
+  entity_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  comment TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (user_id) REFERENCES users(id)
+    ON UPDATE CASCADE
+    ON DELETE RESTRICT
 );
 
 -- =========================================================
@@ -385,6 +445,20 @@ BEGIN
   UPDATE on_call_technicians SET updated_at = datetime('now') WHERE id = NEW.id;
 END;
 
+CREATE TRIGGER IF NOT EXISTS trg_users_updated_at
+AFTER UPDATE ON users
+FOR EACH ROW
+BEGIN
+  UPDATE users SET updated_at = datetime('now') WHERE id = NEW.id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_comments_updated_at
+AFTER UPDATE ON comments
+FOR EACH ROW
+BEGIN
+  UPDATE comments SET updated_at = datetime('now') WHERE id = NEW.id;
+END;
+
 -- =========================================================
 -- INDEXES: performance for operational queries.
 -- =========================================================
@@ -439,6 +513,9 @@ CREATE INDEX IF NOT EXISTS idx_on_call_technicians_active ON on_call_technicians
 
 CREATE INDEX IF NOT EXISTS idx_location_notes_location_created
   ON location_notes(location_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(lower(email));
+CREATE INDEX IF NOT EXISTS idx_users_role_active ON users(role, active);
+CREATE INDEX IF NOT EXISTS idx_comments_entity ON comments(entity_type, entity_id, created_at DESC, id DESC);
 
 -- =========================================================
 -- VIEW: daily rollup generated on demand (no persisted daily_reports in MVP).

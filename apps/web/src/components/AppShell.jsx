@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { applyTheme, getPreferredTheme } from '../theme';
 
 const navItems = [
@@ -10,7 +11,8 @@ const navItems = [
   { to: '/on-call', label: 'Guardias' },
   { to: '/location-notes', label: 'Notas Tecnicas' },
   { to: '/teamviewer-explorer', label: 'TeamViewer Explorer' },
-  { to: '/teamviewer-import', label: 'TeamViewer Import' }
+  { to: '/teamviewer-import', label: 'TeamViewer Import' },
+  { to: '/users', label: 'Usuarios', adminOnly: true }
 ];
 
 const pageTitles = {
@@ -21,7 +23,8 @@ const pageTitles = {
   '/on-call': 'Guardias',
   '/location-notes': 'Notas Tecnicas',
   '/teamviewer-explorer': 'TeamViewer Explorer',
-  '/teamviewer-import': 'TeamViewer Import'
+  '/teamviewer-import': 'TeamViewer Import',
+  '/users': 'Usuarios'
 };
 
 function resolveTitle(pathname) {
@@ -34,12 +37,21 @@ function resolveTitle(pathname) {
 
 function AppShell() {
   const { pathname } = useLocation();
+  const { user, isAdmin, logout } = useAuth();
   const [theme, setTheme] = useState(() => getPreferredTheme());
   const headerTitle = useMemo(() => resolveTitle(pathname), [pathname]);
+  const visibleNavItems = useMemo(
+    () => navItems.filter((item) => !item.adminOnly || isAdmin),
+    [isAdmin]
+  );
 
   const onToggleTheme = () => {
     const nextTheme = theme === 'dark' ? 'light' : 'dark';
     setTheme(applyTheme(nextTheme));
+  };
+
+  const onLogout = async () => {
+    await logout();
   };
 
   return (
@@ -48,7 +60,7 @@ function AppShell() {
         <div className="sidebar-brand">SOPALOHA</div>
         <div className="sidebar-subtitle">OPS Console / Aloha POS</div>
         <nav className="sidebar-nav">
-          {navItems.map((item) => (
+          {visibleNavItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -64,11 +76,19 @@ function AppShell() {
         <header className="main-header">
           <div>
             <h1>{headerTitle}</h1>
-            <div className="header-subtitle">Mesa interna de soporte POS / Aloha</div>
+            <div className="header-subtitle">
+              Mesa interna de soporte POS / Aloha
+              {user ? ` · ${user.name} (${user.role})` : ''}
+            </div>
           </div>
-          <button type="button" className="theme-toggle" onClick={onToggleTheme}>
-            Tema: {theme === 'dark' ? 'Oscuro' : 'Claro'}
-          </button>
+          <div className="form-actions">
+            <button type="button" className="theme-toggle" onClick={onToggleTheme}>
+              Tema: {theme === 'dark' ? 'Oscuro' : 'Claro'}
+            </button>
+            <button type="button" className="btn-secondary" onClick={onLogout}>
+              Logout
+            </button>
+          </div>
         </header>
 
         <section className="page-body">

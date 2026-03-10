@@ -10,7 +10,7 @@ function getLocationNotes(req, res, next) {
 
 function createLocationNote(req, res, next) {
   try {
-    const created = service.createLocationNote(req.body);
+    const created = service.createLocationNote(req.body, req.user.id);
     res.status(201).json(created);
   } catch (error) {
     next(error);

@@ -21,6 +21,7 @@ function requestContext(req, res, next) {
       path: req.originalUrl || req.url,
       status,
       duration_ms: Math.round(durationMs * 100) / 100,
+      user_id: req.user?.id || null,
       ip: getClientIp(req),
       user_agent: req.headers['user-agent'] || null
     });

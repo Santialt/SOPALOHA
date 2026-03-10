@@ -96,13 +96,13 @@ function getIncident(id) {
   return row;
 }
 
-function createIncident(payload) {
-  return repository.create(payload);
+function createIncident(payload, actorId) {
+  return repository.create({ ...payload, created_by: actorId, updated_by: actorId });
 }
 
-function updateIncident(id, payload) {
+function updateIncident(id, payload, actorId) {
   getIncident(id);
-  return repository.update(id, payload);
+  return repository.update(id, { ...payload, updated_by: actorId });
 }
 
 function deleteIncident(id) {

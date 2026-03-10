@@ -22,8 +22,13 @@ function findAll(filters = {}) {
   return db
     .prepare(
       `
-      SELECT *
+      SELECT
+        location_notes.*,
+        creator.name AS created_by_name,
+        updater.name AS updated_by_name
       FROM location_notes
+      LEFT JOIN users creator ON creator.id = location_notes.created_by
+      LEFT JOIN users updater ON updater.id = location_notes.updated_by
       ${whereSql}
       ORDER BY created_at DESC, id DESC
       ${limitSql}
@@ -33,9 +38,24 @@ function findAll(filters = {}) {
 }
 
 function create(payload) {
-  const stmt = db.prepare('INSERT INTO location_notes (location_id, note) VALUES (?, ?)');
-  const result = stmt.run(payload.location_id, payload.note);
-  return db.prepare('SELECT * FROM location_notes WHERE id = ?').get(result.lastInsertRowid);
+  const stmt = db.prepare(
+    'INSERT INTO location_notes (location_id, note, created_by, updated_by) VALUES (?, ?, ?, ?)'
+  );
+  const result = stmt.run(payload.location_id, payload.note, payload.created_by ?? null, payload.updated_by ?? null);
+  return db
+    .prepare(
+      `
+      SELECT
+        location_notes.*,
+        creator.name AS created_by_name,
+        updater.name AS updated_by_name
+      FROM location_notes
+      LEFT JOIN users creator ON creator.id = location_notes.created_by
+      LEFT JOIN users updater ON updater.id = location_notes.updated_by
+      WHERE location_notes.id = ?
+    `
+    )
+    .get(result.lastInsertRowid);
 }
 
 function remove(id) {

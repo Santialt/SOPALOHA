@@ -1,12 +1,16 @@
 import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import AppShell from '../components/AppShell';
+import AdminRoute from '../components/AdminRoute';
 import LoadingBlock from '../components/LoadingBlock';
+import ProtectedRoute from '../components/ProtectedRoute';
 import DashboardPage from '../pages/DashboardPage';
 import LocationsPage from '../pages/LocationsPage';
 import LocationDetailPage from '../pages/LocationDetailPage';
 import IncidentsPage from '../pages/IncidentsPage';
+import LoginPage from '../pages/LoginPage';
 import TasksPage from '../pages/TasksPage';
+import UsersPage from '../pages/UsersPage';
 import LocationNotesPage from '../pages/LocationNotesPage';
 import TeamViewerImportPage from '../pages/TeamViewerImportPage';
 import TeamViewerExplorerPage from '../pages/TeamViewerExplorerPage';
@@ -17,26 +21,32 @@ const TeamViewerImportedCasesPage = lazy(() => import('../pages/TeamViewerImport
 export function AppRouter() {
   return (
     <Routes>
-      <Route path="/" element={<AppShell />}>
-        <Route index element={<Navigate to="/dashboard" replace />} />
-        <Route path="dashboard" element={<DashboardPage />} />
-        <Route path="locations" element={<LocationsPage />} />
-        <Route path="locations/:id" element={<LocationDetailPage />} />
-        <Route path="incidents" element={<IncidentsPage />} />
-        <Route path="tasks" element={<TasksPage />} />
-        <Route path="location-notes" element={<LocationNotesPage />} />
-        <Route path="on-call" element={<OnCallPage />} />
-        <Route path="teamviewer-explorer" element={<TeamViewerExplorerPage />} />
-        <Route path="teamviewer-import" element={<TeamViewerImportPage />} />
-        <Route
-          path="teamviewer-imported-cases"
-          element={
-            <Suspense fallback={<LoadingBlock label="Cargando casos TeamViewer..." />}>
-              <TeamViewerImportedCasesPage />
-            </Suspense>
-          }
-        />
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/login" element={<LoginPage />} />
+      <Route element={<ProtectedRoute />}>
+        <Route path="/" element={<AppShell />}>
+          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route path="dashboard" element={<DashboardPage />} />
+          <Route path="locations" element={<LocationsPage />} />
+          <Route path="locations/:id" element={<LocationDetailPage />} />
+          <Route path="incidents" element={<IncidentsPage />} />
+          <Route path="tasks" element={<TasksPage />} />
+          <Route path="location-notes" element={<LocationNotesPage />} />
+          <Route path="on-call" element={<OnCallPage />} />
+          <Route path="teamviewer-explorer" element={<TeamViewerExplorerPage />} />
+          <Route path="teamviewer-import" element={<TeamViewerImportPage />} />
+          <Route
+            path="teamviewer-imported-cases"
+            element={
+              <Suspense fallback={<LoadingBlock label="Cargando casos TeamViewer..." />}>
+                <TeamViewerImportedCasesPage />
+              </Suspense>
+            }
+          />
+          <Route element={<AdminRoute />}>
+            <Route path="users" element={<UsersPage />} />
+          </Route>
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Route>
       </Route>
     </Routes>
   );
