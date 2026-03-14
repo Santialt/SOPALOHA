@@ -132,7 +132,7 @@ async function openTeamviewer(req, res, next) {
           executable,
           teamviewer_id: teamviewerId
         });
-      } catch (fallbackError) {
+      } catch {
         // Try next executable path.
       }
     }

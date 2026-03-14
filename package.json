@@ -10,7 +10,23 @@
     "dev": "concurrently \"npm run dev --prefix apps/api\" \"npm run dev --prefix apps/web\"",
     "dev:api": "npm run dev --prefix apps/api",
     "dev:web": "npm run dev --prefix apps/web",
-    "install:all": "npm install --prefix apps/api && npm install --prefix apps/web"
+    "install:all": "npm install --prefix apps/api && npm install --prefix apps/web",
+    "lint": "npm run lint:api && npm run lint:web",
+    "lint:api": "npm --prefix apps/api run lint",
+    "lint:web": "npm --prefix apps/web run lint",
+    "format:check": "npm run format:check:root && npm run format:check:api && npm run format:check:web",
+    "format:check:root": "prettier --check \"package.json\" \"eslint.config.js\" \".github/workflows/*.yml\" \"docs/quality-foundation.md\"",
+    "format:check:api": "npm --prefix apps/api run format:check",
+    "format:check:web": "npm --prefix apps/web run format:check",
+    "test": "npm run test:api && npm run test:web",
+    "test:api": "npm --prefix apps/api run test",
+    "test:web": "npm --prefix apps/web run test",
+    "smoke": "npm run smoke:api",
+    "smoke:api": "npm --prefix apps/api run test:smoke",
+    "build": "npm run build:web",
+    "build:web": "npm --prefix apps/web run build",
+    "check": "npm run lint && npm run format:check && npm run test && npm run smoke",
+    "ci": "npm run lint && npm run format:check && npm run test && npm run build && npm run smoke"
   },
   "repository": {
     "type": "git",
@@ -24,7 +40,12 @@
   },
   "homepage": "https://github.com/Santialt/SOPALOHA#readme",
   "devDependencies": {
+    "@eslint/js": "^9.23.0",
     "concurrently": "^9.2.1",
-    "nodemon": "^3.1.14"
+    "eslint": "^9.23.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "globals": "^15.15.0",
+    "nodemon": "^3.1.14",
+    "prettier": "^3.5.3"
   }
 }

@@ -67,7 +67,7 @@ function isAllowedOrigin(origin, allowedOrigins) {
   try {
     const parsed = new URL(origin);
     return isLoopbackOrPrivateAddress(parsed.hostname);
-  } catch (error) {
+  } catch {
     return false;
   }
 }

@@ -7,7 +7,11 @@
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "db:init": "node src/db/initDb.js",
-    "db:backup": "node scripts/backup-db.js"
+    "db:backup": "node scripts/backup-db.js",
+    "lint": "npx --prefix ../.. eslint src test --ext .js",
+    "format:check": "npx --prefix ../.. prettier --check \"src/server.js\" \"src/db/**/*.js\" \"test/**/*.js\" \"package.json\"",
+    "test": "node --test test/**/*.test.js",
+    "test:smoke": "node --test test/smoke/**/*.test.js"
   },
   "dependencies": {
     "better-sqlite3": "^11.7.0",

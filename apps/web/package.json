@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "lint": "npx --prefix ../.. eslint src vite.config.js --ext .js,.jsx",
+    "format:check": "npx --prefix ../.. prettier --check \"src/theme.js\" \"src/theme.test.js\" \"vite.config.js\" \"package.json\"",
+    "test": "vitest run"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -16,6 +19,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
-    "vite": "^5.4.10"
+    "vite": "^5.4.10",
+    "vitest": "^2.1.9"
   }
 }
