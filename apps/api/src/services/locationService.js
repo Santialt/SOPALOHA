@@ -21,6 +21,12 @@ function listLocations() {
   return repository.findAll();
 }
 
+function searchLocations(query) {
+  const normalized = String(query || '').trim();
+  if (!normalized) return [];
+  return repository.search(normalized, 10);
+}
+
 function getLocation(id) {
   const row = repository.findById(id);
   if (!row) throw httpError(404, 'Location not found');
@@ -77,6 +83,7 @@ function listLocationNotes(locationId, filters = {}) {
 
 module.exports = {
   listLocations,
+  searchLocations,
   getLocation,
   createLocation,
   updateLocation,

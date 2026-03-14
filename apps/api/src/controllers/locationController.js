@@ -8,6 +8,14 @@ function getLocations(req, res, next) {
   }
 }
 
+function searchLocations(req, res, next) {
+  try {
+    res.json(service.searchLocations(req.query.q));
+  } catch (error) {
+    next(error);
+  }
+}
+
 function getLocationById(req, res, next) {
   try {
     res.json(service.getLocation(Number(req.params.id)));
@@ -98,6 +106,7 @@ function getLocationNotes(req, res, next) {
 
 module.exports = {
   getLocations,
+  searchLocations,
   getLocationById,
   createLocation,
   updateLocation,

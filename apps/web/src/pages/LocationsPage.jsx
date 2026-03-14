@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import InlineError from '../components/InlineError';
 import InlineSuccess from '../components/InlineSuccess';
 import LoadingBlock from '../components/LoadingBlock';
@@ -23,6 +23,8 @@ const initialForm = {
 
 function LocationsPage() {
   const navigate = useNavigate();
+  const routeLocation = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [locations, setLocations] = useState([]);
   const [search, setSearch] = useState('');
   const [saving, setSaving] = useState(false);
@@ -30,6 +32,10 @@ function LocationsPage() {
   const [success, setSuccess] = useState('');
   const [form, setForm] = useState(initialForm);
   const [editingId, setEditingId] = useState(null);
+  const rowRefs = useRef(new Map());
+  const selectedId = Number(searchParams.get('selected'));
+  const validSelectedId = Number.isInteger(selectedId) ? selectedId : null;
+  const selectedLocationFromState = routeLocation.state?.selectedLocation || null;
 
   const { load: loadLocations, loading, error, setError } = useDataLoader(async () => {
     const data = await api.getLocations();
@@ -37,6 +43,10 @@ function LocationsPage() {
   }, []);
 
   const filtered = useMemo(() => {
+    if (validSelectedId) {
+      return locations.filter((location) => location.id === validSelectedId);
+    }
+
     const term = search.trim().toLowerCase();
     if (!term) return locations;
 
@@ -56,7 +66,39 @@ function LocationsPage() {
         .toLowerCase()
         .includes(term);
     });
-  }, [locations, search]);
+  }, [locations, search, validSelectedId]);
+
+  useEffect(() => {
+    if (!selectedLocationFromState || validSelectedId) return;
+
+    setSearchParams(
+      (currentParams) => {
+        const next = new URLSearchParams(currentParams);
+        next.set('selected', String(selectedLocationFromState.id));
+        return next;
+      },
+      { replace: true }
+    );
+  }, [selectedLocationFromState, setSearchParams, validSelectedId]);
+
+  useEffect(() => {
+    if (validSelectedId) {
+      setSearch('');
+    }
+  }, [validSelectedId]);
+
+  useEffect(() => {
+    if (!validSelectedId || filtered.length === 0) return;
+
+    const frameId = window.requestAnimationFrame(() => {
+      rowRefs.current.get(validSelectedId)?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center'
+      });
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [filtered, validSelectedId]);
 
   const onSubmit = async (event) => {
     event.preventDefault();
@@ -134,17 +176,36 @@ function LocationsPage() {
     <div className="grid-two-columns">
       <section className="section-card">
         <div className="section-head">
-          <h2>Listado de locales</h2>
+          <div>
+            <h2>Listado de locales</h2>
+            {validSelectedId && (
+              <small>
+                Local enfocado: {selectedLocationFromState?.name || `#${validSelectedId}`}
+              </small>
+            )}
+          </div>
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Buscar por nombre, CUIT, llave Aloha, ciudad o telefono"
             className="input"
+            disabled={Boolean(validSelectedId)}
           />
         </div>
 
         <InlineError message={error} />
         <InlineSuccess message={success} />
+        {validSelectedId && (
+          <div className="form-actions">
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => setSearchParams({}, { replace: true })}
+            >
+              Limpiar foco rapido
+            </button>
+          </div>
+        )}
 
         <table className="table">
           <thead>
@@ -161,7 +222,18 @@ function LocationsPage() {
           </thead>
           <tbody>
             {filtered.map((location) => (
-              <tr key={location.id} onClick={() => navigate(`/locations/${location.id}`)} className="row-clickable">
+              <tr
+                key={location.id}
+                ref={(node) => {
+                  if (node) {
+                    rowRefs.current.set(location.id, node);
+                  } else {
+                    rowRefs.current.delete(location.id);
+                  }
+                }}
+                onClick={() => navigate(`/locations/${location.id}`)}
+                className={`row-clickable ${validSelectedId === location.id ? 'row-highlighted' : ''}`}
+              >
                 <td>{location.id}</td>
                 <td>{location.name}</td>
                 <td>{location.company_name || '-'}</td>

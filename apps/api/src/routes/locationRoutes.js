@@ -11,6 +11,7 @@ const locationRules = [
 ];
 
 router.get('/', controller.getLocations);
+router.get('/search', controller.searchLocations);
 router.post('/', validateBody(locationRules), controller.createLocation);
 router.get('/:id', controller.getLocationById);
 router.get('/:id/devices', controller.getLocationDevices);

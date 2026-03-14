@@ -184,6 +184,62 @@ small {
   backdrop-filter: blur(6px);
 }
 
+.location-quick-search {
+  position: relative;
+  width: min(460px, 100%);
+  flex: 1;
+  min-width: 240px;
+}
+
+.location-quick-search-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 360px;
+  overflow-y: auto;
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  padding: 6px;
+  display: grid;
+  gap: 6px;
+}
+
+.location-quick-search-item,
+.location-quick-search-status {
+  width: 100%;
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 12px;
+}
+
+.location-quick-search-item {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  display: grid;
+  gap: 3px;
+}
+
+.location-quick-search-item:hover {
+  border-color: color-mix(in srgb, var(--color-primary) 58%, var(--color-border));
+  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface));
+}
+
+.location-quick-search-item small,
+.location-quick-search-status {
+  color: var(--color-text-muted);
+}
+
+.row-highlighted {
+  background: color-mix(in srgb, var(--color-primary) 14%, var(--color-surface));
+  box-shadow: inset 3px 0 0 var(--color-primary);
+}
+
 .main-header h1 {
   font-size: 18px;
   line-height: 1.25;
@@ -1240,6 +1296,8 @@ button:disabled {
 
   .main-header {
     padding: 10px 12px;
+    align-items: stretch;
+    flex-wrap: wrap;
   }
 
   .page-body {

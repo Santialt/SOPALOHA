@@ -128,6 +128,10 @@ function runMigrations() {
     CREATE INDEX IF NOT EXISTS idx_location_notes_location_created ON location_notes(location_id, created_at DESC, id DESC);
     CREATE INDEX IF NOT EXISTS idx_teamviewer_imported_cases_started_at ON teamviewer_imported_cases(started_at DESC, id DESC);
     CREATE INDEX IF NOT EXISTS idx_teamviewer_imported_cases_location_started ON teamviewer_imported_cases(location_id, started_at DESC, id DESC);
+    CREATE INDEX IF NOT EXISTS idx_locations_name_search ON locations(lower(name));
+    CREATE INDEX IF NOT EXISTS idx_locations_llave_aloha_search ON locations(lower(llave_aloha));
+    CREATE INDEX IF NOT EXISTS idx_locations_cuit_search ON locations(lower(cuit));
+    CREATE INDEX IF NOT EXISTS idx_locations_razon_social_search ON locations(lower(razon_social));
   `);
 
   db.exec(`

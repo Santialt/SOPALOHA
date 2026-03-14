@@ -79,6 +79,7 @@ export const enums = {
 
 export const api = {
   getLocations: () => request('/locations'),
+  searchLocations: (q) => request(`/locations/search${buildQuery({ q })}`),
   login: (payload) => request('/auth/login', { method: 'POST', body: JSON.stringify(payload) }),
   logout: () => request('/auth/logout', { method: 'POST' }),
   getCurrentUser: () => request('/auth/me'),

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { applyTheme, getPreferredTheme } from '../theme';
+import LocationQuickSearch from './LocationQuickSearch';
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard' },
@@ -81,6 +82,7 @@ function AppShell() {
               {user ? ` · ${user.name} (${user.role})` : ''}
             </div>
           </div>
+          <LocationQuickSearch />
           <div className="form-actions">
             <button type="button" className="theme-toggle" onClick={onToggleTheme}>
               Tema: {theme === 'dark' ? 'Oscuro' : 'Claro'}

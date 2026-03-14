@@ -12,6 +12,42 @@ function findById(id) {
   return db.prepare('SELECT * FROM locations WHERE id = ?').get(id);
 }
 
+function search(query, limit = 10) {
+  const term = `%${String(query || '').trim().toLowerCase()}%`;
+  return db
+    .prepare(
+      `
+      SELECT
+        id,
+        name,
+        llave_aloha AS aloha_key,
+        cuit,
+        razon_social
+      FROM locations
+      WHERE
+        lower(coalesce(name, '')) LIKE @term OR
+        lower(coalesce(llave_aloha, '')) LIKE @term OR
+        lower(coalesce(cuit, '')) LIKE @term OR
+        lower(coalesce(razon_social, '')) LIKE @term
+      ORDER BY
+        CASE
+          WHEN lower(coalesce(name, '')) = @exact THEN 0
+          WHEN lower(coalesce(llave_aloha, '')) = @exact THEN 1
+          WHEN lower(coalesce(cuit, '')) = @exact THEN 2
+          WHEN lower(coalesce(razon_social, '')) = @exact THEN 3
+          ELSE 4
+        END,
+        name ASC
+      LIMIT @limit
+    `
+    )
+    .all({
+      term,
+      exact: String(query || '').trim().toLowerCase(),
+      limit: Number(limit)
+    });
+}
+
 function create(payload) {
   const stmt = db.prepare(`
     INSERT INTO locations (
@@ -122,6 +158,7 @@ module.exports = {
   findAll,
   countAll,
   findById,
+  search,
   create,
   update,
   remove,
