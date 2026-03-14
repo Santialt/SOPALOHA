@@ -1,5 +1,7 @@
 const path = require('path');
-require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
+if (process.env.NODE_ENV !== 'test') {
+  require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
+}
 const express = require('express');
 const { health } = require('./controllers/healthController');
 const authRoutes = require('./routes/authRoutes');

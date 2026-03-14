@@ -11,6 +11,11 @@ process.env.NODE_ENV = "test";
 process.env.PORT = "0";
 process.env.SQLITE_DB_PATH = sqliteDbPath;
 process.env.AUTH_SESSION_SECRET = "sopaloha-smoke-secret";
+process.env.INTERNAL_API_KEY = "";
+process.env.TEAMVIEWER_API_TOKEN = "";
+process.env.TEAMVIEWER_REPORTS_API_TOKEN = "";
+process.env.TEAMVIEWER_TIMEOUT_MS = "15000";
+process.env.TEAMVIEWER_MAX_RETRIES = "0";
 
 const db = require("../../src/db/connection");
 const { startServer } = require("../../src/server");
@@ -19,6 +24,12 @@ const { hashPassword } = require("../../src/utils/passwords");
 test("el API responde health y permite login basico con DB temporal", async (t) => {
   const seededEmail = "smoke@example.com";
   const seededPassword = "Sopaloha#Smoke123";
+
+  assert.equal(path.resolve(db.dbFilePath), path.resolve(sqliteDbPath));
+  assert.notEqual(
+    path.basename(path.dirname(path.resolve(db.dbFilePath))).toLowerCase(),
+    "data",
+  );
 
   const server = await startServer({ port: 0 });
 
@@ -56,6 +67,7 @@ test("el API responde health y permite login basico con DB temporal", async (t) 
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      "X-Internal-Api-Key": "",
     },
     body: JSON.stringify({
       email: seededEmail,
@@ -75,6 +87,7 @@ test("el API responde health y permite login basico con DB temporal", async (t) 
   const meResponse = await fetch(`${baseUrl}/auth/me`, {
     headers: {
       Cookie: sessionCookie,
+      "X-Internal-Api-Key": "",
     },
   });
 

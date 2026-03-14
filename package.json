@@ -11,13 +11,14 @@
     "dev:api": "npm run dev --prefix apps/api",
     "dev:web": "npm run dev --prefix apps/web",
     "install:all": "npm install --prefix apps/api && npm install --prefix apps/web",
+    "setup": "npm ci && npm ci --prefix apps/api && npm ci --prefix apps/web",
     "lint": "npm run lint:api && npm run lint:web",
     "lint:api": "npm --prefix apps/api run lint",
     "lint:web": "npm --prefix apps/web run lint",
-    "format:check": "npm run format:check:root && npm run format:check:api && npm run format:check:web",
+    "format:check:phase1": "npm run format:check:root && npm run format:check:api && npm run format:check:web",
     "format:check:root": "prettier --check \"package.json\" \"eslint.config.js\" \".github/workflows/*.yml\" \"docs/quality-foundation.md\"",
-    "format:check:api": "npm --prefix apps/api run format:check",
-    "format:check:web": "npm --prefix apps/web run format:check",
+    "format:check:api": "npm --prefix apps/api run format:check:phase1",
+    "format:check:web": "npm --prefix apps/web run format:check:phase1",
     "test": "npm run test:api && npm run test:web",
     "test:api": "npm --prefix apps/api run test",
     "test:web": "npm --prefix apps/web run test",
@@ -25,8 +26,8 @@
     "smoke:api": "npm --prefix apps/api run test:smoke",
     "build": "npm run build:web",
     "build:web": "npm --prefix apps/web run build",
-    "check": "npm run lint && npm run format:check && npm run test && npm run smoke",
-    "ci": "npm run lint && npm run format:check && npm run test && npm run build && npm run smoke"
+    "check:phase1": "npm run lint && npm run format:check:phase1 && npm run test && npm run smoke",
+    "ci": "npm run lint && npm run format:check:phase1 && npm run test && npm run build && npm run smoke"
   },
   "repository": {
     "type": "git",
