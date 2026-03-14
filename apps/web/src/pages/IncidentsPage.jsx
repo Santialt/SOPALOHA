@@ -37,6 +37,7 @@ function IncidentsPage() {
   const [searchParams] = useSearchParams();
   const prefillLocationId = Number(searchParams.get('location_id')) || '';
   const prefillDeviceId = Number(searchParams.get('device_id')) || '';
+  const preselectIncidentId = Number(searchParams.get('incident_id')) || null;
   const initialView = searchParams.get('view') === 'teamviewer' ? 'teamviewer' : 'incidents';
 
   const [activeView, setActiveView] = useState(initialView);
@@ -123,6 +124,12 @@ function IncidentsPage() {
       setError(err.message);
     });
   }, [activeView, selectedLocationId, prefillLocationId]);
+
+  useEffect(() => {
+    if (!preselectIncidentId) return;
+    if (!recentIncidents.some((incident) => incident.id === preselectIncidentId)) return;
+    setSelectedIncidentId(preselectIncidentId);
+  }, [preselectIncidentId, recentIncidents]);
 
   const onSubmit = async (event) => {
     event.preventDefault();
@@ -323,12 +330,22 @@ function IncidentsPage() {
                       const location = locations.find((item) => item.id === incident.location_id);
                       return (
                         <tr key={incident.id}>
-                          <td>{formatDateTime(incident.incident_date)}</td>
-                          <td>{location?.name || `Local #${incident.location_id}`}</td>
-                          <td>{incident.description || incident.title}</td>
-                          <td>{incident.solution || '-'}</td>
-                          <td>{incident.time_spent_minutes || 0}</td>
-                          <td>
+                          <td className={selectedIncidentId === incident.id ? 'row-highlighted' : ''}>
+                            {formatDateTime(incident.incident_date)}
+                          </td>
+                          <td className={selectedIncidentId === incident.id ? 'row-highlighted' : ''}>
+                            {location?.name || `Local #${incident.location_id}`}
+                          </td>
+                          <td className={selectedIncidentId === incident.id ? 'row-highlighted' : ''}>
+                            {incident.description || incident.title}
+                          </td>
+                          <td className={selectedIncidentId === incident.id ? 'row-highlighted' : ''}>
+                            {incident.solution || '-'}
+                          </td>
+                          <td className={selectedIncidentId === incident.id ? 'row-highlighted' : ''}>
+                            {incident.time_spent_minutes || 0}
+                          </td>
+                          <td className={selectedIncidentId === incident.id ? 'row-highlighted' : ''}>
                             <div className="form-actions">
                               <button
                                 type="button"

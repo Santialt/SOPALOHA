@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import InlineError from '../components/InlineError';
 import InlineSuccess from '../components/InlineSuccess';
@@ -41,6 +41,28 @@ const defaultDeviceForm = {
 };
 
 const suggestedIntegrations = ['mercado_pago', 'bancard', 'pedidos_ya', 'rappi', 'modo'];
+
+function formatDateTime(value) {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString('es-AR');
+}
+
+function resolveTeamviewerCaseTechnician(row) {
+  if (row.technician_display_name) return row.technician_display_name;
+  if (row.raw_payload_json) {
+    try {
+      const parsed = JSON.parse(row.raw_payload_json);
+      const name = String(parsed?.username || parsed?.USER || '').trim();
+      if (name) return name;
+    } catch (error) {
+      // ignore payload parsing errors in UI fallback
+    }
+  }
+  if (row.technician_username) return row.technician_username;
+  return '-';
+}
 
 function mapLocationToForm(location) {
   return {
@@ -93,7 +115,7 @@ function LocationDetailPage() {
   const [locationForm, setLocationForm] = useState(defaultLocationForm);
   const [savingLocation, setSavingLocation] = useState(false);
   const [devices, setDevices] = useState([]);
-  const [incidents, setIncidents] = useState([]);
+  const [teamviewerCases, setTeamviewerCases] = useState([]);
   const [notes, setNotes] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [integrations, setIntegrations] = useState([]);
@@ -112,11 +134,18 @@ function LocationDetailPage() {
   const teamviewerOpenLockRef = useRef(new Map());
 
   const { load, loading, error, setError } = useDataLoader(async () => {
-    const [locationData, locationDevices, locationIncidents, locationNotes, locationTasks, locationIntegrations] =
+    const [
+      locationData,
+      locationDevices,
+      locationTeamviewerCases,
+      locationNotes,
+      locationTasks,
+      locationIntegrations
+    ] =
       await Promise.all([
         api.getLocationById(id),
         api.getLocationDevices(id),
-        api.getLocationIncidents(id, { limit: 8 }),
+        api.getTeamviewerImportedCases({ location_id: id }),
         api.getLocationNotesByLocation(id),
         api.getLocationTasks(id, { limit: 20 }),
         api.getLocationIntegrations(id)
@@ -125,13 +154,11 @@ function LocationDetailPage() {
     setLocation(locationData);
     setLocationForm(mapLocationToForm(locationData));
     setDevices(locationDevices);
-    setIncidents(locationIncidents);
+    setTeamviewerCases(locationTeamviewerCases);
     setNotes(locationNotes);
     setTasks(locationTasks);
     setIntegrations(locationIntegrations.map((item) => item.integration_name));
   }, [id, numericLocationId]);
-
-  const lastIncidents = useMemo(() => incidents.slice(0, 8), [incidents]);
 
   const onSaveLocation = async (event) => {
     event.preventDefault();
@@ -345,31 +372,6 @@ function LocationDetailPage() {
       } else {
         setSuccess(`TeamViewer lanzado por backend (${result.method}).`);
       }
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setRunningActionKey('');
-    }
-  };
-
-  const onPingDevice = async (device) => {
-    if (!device.ip_address) {
-      setError('El dispositivo no tiene IP cargada.');
-      return;
-    }
-
-    const actionKey = `ping-${device.id}`;
-    setRunningActionKey(actionKey);
-    setError('');
-    setSuccess('');
-
-    try {
-      const result = await api.pingDeviceIp(device.ip_address);
-      setSuccess(
-        result.success
-          ? `Ping exitoso a ${device.ip_address}.`
-          : `Ping sin respuesta a ${device.ip_address}.`
-      );
     } catch (err) {
       setError(err.message);
     } finally {
@@ -665,22 +667,6 @@ function LocationDetailPage() {
                     >
                       {runningActionKey === `tv-${device.id}` ? 'Abriendo...' : 'Abrir TeamViewer'}
                     </button>
-                    <button
-                      type="button"
-                      className="btn-small"
-                      onClick={() => onPingDevice(device)}
-                      disabled={runningActionKey === `ping-${device.id}`}
-                    >
-                      {runningActionKey === `ping-${device.id}` ? 'Pingeando...' : 'Ping IP'}
-                    </button>
-                    <Link
-                      to={`/incidents?location_id=${numericLocationId}&device_id=${device.id}`}
-                      className="btn-link"
-                    >
-                      Incidente
-                    </Link>
-                  </div>
-                  <div className="form-actions">
                     <button type="button" className="btn-small" onClick={() => onEditDevice(device)}>
                       Editar
                     </button>
@@ -811,34 +797,42 @@ function LocationDetailPage() {
       </section>
 
       <section className="section-card">
-        <h3>Incidentes ({incidents.length})</h3>
-        <table className="table compact">
-          <thead>
-            <tr>
-              <th>Fecha</th>
-              <th>Titulo</th>
-              <th>Estado</th>
-              <th>Categoria</th>
-            </tr>
-          </thead>
-          <tbody>
-            {lastIncidents.map((incident) => (
-              <tr key={incident.id}>
-                <td>{incident.incident_date}</td>
-                <td>{incident.title}</td>
-                <td>{incident.status}</td>
-                <td>{incident.category}</td>
-              </tr>
-            ))}
-            {incidents.length === 0 && (
-              <tr>
-                <td colSpan="4" className="empty-row">
-                  Sin incidentes
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+        <div className="section-head">
+          <h3>Resumen TeamViewer</h3>
+          <Link to={`/teamviewer-imported-cases?location_id=${numericLocationId}`} className="btn-link">
+            Ver todos
+          </Link>
+        </div>
+
+        <div className="incident-summary-total">
+          <strong>{teamviewerCases.length}</strong>
+          <span>casos TeamViewer visibles para este local</span>
+        </div>
+
+        <div className="incident-summary-list">
+          {teamviewerCases.slice(0, 5).map((teamviewerCase) => (
+            <article key={teamviewerCase.id} className="incident-summary-item">
+              <div className="incident-summary-meta">
+                <small>{formatDateTime(teamviewerCase.started_at)}</small>
+                <span className="badge pending">TeamViewer</span>
+              </div>
+              <strong>{teamviewerCase.problem_description || teamviewerCase.note_raw || 'Caso sin descripcion'}</strong>
+              <small>
+                Resuelto por: {resolveTeamviewerCaseTechnician(teamviewerCase)}
+              </small>
+              <small>
+                Solicitante: {teamviewerCase.requested_by || 'Sin solicitante'}
+              </small>
+              <Link
+                to={`/teamviewer-imported-cases?location_id=${numericLocationId}`}
+                className="btn-link"
+              >
+                Abrir casos
+              </Link>
+            </article>
+          ))}
+          {teamviewerCases.length === 0 && <div className="empty-row">Sin casos TeamViewer vinculados.</div>}
+        </div>
       </section>
 
       <section className="section-card">

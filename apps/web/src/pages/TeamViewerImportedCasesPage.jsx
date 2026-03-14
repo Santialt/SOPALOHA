@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import InlineError from '../components/InlineError';
 import InlineSuccess from '../components/InlineSuccess';
 import LoadingBlock from '../components/LoadingBlock';
@@ -39,6 +40,8 @@ function resolveTechnicianFromCase(row) {
 }
 
 function TeamViewerImportedCasesPage() {
+  const [searchParams] = useSearchParams();
+  const prefillLocationId = Number(searchParams.get('location_id')) || '';
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
   const [savingManual, setSavingManual] = useState(false);
@@ -66,7 +69,7 @@ function TeamViewerImportedCasesPage() {
     const from = new Date(now);
     from.setDate(now.getDate() - 30);
     return {
-      location_id: '',
+      location_id: prefillLocationId,
       from_date: toDateInputValue(from),
       to_date: toDateInputValue(now),
       technician: '',
@@ -411,14 +414,17 @@ function TeamViewerImportedCasesPage() {
               </thead>
               <tbody>
                 {rows.map((row) => {
-                  const location = row.location_id ? locations.find((item) => item.id === row.location_id) : null;
+                  const resolvedLocationId = row.resolved_location_id || row.location_id || null;
+                  const location = resolvedLocationId
+                    ? locations.find((item) => item.id === resolvedLocationId)
+                    : null;
                   return (
                     <tr key={row.id}>
                       <td>{formatDateTime(row.started_at)}</td>
                       <td>{formatDateTime(row.ended_at)}</td>
                       <td>{resolveTechnicianFromCase(row)}</td>
                       <td>{row.teamviewer_group_name || '-'}</td>
-                      <td>{location?.name || '-'}</td>
+                      <td>{location?.name || row.resolved_location_name || row.teamviewer_group_name || '-'}</td>
                       <td>{row.requested_by || '-'}</td>
                       <td>{row.problem_description || '-'}</td>
                       <td>

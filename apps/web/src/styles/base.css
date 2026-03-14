@@ -1101,6 +1101,47 @@ button:disabled {
   color: var(--color-text-muted);
 }
 
+.incident-summary-total {
+  display: grid;
+  gap: 2px;
+  margin-bottom: 10px;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface));
+}
+
+.incident-summary-total strong {
+  font-size: 26px;
+  line-height: 1;
+}
+
+.incident-summary-total span {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.incident-summary-list {
+  display: grid;
+  gap: 8px;
+}
+
+.incident-summary-item {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+}
+
+.incident-summary-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .key-value-grid {
   margin-top: 10px;
   display: grid;

@@ -3,6 +3,15 @@ const db = require('../db/connection');
 function findAll(filters = {}) {
   const where = [];
   const params = {};
+  const resolvedLocationJoin = `
+    LEFT JOIN locations explicit_location ON explicit_location.id = teamviewer_imported_cases.location_id
+    LEFT JOIN locations matched_location
+      ON teamviewer_imported_cases.location_id IS NULL
+      AND lower(trim(coalesce(matched_location.name, ''))) = lower(trim(coalesce(teamviewer_imported_cases.teamviewer_group_name, '')))
+  `;
+  const resolvedLocationIdExpr = 'coalesce(teamviewer_imported_cases.location_id, matched_location.id)';
+  const resolvedLocationNameExpr =
+    "coalesce(explicit_location.name, matched_location.name, teamviewer_imported_cases.teamviewer_group_name)";
 
   if (filters.from_date) {
     where.push('started_at >= @from_date');
@@ -15,7 +24,7 @@ function findAll(filters = {}) {
   }
 
   if (filters.location_id) {
-    where.push('location_id = @location_id');
+    where.push(`${resolvedLocationIdExpr} = @location_id`);
     params.location_id = filters.location_id;
   }
 
@@ -48,8 +57,12 @@ function findAll(filters = {}) {
   return db
     .prepare(
       `
-      SELECT *
+      SELECT
+        teamviewer_imported_cases.*,
+        ${resolvedLocationIdExpr} AS resolved_location_id,
+        ${resolvedLocationNameExpr} AS resolved_location_name
       FROM teamviewer_imported_cases
+      ${resolvedLocationJoin}
       ${whereSql}
       ORDER BY started_at DESC, id DESC
       ${limit ? 'LIMIT @limit OFFSET @offset' : ''}
