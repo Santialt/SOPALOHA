@@ -1,4 +1,5 @@
 const service = require('../services/locationService');
+const { httpError } = require('../utils/httpError');
 
 function getLocations(req, res, next) {
   try {
@@ -98,7 +99,7 @@ function getLocationTasks(req, res, next) {
 
 function getLocationNotes(req, res, next) {
   try {
-    res.json(service.listLocationNotes(Number(req.params.id), req.query || {}));
+    next(httpError(410, 'Location notes module is disabled'));
   } catch (error) {
     next(error);
   }

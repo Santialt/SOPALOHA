@@ -42,6 +42,7 @@ function resolveTechnicianFromCase(row) {
 function TeamViewerImportedCasesPage() {
   const [searchParams] = useSearchParams();
   const prefillLocationId = Number(searchParams.get('location_id')) || '';
+  const prefillGroupId = searchParams.get('teamviewer_group_id') || '';
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
   const [savingManual, setSavingManual] = useState(false);
@@ -52,6 +53,7 @@ function TeamViewerImportedCasesPage() {
   const [discarded, setDiscarded] = useState([]);
   const [rows, setRows] = useState([]);
   const [locations, setLocations] = useState([]);
+  const [teamviewerGroups, setTeamviewerGroups] = useState([]);
   const [pageOffset, setPageOffset] = useState(0);
 
   const [importRange, setImportRange] = useState(() => {
@@ -84,7 +86,7 @@ function TeamViewerImportedCasesPage() {
       started_at: toDatetimeLocalValue(now),
       ended_at: toDatetimeLocalValue(now),
       technician_display_name: '',
-      teamviewer_group_name: '',
+      teamviewer_group_id: prefillGroupId,
       note_raw: ''
     };
   });
@@ -94,16 +96,18 @@ function TeamViewerImportedCasesPage() {
     setError('');
 
     try {
-      const [casesData, locationsData] = await Promise.all([
+      const [casesData, locationsData, explorerData] = await Promise.all([
         api.getTeamviewerImportedCases({
           ...listFilters,
           limit: PAGE_SIZE,
           offset
         }),
-        api.getLocations()
+        api.getLocations(),
+        api.getTeamviewerExplorer()
       ]);
       setRows(casesData);
       setLocations(locationsData);
+      setTeamviewerGroups(Array.isArray(explorerData.groups) ? explorerData.groups : []);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -119,6 +123,14 @@ function TeamViewerImportedCasesPage() {
   const locationOptions = useMemo(
     () => [...locations].sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' })),
     [locations]
+  );
+  const groupOptions = useMemo(
+    () => [...teamviewerGroups].sort((a, b) => a.group_name.localeCompare(b.group_name, 'es', { sensitivity: 'base' })),
+    [teamviewerGroups]
+  );
+  const selectedManualGroup = useMemo(
+    () => teamviewerGroups.find((group) => group.group_id === manualForm.teamviewer_group_id) || null,
+    [teamviewerGroups, manualForm.teamviewer_group_id]
   );
 
   const hasMore = rows.length === PAGE_SIZE;
@@ -153,11 +165,17 @@ function TeamViewerImportedCasesPage() {
         started_at: manualForm.started_at,
         ended_at: manualForm.ended_at || null,
         technician_display_name: manualForm.technician_display_name,
-        teamviewer_group_name: manualForm.teamviewer_group_name,
+        teamviewer_group_name: selectedManualGroup?.group_name || '',
+        location_id: selectedManualGroup?.location_id || null,
         note_raw: manualForm.note_raw
       });
       setSuccess('Caso manual creado.');
-      setManualForm((prev) => ({ ...prev, teamviewer_group_name: '', note_raw: '', technician_display_name: '' }));
+      setManualForm((prev) => ({
+        ...prev,
+        teamviewer_group_id: prefillGroupId,
+        note_raw: '',
+        technician_display_name: ''
+      }));
       setPageOffset(0);
       await loadRows(0);
     } catch (err) {
@@ -197,7 +215,12 @@ function TeamViewerImportedCasesPage() {
   return (
     <div>
       <section className="section-card">
-        <h2>Importar casos desde TeamViewer</h2>
+        <h2>Incidentes TeamViewer</h2>
+        <small>Importacion automatica, alta manual y visualizacion centralizada de casos TeamViewer.</small>
+      </section>
+
+      <section className="section-card">
+        <h2>Importar casos desde API TeamViewer</h2>
         <div className="form-grid form-grid-3">
           <label>
             Fecha desde
@@ -256,13 +279,20 @@ function TeamViewerImportedCasesPage() {
             />
           </label>
           <label>
-            Grupo TeamViewer
-            <input
+            Grupo TeamViewer *
+            <select
               className="input"
-              value={manualForm.teamviewer_group_name}
-              onChange={(event) => setManualForm((prev) => ({ ...prev, teamviewer_group_name: event.target.value }))}
+              value={manualForm.teamviewer_group_id}
+              onChange={(event) => setManualForm((prev) => ({ ...prev, teamviewer_group_id: event.target.value }))}
               required
-            />
+            >
+              <option value="">Seleccionar grupo</option>
+              {groupOptions.map((group) => (
+                <option key={group.group_id} value={group.group_id}>
+                  {group.group_name}
+                </option>
+              ))}
+            </select>
           </label>
           <label className="full-row">
             Comentario (formato: problema - solicitante)
@@ -274,11 +304,17 @@ function TeamViewerImportedCasesPage() {
             />
           </label>
           <div className="form-actions">
-            <button type="submit" className="btn-primary" disabled={savingManual}>
+            <button type="submit" className="btn-primary" disabled={savingManual || !selectedManualGroup}>
               {savingManual ? 'Guardando...' : 'Agregar caso manual'}
             </button>
           </div>
         </form>
+        {selectedManualGroup && (
+          <small>
+            Grupo seleccionado: {selectedManualGroup.group_name}
+            {selectedManualGroup.location_name ? ` | Local vinculado: ${selectedManualGroup.location_name}` : ''}
+          </small>
+        )}
       </section>
 
       <InlineError message={error} />
@@ -322,7 +358,7 @@ function TeamViewerImportedCasesPage() {
 
       <section className="section-card">
         <div className="section-head">
-          <h2>Casos importados</h2>
+          <h2>Casos TeamViewer</h2>
           <small>{rows.length} cargados en esta pagina</small>
         </div>
 

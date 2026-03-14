@@ -178,13 +178,27 @@ function TeamViewerExplorerPage() {
   const locationForDetails = selectedDevice?.linked_location || selectedGroup?.linked_location || null;
   const hasLocation = Boolean(locationForDetails?.id);
   const linkedDevice = selectedDevice?.linked_device || null;
-  const incidentQuery = selectedDevice
-    ? `/incidents?location_id=${selectedDevice.location_id || ''}${
-        linkedDevice?.id ? `&device_id=${linkedDevice.id}` : ''
-      }`
-    : selectedGroup?.location_id
-      ? `/incidents?location_id=${selectedGroup.location_id}`
-      : '/incidents';
+  const incidentQuery = (() => {
+    const params = new URLSearchParams();
+    const groupId = selectedGroup?.group_id || '';
+
+    if (groupId) {
+      params.set('teamviewer_group_id', groupId);
+    }
+
+    if (selectedDevice?.location_id) {
+      params.set('location_id', String(selectedDevice.location_id));
+    } else if (selectedGroup?.location_id) {
+      params.set('location_id', String(selectedGroup.location_id));
+    }
+
+    if (linkedDevice?.id) {
+      params.set('device_id', String(linkedDevice.id));
+    }
+
+    const queryString = params.toString();
+    return queryString ? `/incidents?${queryString}` : '/incidents';
+  })();
 
   return (
     <div className="teamviewer-explorer-page">

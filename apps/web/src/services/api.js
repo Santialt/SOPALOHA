@@ -96,7 +96,6 @@ export const api = {
   getLocationDevices: (id, filters = {}) => request(`/locations/${id}/devices${buildQuery(filters)}`),
   getLocationIncidents: (id, filters = {}) => request(`/locations/${id}/incidents${buildQuery(filters)}`),
   getLocationTasks: (id, filters = {}) => request(`/locations/${id}/tasks${buildQuery(filters)}`),
-  getLocationNotesByLocation: (id, filters = {}) => request(`/locations/${id}/notes${buildQuery(filters)}`),
   createLocation: (payload) => request('/locations', { method: 'POST', body: JSON.stringify(payload) }),
   updateLocation: (id, payload) => request(`/locations/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
   getLocationIntegrations: (id) => request(`/locations/${id}/integrations`),
@@ -134,9 +133,6 @@ export const api = {
   updateTask: (id, payload) => request(`/tasks/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
   deleteTask: (id) => request(`/tasks/${id}`, { method: 'DELETE' }),
 
-  getLocationNotes: (filters = {}) => request(`/location-notes${buildQuery(filters)}`),
-  createLocationNote: (payload) => request('/location-notes', { method: 'POST', body: JSON.stringify(payload) }),
-  deleteLocationNote: (id) => request(`/location-notes/${id}`, { method: 'DELETE' }),
   getDashboardSummary: () => request('/dashboard/summary'),
 
   pingDeviceIp: (ip) =>

@@ -1,8 +1,8 @@
-const service = require('../services/locationNoteService');
+const { httpError } = require('../utils/httpError');
 
 function getLocationNotes(req, res, next) {
   try {
-    res.json(service.listLocationNotes(req.query || {}));
+    next(httpError(410, 'Location notes module is disabled'));
   } catch (error) {
     next(error);
   }
@@ -10,8 +10,7 @@ function getLocationNotes(req, res, next) {
 
 function createLocationNote(req, res, next) {
   try {
-    const created = service.createLocationNote(req.body, req.user.id);
-    res.status(201).json(created);
+    next(httpError(410, 'Location notes module is disabled'));
   } catch (error) {
     next(error);
   }
@@ -19,8 +18,7 @@ function createLocationNote(req, res, next) {
 
 function deleteLocationNote(req, res, next) {
   try {
-    service.deleteLocationNote(Number(req.params.id));
-    res.status(204).send();
+    next(httpError(410, 'Location notes module is disabled'));
   } catch (error) {
     next(error);
   }

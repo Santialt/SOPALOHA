@@ -60,13 +60,11 @@ function DashboardPage() {
         </div>
         <div className="quick-links">
           <Link to="/locations" className="btn-link">Ver locales</Link>
-          <Link to="/incidents" className="btn-link">Gestionar incidentes</Link>
+          <Link to="/incidents" className="btn-link">Casos TeamViewer</Link>
           <Link to="/tasks" className="btn-link">Gestionar tareas</Link>
           <Link to="/on-call" className="btn-link">Gestionar guardias</Link>
-          <Link to="/location-notes" className="btn-link">Notas tecnicas</Link>
           <Link to="/teamviewer-explorer" className="btn-link">TeamViewer Explorer</Link>
           <Link to="/teamviewer-import" className="btn-link">TeamViewer Import</Link>
-          <Link to="/incidents?view=teamviewer" className="btn-link">Casos TeamViewer</Link>
         </div>
       </section>
     </div>

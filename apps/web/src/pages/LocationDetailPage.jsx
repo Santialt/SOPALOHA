@@ -116,7 +116,6 @@ function LocationDetailPage() {
   const [savingLocation, setSavingLocation] = useState(false);
   const [devices, setDevices] = useState([]);
   const [teamviewerCases, setTeamviewerCases] = useState([]);
-  const [notes, setNotes] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [integrations, setIntegrations] = useState([]);
   const [customIntegration, setCustomIntegration] = useState('');
@@ -124,11 +123,8 @@ function LocationDetailPage() {
 
   const [deviceForm, setDeviceForm] = useState(defaultDeviceForm);
   const [editingDeviceId, setEditingDeviceId] = useState(null);
-  const [noteText, setNoteText] = useState('');
   const [savingDevice, setSavingDevice] = useState(false);
-  const [savingNote, setSavingNote] = useState(false);
   const [deletingDeviceId, setDeletingDeviceId] = useState(null);
-  const [deletingNoteId, setDeletingNoteId] = useState(null);
   const [runningActionKey, setRunningActionKey] = useState('');
   const [success, setSuccess] = useState('');
   const teamviewerOpenLockRef = useRef(new Map());
@@ -138,7 +134,6 @@ function LocationDetailPage() {
       locationData,
       locationDevices,
       locationTeamviewerCases,
-      locationNotes,
       locationTasks,
       locationIntegrations
     ] =
@@ -146,7 +141,6 @@ function LocationDetailPage() {
         api.getLocationById(id),
         api.getLocationDevices(id),
         api.getTeamviewerImportedCases({ location_id: id }),
-        api.getLocationNotesByLocation(id),
         api.getLocationTasks(id, { limit: 20 }),
         api.getLocationIntegrations(id)
       ]);
@@ -155,7 +149,6 @@ function LocationDetailPage() {
     setLocationForm(mapLocationToForm(locationData));
     setDevices(locationDevices);
     setTeamviewerCases(locationTeamviewerCases);
-    setNotes(locationNotes);
     setTasks(locationTasks);
     setIntegrations(locationIntegrations.map((item) => item.integration_name));
   }, [id, numericLocationId]);
@@ -271,43 +264,6 @@ function LocationDetailPage() {
       setError(err.message);
     } finally {
       setDeletingDeviceId(null);
-    }
-  };
-
-  const onCreateNote = async (event) => {
-    event.preventDefault();
-    setSavingNote(true);
-    setError('');
-    setSuccess('');
-
-    try {
-      await api.createLocationNote({ location_id: numericLocationId, note: noteText });
-      setNoteText('');
-      setSuccess('Nota creada.');
-      await load();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSavingNote(false);
-    }
-  };
-
-  const onDeleteNote = async (note) => {
-    const ok = window.confirm('Eliminar esta nota tecnica?');
-    if (!ok) return;
-
-    setDeletingNoteId(note.id);
-    setError('');
-    setSuccess('');
-
-    try {
-      await api.deleteLocationNote(note.id);
-      setSuccess('Nota eliminada.');
-      await load();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setDeletingNoteId(null);
     }
   };
 
@@ -630,7 +586,7 @@ function LocationDetailPage() {
         <div className="section-head wrap">
           <h3>Dispositivos ({devices.length})</h3>
           <Link to={`/incidents?location_id=${numericLocationId}`} className="btn-link">
-            Registrar incidente del local
+            Registrar caso TeamViewer
           </Link>
         </div>
         <table className="table compact">
@@ -833,41 +789,6 @@ function LocationDetailPage() {
           ))}
           {teamviewerCases.length === 0 && <div className="empty-row">Sin casos TeamViewer vinculados.</div>}
         </div>
-      </section>
-
-      <section className="section-card">
-        <h3>Notas Tecnicas ({notes.length})</h3>
-        <ul className="notes-list">
-          {notes.map((note) => (
-            <li key={note.id}>
-              <div>{note.note}</div>
-              <div className="form-actions">
-                <small>{note.created_at}</small>
-                <button
-                  className="btn-danger"
-                  onClick={() => onDeleteNote(note)}
-                  disabled={deletingNoteId === note.id}
-                >
-                  {deletingNoteId === note.id ? 'Eliminando...' : 'Eliminar'}
-                </button>
-              </div>
-            </li>
-          ))}
-          {notes.length === 0 && <li className="empty-row">Sin notas</li>}
-        </ul>
-
-        <form onSubmit={onCreateNote} className="inline-form">
-          <input
-            className="input"
-            value={noteText}
-            onChange={(event) => setNoteText(event.target.value)}
-            placeholder="Agregar nota tecnica"
-            required
-          />
-          <button className="btn-primary" type="submit" disabled={savingNote}>
-            {savingNote ? 'Guardando...' : 'Agregar Nota'}
-          </button>
-        </form>
       </section>
 
       <section className="section-card full-width">
