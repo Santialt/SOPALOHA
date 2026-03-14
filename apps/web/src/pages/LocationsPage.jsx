@@ -15,11 +15,46 @@ const initialForm = {
   version_aloha: '',
   version_modulo_fiscal: '',
   usa_nbo: false,
-  network_notes: '',
   city: '',
-  status: 'active',
-  phone: ''
+  address: '',
+  phone: '',
+  cantidad_licencias_aloha: '',
+  tiene_kitchen: false,
+  usa_insight_pulse: false,
+  cmc: '',
+  status: 'abierto',
+  fecha_apertura: '',
+  fecha_cierre: '',
+  notes: ''
 };
+
+function mapLocationToForm(location) {
+  return {
+    ...initialForm,
+    ...location,
+    usa_nbo: Boolean(location.usa_nbo),
+    tiene_kitchen: Boolean(location.tiene_kitchen),
+    usa_insight_pulse: Boolean(location.usa_insight_pulse),
+    cantidad_licencias_aloha: location.cantidad_licencias_aloha ?? '',
+    fecha_apertura: location.fecha_apertura || '',
+    fecha_cierre: location.fecha_cierre || ''
+  };
+}
+
+function setLocationStatus(setter, status) {
+  setter((current) => ({
+    ...current,
+    status,
+    fecha_cierre: status === 'cerrado' ? current.fecha_cierre : ''
+  }));
+}
+
+function setBooleanSelect(setter, field, value) {
+  setter((current) => ({
+    ...current,
+    [field]: value === 'si'
+  }));
+}
 
 function LocationsPage() {
   const navigate = useNavigate();
@@ -59,7 +94,9 @@ function LocationsPage() {
         location.llave_aloha,
         location.version_aloha,
         location.city,
-        location.phone
+        location.address,
+        location.phone,
+        location.cmc
       ]
         .filter(Boolean)
         .join(' ')
@@ -130,20 +167,7 @@ function LocationsPage() {
     event.stopPropagation();
     setSuccess('');
     setEditingId(location.id);
-    setForm({
-      name: location.name || '',
-      company_name: location.company_name || '',
-      razon_social: location.razon_social || '',
-      cuit: location.cuit || '',
-      llave_aloha: location.llave_aloha || '',
-      version_aloha: location.version_aloha || '',
-      version_modulo_fiscal: location.version_modulo_fiscal || '',
-      usa_nbo: Boolean(location.usa_nbo),
-      network_notes: location.network_notes || '',
-      city: location.city || '',
-      status: location.status || 'active',
-      phone: location.phone || ''
-    });
+    setForm(mapLocationToForm(location));
   };
 
   const onDelete = async (location, event) => {
@@ -187,7 +211,7 @@ function LocationsPage() {
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Buscar por nombre, CUIT, llave Aloha, ciudad o telefono"
+            placeholder="Buscar por nombre, CUIT, llave Aloha, ciudad, direccion o telefono"
             className="input"
             disabled={Boolean(validSelectedId)}
           />
@@ -290,15 +314,6 @@ function LocationsPage() {
           </label>
 
           <label>
-            Razon social
-            <input
-              className="input"
-              value={form.razon_social}
-              onChange={(event) => setForm({ ...form, razon_social: event.target.value })}
-            />
-          </label>
-
-          <label>
             CUIT
             <input
               className="input"
@@ -308,29 +323,11 @@ function LocationsPage() {
           </label>
 
           <label>
-            Llave Aloha
+            Razon social
             <input
               className="input"
-              value={form.llave_aloha}
-              onChange={(event) => setForm({ ...form, llave_aloha: event.target.value })}
-            />
-          </label>
-
-          <label>
-            Version Aloha
-            <input
-              className="input"
-              value={form.version_aloha}
-              onChange={(event) => setForm({ ...form, version_aloha: event.target.value })}
-            />
-          </label>
-
-          <label>
-            Version modulo fiscal
-            <input
-              className="input"
-              value={form.version_modulo_fiscal}
-              onChange={(event) => setForm({ ...form, version_modulo_fiscal: event.target.value })}
+              value={form.razon_social}
+              onChange={(event) => setForm({ ...form, razon_social: event.target.value })}
             />
           </label>
 
@@ -344,7 +341,16 @@ function LocationsPage() {
           </label>
 
           <label>
-            Telefono
+            Direccion
+            <input
+              className="input"
+              value={form.address}
+              onChange={(event) => setForm({ ...form, address: event.target.value })}
+            />
+          </label>
+
+          <label>
+            Telefono de contacto
             <input
               className="input"
               value={form.phone}
@@ -353,20 +359,87 @@ function LocationsPage() {
           </label>
 
           <label>
-            <span>Usa NBO</span>
+            Key Aloha
             <input
-              type="checkbox"
-              checked={form.usa_nbo}
-              onChange={(event) => setForm({ ...form, usa_nbo: event.target.checked })}
+              className="input"
+              value={form.llave_aloha}
+              onChange={(event) => setForm({ ...form, llave_aloha: event.target.value })}
             />
           </label>
 
           <label>
-            Estado
+            Cantidad de licencias Aloha
+            <input
+              type="number"
+              min="0"
+              step="1"
+              className="input"
+              value={form.cantidad_licencias_aloha}
+              onChange={(event) =>
+                setForm({ ...form, cantidad_licencias_aloha: event.target.value })
+              }
+            />
+          </label>
+
+          <label>
+            Version Aloha
+            <input
+              className="input"
+              value={form.version_aloha}
+              onChange={(event) => setForm({ ...form, version_aloha: event.target.value })}
+            />
+          </label>
+
+          <label>
+            Version Fiscal
+            <input
+              className="input"
+              value={form.version_modulo_fiscal}
+              onChange={(event) => setForm({ ...form, version_modulo_fiscal: event.target.value })}
+            />
+          </label>
+
+          <label>
+            Kitchen
+            <select
+              className="input"
+              value={form.tiene_kitchen ? 'si' : 'no'}
+              onChange={(event) => setBooleanSelect(setForm, 'tiene_kitchen', event.target.value)}
+            >
+              <option value="si">Si</option>
+              <option value="no">No</option>
+            </select>
+          </label>
+
+          <label>
+            CMC
+            <input
+              className="input"
+              value={form.cmc}
+              onChange={(event) => setForm({ ...form, cmc: event.target.value })}
+            />
+          </label>
+
+          <label>
+            PULSE INSIGHT
+            <select
+              className="input"
+              value={form.usa_insight_pulse ? 'si' : 'no'}
+              onChange={(event) =>
+                setBooleanSelect(setForm, 'usa_insight_pulse', event.target.value)
+              }
+            >
+              <option value="si">Si</option>
+              <option value="no">No</option>
+            </select>
+          </label>
+
+          <label>
+            Estado del local
             <select
               className="input"
               value={form.status}
-              onChange={(event) => setForm({ ...form, status: event.target.value })}
+              onChange={(event) => setLocationStatus(setForm, event.target.value)}
             >
               {enums.locationStatus.map((status) => (
                 <option key={status} value={status}>{status}</option>
@@ -374,13 +447,47 @@ function LocationsPage() {
             </select>
           </label>
 
+          <label>
+            NBO
+            <select
+              className="input"
+              value={form.usa_nbo ? 'si' : 'no'}
+              onChange={(event) => setBooleanSelect(setForm, 'usa_nbo', event.target.value)}
+            >
+              <option value="si">Si</option>
+              <option value="no">No</option>
+            </select>
+          </label>
+
+          <label>
+            Fecha de apertura
+            <input
+              type="date"
+              className="input"
+              value={form.fecha_apertura}
+              onChange={(event) => setForm({ ...form, fecha_apertura: event.target.value })}
+            />
+          </label>
+
+          {form.status === 'cerrado' && (
+            <label>
+              Fecha de cierre
+              <input
+                type="date"
+                className="input"
+                value={form.fecha_cierre}
+                onChange={(event) => setForm({ ...form, fecha_cierre: event.target.value })}
+              />
+            </label>
+          )}
+
           <label className="full-row">
-            Notas de red
+            Notas generales
             <textarea
               className="input"
               rows="3"
-              value={form.network_notes}
-              onChange={(event) => setForm({ ...form, network_notes: event.target.value })}
+              value={form.notes}
+              onChange={(event) => setForm({ ...form, notes: event.target.value })}
             />
           </label>
 

@@ -574,6 +574,7 @@ button:disabled {
 }
 
 .badge.active,
+.badge.abierto,
 .badge.open,
 .badge.todo {
   background: color-mix(in srgb, var(--color-primary) 17%, transparent);
@@ -582,6 +583,7 @@ button:disabled {
 }
 
 .badge.inactive,
+.badge.cerrado,
 .badge.closed,
 .badge.done,
 .badge.cancelled {

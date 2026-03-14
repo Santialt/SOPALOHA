@@ -66,7 +66,7 @@ function buildQuery(params = {}) {
 }
 
 export const enums = {
-  locationStatus: ['active', 'inactive'],
+  locationStatus: ['abierto', 'cerrado'],
   deviceTypes: ['server', 'pos_terminal', 'fiscal_printer', 'kitchen_printer', 'pinpad', 'router', 'switch', 'other'],
   deviceRoles: ['server', 'pos', 'kitchen_display', 'kitchen_printer', 'fiscal_printer', 'router', 'switch', 'other'],
   incidentCategories: ['network', 'sql', 'aloha', 'printer', 'fiscal', 'hardware', 'other'],

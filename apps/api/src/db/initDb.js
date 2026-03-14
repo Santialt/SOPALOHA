@@ -25,6 +25,12 @@ function runMigrations() {
   ensureColumn('locations', 'version_modulo_fiscal', 'TEXT');
   ensureColumn('locations', 'usa_nbo', 'INTEGER NOT NULL DEFAULT 0 CHECK (usa_nbo IN (0, 1))');
   ensureColumn('locations', 'network_notes', 'TEXT');
+  ensureColumn('locations', 'cantidad_licencias_aloha', 'INTEGER');
+  ensureColumn('locations', 'tiene_kitchen', 'INTEGER NOT NULL DEFAULT 0 CHECK (tiene_kitchen IN (0, 1))');
+  ensureColumn('locations', 'usa_insight_pulse', 'INTEGER NOT NULL DEFAULT 0 CHECK (usa_insight_pulse IN (0, 1))');
+  ensureColumn('locations', 'cmc', 'TEXT');
+  ensureColumn('locations', 'fecha_apertura', 'TEXT');
+  ensureColumn('locations', 'fecha_cierre', 'TEXT');
 
   ensureColumn('devices', 'windows_version', 'TEXT');
   ensureColumn('devices', 'ram_gb', 'REAL');

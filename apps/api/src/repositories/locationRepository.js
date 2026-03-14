@@ -52,11 +52,13 @@ function create(payload) {
   const stmt = db.prepare(`
     INSERT INTO locations (
       name, company_name, razon_social, cuit, llave_aloha, version_aloha, version_modulo_fiscal,
-      usa_nbo, network_notes, address, city, province, phone, main_contact, status, notes
+      usa_nbo, network_notes, address, city, province, phone, main_contact, status, notes,
+      cantidad_licencias_aloha, tiene_kitchen, usa_insight_pulse, cmc, fecha_apertura, fecha_cierre
     )
     VALUES (
       @name, @company_name, @razon_social, @cuit, @llave_aloha, @version_aloha, @version_modulo_fiscal,
-      @usa_nbo, @network_notes, @address, @city, @province, @phone, @main_contact, @status, @notes
+      @usa_nbo, @network_notes, @address, @city, @province, @phone, @main_contact, @status, @notes,
+      @cantidad_licencias_aloha, @tiene_kitchen, @usa_insight_pulse, @cmc, @fecha_apertura, @fecha_cierre
     )
   `);
   const result = stmt.run({
@@ -75,7 +77,13 @@ function create(payload) {
     phone: payload.phone || null,
     main_contact: payload.main_contact || null,
     status: payload.status || 'active',
-    notes: payload.notes || null
+    notes: payload.notes || null,
+    cantidad_licencias_aloha: payload.cantidad_licencias_aloha ?? null,
+    tiene_kitchen: payload.tiene_kitchen ? 1 : 0,
+    usa_insight_pulse: payload.usa_insight_pulse ? 1 : 0,
+    cmc: payload.cmc || null,
+    fecha_apertura: payload.fecha_apertura || null,
+    fecha_cierre: payload.fecha_cierre || null
   });
   return findById(result.lastInsertRowid);
 }
@@ -99,7 +107,13 @@ function update(id, payload) {
       phone = @phone,
       main_contact = @main_contact,
       status = @status,
-      notes = @notes
+      notes = @notes,
+      cantidad_licencias_aloha = @cantidad_licencias_aloha,
+      tiene_kitchen = @tiene_kitchen,
+      usa_insight_pulse = @usa_insight_pulse,
+      cmc = @cmc,
+      fecha_apertura = @fecha_apertura,
+      fecha_cierre = @fecha_cierre
     WHERE id = @id
   `);
   stmt.run({
@@ -119,7 +133,13 @@ function update(id, payload) {
     phone: payload.phone || null,
     main_contact: payload.main_contact || null,
     status: payload.status || 'active',
-    notes: payload.notes || null
+    notes: payload.notes || null,
+    cantidad_licencias_aloha: payload.cantidad_licencias_aloha ?? null,
+    tiene_kitchen: payload.tiene_kitchen ? 1 : 0,
+    usa_insight_pulse: payload.usa_insight_pulse ? 1 : 0,
+    cmc: payload.cmc || null,
+    fecha_apertura: payload.fecha_apertura || null,
+    fecha_cierre: payload.fecha_cierre || null
   });
   return findById(id);
 }

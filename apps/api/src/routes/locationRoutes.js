@@ -7,7 +7,12 @@ const router = express.Router();
 const locationRules = [
   { field: 'name', required: true },
   { field: 'usa_nbo', type: 'boolean' },
-  { field: 'status', allowedValues: ['active', 'inactive'] }
+  { field: 'tiene_kitchen', type: 'boolean' },
+  { field: 'usa_insight_pulse', type: 'boolean' },
+  { field: 'cantidad_licencias_aloha', type: 'integer' },
+  { field: 'fecha_apertura', pattern: /^\d{4}-\d{2}-\d{2}$/, patternDescription: 'YYYY-MM-DD' },
+  { field: 'fecha_cierre', pattern: /^\d{4}-\d{2}-\d{2}$/, patternDescription: 'YYYY-MM-DD' },
+  { field: 'status', allowedValues: ['abierto', 'cerrado', 'active', 'inactive'] }
 ];
 
 router.get('/', controller.getLocations);

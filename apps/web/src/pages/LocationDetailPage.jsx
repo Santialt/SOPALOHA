@@ -15,13 +15,16 @@ const defaultLocationForm = {
   version_aloha: '',
   version_modulo_fiscal: '',
   usa_nbo: false,
-  network_notes: '',
   address: '',
   city: '',
-  province: '',
   phone: '',
-  main_contact: '',
-  status: 'active',
+  cantidad_licencias_aloha: '',
+  tiene_kitchen: false,
+  usa_insight_pulse: false,
+  cmc: '',
+  status: 'abierto',
+  fecha_apertura: '',
+  fecha_cierre: '',
   notes: ''
 };
 
@@ -43,8 +46,28 @@ function mapLocationToForm(location) {
   return {
     ...defaultLocationForm,
     ...location,
-    usa_nbo: Boolean(location.usa_nbo)
+    usa_nbo: Boolean(location.usa_nbo),
+    tiene_kitchen: Boolean(location.tiene_kitchen),
+    usa_insight_pulse: Boolean(location.usa_insight_pulse),
+    cantidad_licencias_aloha: location.cantidad_licencias_aloha ?? '',
+    fecha_apertura: location.fecha_apertura || '',
+    fecha_cierre: location.fecha_cierre || ''
   };
+}
+
+function setLocationStatus(setter, status) {
+  setter((current) => ({
+    ...current,
+    status,
+    fecha_cierre: status === 'cerrado' ? current.fecha_cierre : ''
+  }));
+}
+
+function setBooleanSelect(setter, field, value) {
+  setter((current) => ({
+    ...current,
+    [field]: value === 'si'
+  }));
 }
 
 function mapDeviceToForm(device) {
@@ -386,14 +409,6 @@ function LocationDetailPage() {
             />
           </label>
           <label>
-            Razon social
-            <input
-              className="input"
-              value={locationForm.razon_social || ''}
-              onChange={(event) => setLocationForm({ ...locationForm, razon_social: event.target.value })}
-            />
-          </label>
-          <label>
             CUIT
             <input
               className="input"
@@ -402,29 +417,11 @@ function LocationDetailPage() {
             />
           </label>
           <label>
-            Llave Aloha
+            Razon social
             <input
               className="input"
-              value={locationForm.llave_aloha || ''}
-              onChange={(event) => setLocationForm({ ...locationForm, llave_aloha: event.target.value })}
-            />
-          </label>
-          <label>
-            Version Aloha
-            <input
-              className="input"
-              value={locationForm.version_aloha || ''}
-              onChange={(event) => setLocationForm({ ...locationForm, version_aloha: event.target.value })}
-            />
-          </label>
-          <label>
-            Version modulo fiscal
-            <input
-              className="input"
-              value={locationForm.version_modulo_fiscal || ''}
-              onChange={(event) =>
-                setLocationForm({ ...locationForm, version_modulo_fiscal: event.target.value })
-              }
+              value={locationForm.razon_social || ''}
+              onChange={(event) => setLocationForm({ ...locationForm, razon_social: event.target.value })}
             />
           </label>
           <label>
@@ -436,15 +433,15 @@ function LocationDetailPage() {
             />
           </label>
           <label>
-            Provincia
+            Direccion
             <input
               className="input"
-              value={locationForm.province || ''}
-              onChange={(event) => setLocationForm({ ...locationForm, province: event.target.value })}
+              value={locationForm.address || ''}
+              onChange={(event) => setLocationForm({ ...locationForm, address: event.target.value })}
             />
           </label>
           <label>
-            Telefono
+            Telefono de contacto
             <input
               className="input"
               value={locationForm.phone || ''}
@@ -452,19 +449,82 @@ function LocationDetailPage() {
             />
           </label>
           <label>
-            Contacto principal
+            Key Aloha
             <input
               className="input"
-              value={locationForm.main_contact || ''}
-              onChange={(event) => setLocationForm({ ...locationForm, main_contact: event.target.value })}
+              value={locationForm.llave_aloha || ''}
+              onChange={(event) => setLocationForm({ ...locationForm, llave_aloha: event.target.value })}
             />
           </label>
           <label>
-            Estado
+            Cantidad de licencias Aloha
+            <input
+              type="number"
+              min="0"
+              step="1"
+              className="input"
+              value={locationForm.cantidad_licencias_aloha}
+              onChange={(event) =>
+                setLocationForm({ ...locationForm, cantidad_licencias_aloha: event.target.value })
+              }
+            />
+          </label>
+          <label>
+            Version Aloha
+            <input
+              className="input"
+              value={locationForm.version_aloha || ''}
+              onChange={(event) => setLocationForm({ ...locationForm, version_aloha: event.target.value })}
+            />
+          </label>
+          <label>
+            Version Fiscal
+            <input
+              className="input"
+              value={locationForm.version_modulo_fiscal || ''}
+              onChange={(event) =>
+                setLocationForm({ ...locationForm, version_modulo_fiscal: event.target.value })
+              }
+            />
+          </label>
+          <label>
+            Kitchen
             <select
               className="input"
-              value={locationForm.status || 'active'}
-              onChange={(event) => setLocationForm({ ...locationForm, status: event.target.value })}
+              value={locationForm.tiene_kitchen ? 'si' : 'no'}
+              onChange={(event) => setBooleanSelect(setLocationForm, 'tiene_kitchen', event.target.value)}
+            >
+              <option value="si">Si</option>
+              <option value="no">No</option>
+            </select>
+          </label>
+          <label>
+            CMC
+            <input
+              className="input"
+              value={locationForm.cmc || ''}
+              onChange={(event) => setLocationForm({ ...locationForm, cmc: event.target.value })}
+            />
+          </label>
+          <label>
+            PULSE INSIGHT
+            <select
+              className="input"
+              value={locationForm.usa_insight_pulse ? 'si' : 'no'}
+              onChange={(event) =>
+                setBooleanSelect(setLocationForm, 'usa_insight_pulse', event.target.value)
+              }
+            >
+              <option value="si">Si</option>
+              <option value="no">No</option>
+            </select>
+          </label>
+          <label>
+            Estado del local
+            <select
+              className="input"
+              value={locationForm.status || 'abierto'}
+              onChange={(event) => setLocationStatus(setLocationForm, event.target.value)}
             >
               {enums.locationStatus.map((status) => (
                 <option key={status} value={status}>
@@ -474,27 +534,41 @@ function LocationDetailPage() {
             </select>
           </label>
           <label>
-            <span>Usa NBO</span>
-            <input
-              type="checkbox"
-              checked={Boolean(locationForm.usa_nbo)}
-              onChange={(event) => setLocationForm({ ...locationForm, usa_nbo: event.target.checked })}
-            />
-          </label>
-          <label className="full-row">
-            Notas de red
-            <textarea
+            NBO
+            <select
               className="input"
-              rows="3"
-              value={locationForm.network_notes || ''}
-              onChange={(event) => setLocationForm({ ...locationForm, network_notes: event.target.value })}
+              value={locationForm.usa_nbo ? 'si' : 'no'}
+              onChange={(event) => setBooleanSelect(setLocationForm, 'usa_nbo', event.target.value)}
+            >
+              <option value="si">Si</option>
+              <option value="no">No</option>
+            </select>
+          </label>
+          <label>
+            Fecha de apertura
+            <input
+              type="date"
+              className="input"
+              value={locationForm.fecha_apertura || ''}
+              onChange={(event) => setLocationForm({ ...locationForm, fecha_apertura: event.target.value })}
             />
           </label>
+          {locationForm.status === 'cerrado' && (
+            <label>
+              Fecha de cierre
+              <input
+                type="date"
+                className="input"
+                value={locationForm.fecha_cierre || ''}
+                onChange={(event) => setLocationForm({ ...locationForm, fecha_cierre: event.target.value })}
+              />
+            </label>
+          )}
           <label className="full-row">
             Notas generales
             <textarea
               className="input"
-              rows="2"
+              rows="3"
               value={locationForm.notes || ''}
               onChange={(event) => setLocationForm({ ...locationForm, notes: event.target.value })}
             />
