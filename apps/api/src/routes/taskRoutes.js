@@ -1,6 +1,7 @@
 const express = require('express');
 const commentController = require('../controllers/commentController');
 const controller = require('../controllers/taskController');
+const { requireRole } = require('../middleware/auth');
 const { validateBody } = require('../middleware/validate');
 
 const router = express.Router();
@@ -27,6 +28,6 @@ router.get('/:id/comments', commentController.listTaskComments);
 router.post('/:id/comments', validateBody([{ field: 'comment', required: true }]), commentController.createTaskComment);
 router.post('/', validateBody(taskRules), controller.createTask);
 router.put('/:id', validateBody(taskRules), controller.updateTask);
-router.delete('/:id', controller.deleteTask);
+router.delete('/:id', requireRole('admin'), controller.deleteTask);
 
 module.exports = router;

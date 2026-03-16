@@ -1,5 +1,6 @@
 const express = require('express');
 const controller = require('../controllers/onCallTechnicianController');
+const { requireRole } = require('../middleware/auth');
 const { validateBody } = require('../middleware/validate');
 
 const router = express.Router();
@@ -11,7 +12,7 @@ const technicianRules = [
 
 router.get('/', controller.getTechnicians);
 router.get('/:id', controller.getTechnicianById);
-router.post('/', validateBody(technicianRules), controller.createTechnician);
-router.put('/:id', validateBody(technicianRules), controller.updateTechnician);
+router.post('/', requireRole('admin'), validateBody(technicianRules), controller.createTechnician);
+router.put('/:id', requireRole('admin'), validateBody(technicianRules), controller.updateTechnician);
 
 module.exports = router;

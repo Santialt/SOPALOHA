@@ -118,23 +118,32 @@ function createApiHarness(options = {}) {
     return { ...result, sessionCookie };
   }
 
-  async function authedRequest(user, method, route, options = {}) {
-    const loginResult = await login(user.email, user.password);
-    assert.equal(loginResult.status, 200);
+  async function loginAs(user) {
+    return login(user.email, user.password);
+  }
 
+  async function requestWithSession(method, route, sessionCookie, options = {}) {
     const headers = {
       ...(options.headers || {}),
-      Cookie: loginResult.sessionCookie
+      Cookie: sessionCookie
     };
 
     return request(method, route, { ...options, headers });
+  }
+
+  async function authedRequest(user, method, route, options = {}) {
+    const loginResult = await loginAs(user);
+    assert.equal(loginResult.status, 200);
+    return requestWithSession(method, route, loginResult.sessionCookie, options);
   }
 
   return {
     baseUrl: () => baseUrl,
     db,
     request,
+    requestWithSession,
     login,
+    loginAs,
     seedUser,
     start,
     stop,

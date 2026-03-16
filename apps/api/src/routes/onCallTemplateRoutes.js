@@ -1,5 +1,6 @@
 const express = require('express');
 const controller = require('../controllers/onCallTemplateController');
+const { requireRole } = require('../middleware/auth');
 const { validateBody } = require('../middleware/validate');
 
 const router = express.Router();
@@ -13,7 +14,7 @@ const templateRules = [
 
 router.get('/', controller.getTemplates);
 router.get('/:id', controller.getTemplateById);
-router.post('/', validateBody(templateRules), controller.createTemplate);
-router.put('/:id', validateBody(templateRules), controller.updateTemplate);
+router.post('/', requireRole('admin'), validateBody(templateRules), controller.createTemplate);
+router.put('/:id', requireRole('admin'), validateBody(templateRules), controller.updateTemplate);
 
 module.exports = router;

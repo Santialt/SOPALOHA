@@ -1,5 +1,6 @@
 const express = require('express');
 const controller = require('../controllers/locationController');
+const { requireRole } = require('../middleware/auth');
 const { validateBody } = require('../middleware/validate');
 
 const router = express.Router();
@@ -25,7 +26,7 @@ router.get('/:id/tasks', controller.getLocationTasks);
 router.get('/:id/notes', controller.getLocationNotes);
 router.put('/:id', validateBody(locationRules), controller.updateLocation);
 router.get('/:id/integrations', controller.getLocationIntegrations);
-router.put('/:id/integrations', controller.putLocationIntegrations);
-router.delete('/:id', controller.deleteLocation);
+router.put('/:id/integrations', requireRole('admin'), controller.putLocationIntegrations);
+router.delete('/:id', requireRole('admin'), controller.deleteLocation);
 
 module.exports = router;

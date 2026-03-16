@@ -1,6 +1,7 @@
 const express = require('express');
 const commentController = require('../controllers/commentController');
 const controller = require('../controllers/incidentController');
+const { requireRole } = require('../middleware/auth');
 const { validateBody } = require('../middleware/validate');
 
 const router = express.Router();
@@ -27,6 +28,6 @@ router.get('/:id/comments', commentController.listIncidentComments);
 router.post('/:id/comments', validateBody([{ field: 'comment', required: true }]), commentController.createIncidentComment);
 router.get('/:id', controller.getIncidentById);
 router.put('/:id', validateBody(incidentRules), controller.updateIncident);
-router.delete('/:id', controller.deleteIncident);
+router.delete('/:id', requireRole('admin'), controller.deleteIncident);
 
 module.exports = router;

@@ -1,5 +1,6 @@
 const express = require('express');
 const controller = require('../controllers/deviceController');
+const { requireRole } = require('../middleware/auth');
 const { validateBody } = require('../middleware/validate');
 
 const router = express.Router();
@@ -38,6 +39,6 @@ router.get('/', controller.getDevices);
 router.post('/', validateBody(deviceRules), controller.createDevice);
 router.get('/:id', controller.getDeviceById);
 router.put('/:id', validateBody(deviceRules), controller.updateDevice);
-router.delete('/:id', controller.deleteDevice);
+router.delete('/:id', requireRole('admin'), controller.deleteDevice);
 
 module.exports = router;

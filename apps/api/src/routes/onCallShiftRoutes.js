@@ -1,5 +1,6 @@
 const express = require('express');
 const controller = require('../controllers/onCallShiftController');
+const { requireRole } = require('../middleware/auth');
 const { validateBody } = require('../middleware/validate');
 
 const router = express.Router();
@@ -24,8 +25,8 @@ const shiftRules = [
 router.get('/', controller.getShifts);
 router.get('/current', controller.getCurrentShift);
 router.get('/:id', controller.getShiftById);
-router.post('/', validateBody(shiftRules), controller.createShift);
-router.put('/:id', validateBody(shiftRules), controller.updateShift);
-router.delete('/:id', controller.deleteShift);
+router.post('/', requireRole('admin'), validateBody(shiftRules), controller.createShift);
+router.put('/:id', requireRole('admin'), validateBody(shiftRules), controller.updateShift);
+router.delete('/:id', requireRole('admin'), controller.deleteShift);
 
 module.exports = router;
