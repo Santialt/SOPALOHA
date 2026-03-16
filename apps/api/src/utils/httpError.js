@@ -3,6 +3,7 @@ function httpError(status, message, options = {}) {
   err.status = status;
   err.code = options.code || null;
   err.expose = options.expose ?? status < 500;
+  err.clientMessage = options.clientMessage || null;
   err.details = options.details || null;
   err.source = options.source || null;
   err.retryable = Boolean(options.retryable);

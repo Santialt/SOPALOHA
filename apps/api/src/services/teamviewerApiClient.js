@@ -82,6 +82,14 @@ function createExternalServiceError({ message, code, retryable, details, cause }
     code,
     source: 'teamviewer',
     retryable,
+    clientMessage:
+      code === 'TEAMVIEWER_AUTH_ERROR'
+        ? 'TeamViewer authentication failed'
+        : code === 'TEAMVIEWER_RATE_LIMITED'
+          ? 'TeamViewer is temporarily rate limited'
+          : code === 'TEAMVIEWER_BAD_RESPONSE'
+            ? 'TeamViewer returned invalid data'
+            : 'TeamViewer service is temporarily unavailable',
     details,
     cause
   });
@@ -214,6 +222,9 @@ async function fetchGroups() {
       }
     } catch (error) {
       lastError = error;
+      if (error?.code !== 'TEAMVIEWER_BAD_RESPONSE') {
+        throw error;
+      }
     }
   }
 
@@ -316,6 +327,9 @@ async function fetchConnectionReports(range) {
       return await fetchConnectionReportsByQueryStrategy(range, strategy);
     } catch (error) {
       lastError = error;
+      if (error?.code !== 'TEAMVIEWER_BAD_RESPONSE') {
+        throw error;
+      }
     }
   }
 

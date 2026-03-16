@@ -200,6 +200,9 @@ function buildImportPreviewFromSnapshot(snapshot) {
       if (existingDeviceMaps.byTeamviewerId.has(resolvedId.value)) {
         status = 'duplicate';
         statusReason = 'Existing device with same teamviewer_id';
+      } else if (resolvedId.source !== 'remotecontrol_id' && existingDeviceMaps.byFallbackKey.has(fallbackKey)) {
+        status = 'duplicate';
+        statusReason = 'Fallback duplicate by location + alias';
       } else if (seenTeamviewerIds.has(resolvedId.value)) {
         status = 'duplicate';
         statusReason = 'Duplicated teamviewer_id in TeamViewer payload';
@@ -354,7 +357,7 @@ async function runImport() {
         continue;
       }
 
-      if (!row.teamviewer_id && deviceExistsByFallback(locationId, row.alias)) {
+      if ((!row.teamviewer_id || row.teamviewer_id_source !== 'remotecontrol_id') && deviceExistsByFallback(locationId, row.alias)) {
         devicesSkippedDuplicate.push({
           ...row,
           status: 'duplicate',

@@ -30,10 +30,15 @@ function createApiHarness(options = {}) {
   process.env.AUTH_SESSION_SECRET =
     options.authSessionSecret || "sopaloha-integration-secret";
   process.env.INTERNAL_API_KEY = "";
-  process.env.TEAMVIEWER_API_TOKEN = "";
-  process.env.TEAMVIEWER_REPORTS_API_TOKEN = "";
-  process.env.TEAMVIEWER_TIMEOUT_MS = "15000";
-  process.env.TEAMVIEWER_MAX_RETRIES = "0";
+  process.env.TEAMVIEWER_API_TOKEN = options.teamviewerApiToken || "";
+  process.env.TEAMVIEWER_REPORTS_API_TOKEN =
+    options.teamviewerReportsApiToken || "";
+  process.env.TEAMVIEWER_TIMEOUT_MS = String(
+    options.teamviewerTimeoutMs || "15000",
+  );
+  process.env.TEAMVIEWER_MAX_RETRIES = String(
+    options.teamviewerMaxRetries || "0",
+  );
 
   const db = require("../../../src/db/connection");
   const { startServer } = require("../../../src/server");
