@@ -1,13 +1,15 @@
-const test = require('node:test');
-const assert = require('node:assert/strict');
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
-const Database = require('better-sqlite3');
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
+const Database = require("better-sqlite3");
 
-test('SQLite initialization is idempotent and upgrades a legacy schema safely', async (t) => {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sopaloha-api-db-init-'));
-  const sqliteDbPath = path.join(tempDir, 'legacy-support.db');
+test("SQLite initialization is idempotent and upgrades a legacy schema safely", async (t) => {
+  const tempDir = fs.mkdtempSync(
+    path.join(os.tmpdir(), "sopaloha-api-db-init-"),
+  );
+  const sqliteDbPath = path.join(tempDir, "legacy-support.db");
 
   const legacyDb = new Database(sqliteDbPath);
   legacyDb.exec(`
@@ -76,12 +78,12 @@ test('SQLite initialization is idempotent and upgrades a legacy schema safely', 
   `);
   legacyDb.close();
 
-  process.env.NODE_ENV = 'test';
+  process.env.NODE_ENV = "test";
   process.env.SQLITE_DB_PATH = sqliteDbPath;
-  process.env.AUTH_SESSION_SECRET = 'sopaloha-db-init-secret';
+  process.env.AUTH_SESSION_SECRET = "sopaloha-db-init-secret";
 
-  const db = require('../../src/db/connection');
-  const { initDatabase } = require('../../src/db/initDb');
+  const db = require("../../src/db/connection");
+  const { initDatabase } = require("../../src/db/initDb");
 
   t.after(() => {
     db.close();
@@ -91,29 +93,39 @@ test('SQLite initialization is idempotent and upgrades a legacy schema safely', 
   initDatabase();
   initDatabase();
 
-  const locationColumns = db.prepare('PRAGMA table_info(locations)').all();
-  const deviceColumns = db.prepare('PRAGMA table_info(devices)').all();
-  const incidentColumns = db.prepare('PRAGMA table_info(incidents)').all();
-  const taskColumns = db.prepare('PRAGMA table_info(tasks)').all();
-  const locationNoteColumns = db.prepare('PRAGMA table_info(location_notes)').all();
+  const locationColumns = db.prepare("PRAGMA table_info(locations)").all();
+  const deviceColumns = db.prepare("PRAGMA table_info(devices)").all();
+  const incidentColumns = db.prepare("PRAGMA table_info(incidents)").all();
+  const taskColumns = db.prepare("PRAGMA table_info(tasks)").all();
+  const locationNoteColumns = db
+    .prepare("PRAGMA table_info(location_notes)")
+    .all();
 
-  assert.ok(locationColumns.some((column) => column.name === 'llave_aloha'));
-  assert.ok(locationColumns.some((column) => column.name === 'usa_nbo'));
-  assert.ok(deviceColumns.some((column) => column.name === 'device_role'));
-  assert.ok(deviceColumns.some((column) => column.name === 'windows_version'));
-  assert.ok(incidentColumns.some((column) => column.name === 'created_by'));
-  assert.ok(taskColumns.some((column) => column.name === 'assigned_user_id'));
-  assert.ok(locationNoteColumns.some((column) => column.name === 'created_by'));
+  assert.ok(locationColumns.some((column) => column.name === "llave_aloha"));
+  assert.ok(locationColumns.some((column) => column.name === "usa_nbo"));
+  assert.ok(deviceColumns.some((column) => column.name === "device_role"));
+  assert.ok(deviceColumns.some((column) => column.name === "windows_version"));
+  assert.ok(incidentColumns.some((column) => column.name === "created_by"));
+  assert.ok(taskColumns.some((column) => column.name === "assigned_user_id"));
+  assert.ok(locationNoteColumns.some((column) => column.name === "created_by"));
 
-  const legacyDevice = db.prepare('SELECT password, device_role FROM devices WHERE id = 1').get();
+  const legacyDevice = db
+    .prepare("SELECT password, device_role FROM devices WHERE id = 1")
+    .get();
   assert.equal(legacyDevice.password, null);
-  assert.equal(legacyDevice.device_role, 'other');
+  assert.equal(legacyDevice.device_role, "other");
 
   const adminUsers = db
-    .prepare("SELECT COUNT(*) AS total FROM users WHERE role = 'admin' AND lower(email) = lower(?)")
-    .get('saltamirano@kronsa.com.ar');
-  const templateCount = db.prepare('SELECT COUNT(*) AS total FROM on_call_templates').get();
-  const technicianCount = db.prepare('SELECT COUNT(*) AS total FROM on_call_technicians').get();
+    .prepare(
+      "SELECT COUNT(*) AS total FROM users WHERE role = 'admin' AND lower(email) = lower(?)",
+    )
+    .get("saltamirano@kronsa.com.ar");
+  const templateCount = db
+    .prepare("SELECT COUNT(*) AS total FROM on_call_templates")
+    .get();
+  const technicianCount = db
+    .prepare("SELECT COUNT(*) AS total FROM on_call_technicians")
+    .get();
 
   assert.equal(adminUsers.total, 1);
   assert.equal(templateCount.total, 3);
