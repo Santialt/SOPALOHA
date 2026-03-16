@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import InlineError from '../components/InlineError';
 import InlineSuccess from '../components/InlineSuccess';
@@ -15,13 +15,16 @@ const defaultLocationForm = {
   version_aloha: '',
   version_modulo_fiscal: '',
   usa_nbo: false,
-  network_notes: '',
   address: '',
   city: '',
-  province: '',
   phone: '',
-  main_contact: '',
-  status: 'active',
+  cantidad_licencias_aloha: '',
+  tiene_kitchen: false,
+  usa_insight_pulse: false,
+  cmc: '',
+  status: 'abierto',
+  fecha_apertura: '',
+  fecha_cierre: '',
   notes: ''
 };
 
@@ -39,12 +42,54 @@ const defaultDeviceForm = {
 
 const suggestedIntegrations = ['mercado_pago', 'bancard', 'pedidos_ya', 'rappi', 'modo'];
 
+function formatDateTime(value) {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString('es-AR');
+}
+
+function resolveTeamviewerCaseTechnician(row) {
+  if (row.technician_display_name) return row.technician_display_name;
+  if (row.raw_payload_json) {
+    try {
+      const parsed = JSON.parse(row.raw_payload_json);
+      const name = String(parsed?.username || parsed?.USER || '').trim();
+      if (name) return name;
+    } catch (error) {
+      // ignore payload parsing errors in UI fallback
+    }
+  }
+  if (row.technician_username) return row.technician_username;
+  return '-';
+}
+
 function mapLocationToForm(location) {
   return {
     ...defaultLocationForm,
     ...location,
-    usa_nbo: Boolean(location.usa_nbo)
+    usa_nbo: Boolean(location.usa_nbo),
+    tiene_kitchen: Boolean(location.tiene_kitchen),
+    usa_insight_pulse: Boolean(location.usa_insight_pulse),
+    cantidad_licencias_aloha: location.cantidad_licencias_aloha ?? '',
+    fecha_apertura: location.fecha_apertura || '',
+    fecha_cierre: location.fecha_cierre || ''
   };
+}
+
+function setLocationStatus(setter, status) {
+  setter((current) => ({
+    ...current,
+    status,
+    fecha_cierre: status === 'cerrado' ? current.fecha_cierre : ''
+  }));
+}
+
+function setBooleanSelect(setter, field, value) {
+  setter((current) => ({
+    ...current,
+    [field]: value === 'si'
+  }));
 }
 
 function mapDeviceToForm(device) {
@@ -70,8 +115,7 @@ function LocationDetailPage() {
   const [locationForm, setLocationForm] = useState(defaultLocationForm);
   const [savingLocation, setSavingLocation] = useState(false);
   const [devices, setDevices] = useState([]);
-  const [incidents, setIncidents] = useState([]);
-  const [notes, setNotes] = useState([]);
+  const [teamviewerCases, setTeamviewerCases] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [integrations, setIntegrations] = useState([]);
   const [customIntegration, setCustomIntegration] = useState('');
@@ -79,22 +123,24 @@ function LocationDetailPage() {
 
   const [deviceForm, setDeviceForm] = useState(defaultDeviceForm);
   const [editingDeviceId, setEditingDeviceId] = useState(null);
-  const [noteText, setNoteText] = useState('');
   const [savingDevice, setSavingDevice] = useState(false);
-  const [savingNote, setSavingNote] = useState(false);
   const [deletingDeviceId, setDeletingDeviceId] = useState(null);
-  const [deletingNoteId, setDeletingNoteId] = useState(null);
   const [runningActionKey, setRunningActionKey] = useState('');
   const [success, setSuccess] = useState('');
   const teamviewerOpenLockRef = useRef(new Map());
 
   const { load, loading, error, setError } = useDataLoader(async () => {
-    const [locationData, locationDevices, locationIncidents, locationNotes, locationTasks, locationIntegrations] =
+    const [
+      locationData,
+      locationDevices,
+      locationTeamviewerCases,
+      locationTasks,
+      locationIntegrations
+    ] =
       await Promise.all([
         api.getLocationById(id),
         api.getLocationDevices(id),
-        api.getLocationIncidents(id, { limit: 8 }),
-        api.getLocationNotesByLocation(id),
+        api.getTeamviewerImportedCases({ location_id: id }),
         api.getLocationTasks(id, { limit: 20 }),
         api.getLocationIntegrations(id)
       ]);
@@ -102,13 +148,10 @@ function LocationDetailPage() {
     setLocation(locationData);
     setLocationForm(mapLocationToForm(locationData));
     setDevices(locationDevices);
-    setIncidents(locationIncidents);
-    setNotes(locationNotes);
+    setTeamviewerCases(locationTeamviewerCases);
     setTasks(locationTasks);
     setIntegrations(locationIntegrations.map((item) => item.integration_name));
   }, [id, numericLocationId]);
-
-  const lastIncidents = useMemo(() => incidents.slice(0, 8), [incidents]);
 
   const onSaveLocation = async (event) => {
     event.preventDefault();
@@ -224,43 +267,6 @@ function LocationDetailPage() {
     }
   };
 
-  const onCreateNote = async (event) => {
-    event.preventDefault();
-    setSavingNote(true);
-    setError('');
-    setSuccess('');
-
-    try {
-      await api.createLocationNote({ location_id: numericLocationId, note: noteText });
-      setNoteText('');
-      setSuccess('Nota creada.');
-      await load();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSavingNote(false);
-    }
-  };
-
-  const onDeleteNote = async (note) => {
-    const ok = window.confirm('Eliminar esta nota tecnica?');
-    if (!ok) return;
-
-    setDeletingNoteId(note.id);
-    setError('');
-    setSuccess('');
-
-    try {
-      await api.deleteLocationNote(note.id);
-      setSuccess('Nota eliminada.');
-      await load();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setDeletingNoteId(null);
-    }
-  };
-
   const copyToClipboard = async (value) => {
     if (navigator.clipboard?.writeText) {
       await navigator.clipboard.writeText(value);
@@ -329,31 +335,6 @@ function LocationDetailPage() {
     }
   };
 
-  const onPingDevice = async (device) => {
-    if (!device.ip_address) {
-      setError('El dispositivo no tiene IP cargada.');
-      return;
-    }
-
-    const actionKey = `ping-${device.id}`;
-    setRunningActionKey(actionKey);
-    setError('');
-    setSuccess('');
-
-    try {
-      const result = await api.pingDeviceIp(device.ip_address);
-      setSuccess(
-        result.success
-          ? `Ping exitoso a ${device.ip_address}.`
-          : `Ping sin respuesta a ${device.ip_address}.`
-      );
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setRunningActionKey('');
-    }
-  };
-
   if (loading) return <LoadingBlock label="Cargando detalle de local..." />;
 
   if (!location) {
@@ -386,14 +367,6 @@ function LocationDetailPage() {
             />
           </label>
           <label>
-            Razon social
-            <input
-              className="input"
-              value={locationForm.razon_social || ''}
-              onChange={(event) => setLocationForm({ ...locationForm, razon_social: event.target.value })}
-            />
-          </label>
-          <label>
             CUIT
             <input
               className="input"
@@ -402,29 +375,11 @@ function LocationDetailPage() {
             />
           </label>
           <label>
-            Llave Aloha
+            Razon social
             <input
               className="input"
-              value={locationForm.llave_aloha || ''}
-              onChange={(event) => setLocationForm({ ...locationForm, llave_aloha: event.target.value })}
-            />
-          </label>
-          <label>
-            Version Aloha
-            <input
-              className="input"
-              value={locationForm.version_aloha || ''}
-              onChange={(event) => setLocationForm({ ...locationForm, version_aloha: event.target.value })}
-            />
-          </label>
-          <label>
-            Version modulo fiscal
-            <input
-              className="input"
-              value={locationForm.version_modulo_fiscal || ''}
-              onChange={(event) =>
-                setLocationForm({ ...locationForm, version_modulo_fiscal: event.target.value })
-              }
+              value={locationForm.razon_social || ''}
+              onChange={(event) => setLocationForm({ ...locationForm, razon_social: event.target.value })}
             />
           </label>
           <label>
@@ -436,15 +391,15 @@ function LocationDetailPage() {
             />
           </label>
           <label>
-            Provincia
+            Direccion
             <input
               className="input"
-              value={locationForm.province || ''}
-              onChange={(event) => setLocationForm({ ...locationForm, province: event.target.value })}
+              value={locationForm.address || ''}
+              onChange={(event) => setLocationForm({ ...locationForm, address: event.target.value })}
             />
           </label>
           <label>
-            Telefono
+            Telefono de contacto
             <input
               className="input"
               value={locationForm.phone || ''}
@@ -452,19 +407,82 @@ function LocationDetailPage() {
             />
           </label>
           <label>
-            Contacto principal
+            Key Aloha
             <input
               className="input"
-              value={locationForm.main_contact || ''}
-              onChange={(event) => setLocationForm({ ...locationForm, main_contact: event.target.value })}
+              value={locationForm.llave_aloha || ''}
+              onChange={(event) => setLocationForm({ ...locationForm, llave_aloha: event.target.value })}
             />
           </label>
           <label>
-            Estado
+            Cantidad de licencias Aloha
+            <input
+              type="number"
+              min="0"
+              step="1"
+              className="input"
+              value={locationForm.cantidad_licencias_aloha}
+              onChange={(event) =>
+                setLocationForm({ ...locationForm, cantidad_licencias_aloha: event.target.value })
+              }
+            />
+          </label>
+          <label>
+            Version Aloha
+            <input
+              className="input"
+              value={locationForm.version_aloha || ''}
+              onChange={(event) => setLocationForm({ ...locationForm, version_aloha: event.target.value })}
+            />
+          </label>
+          <label>
+            Version Fiscal
+            <input
+              className="input"
+              value={locationForm.version_modulo_fiscal || ''}
+              onChange={(event) =>
+                setLocationForm({ ...locationForm, version_modulo_fiscal: event.target.value })
+              }
+            />
+          </label>
+          <label>
+            Kitchen
             <select
               className="input"
-              value={locationForm.status || 'active'}
-              onChange={(event) => setLocationForm({ ...locationForm, status: event.target.value })}
+              value={locationForm.tiene_kitchen ? 'si' : 'no'}
+              onChange={(event) => setBooleanSelect(setLocationForm, 'tiene_kitchen', event.target.value)}
+            >
+              <option value="si">Si</option>
+              <option value="no">No</option>
+            </select>
+          </label>
+          <label>
+            CMC
+            <input
+              className="input"
+              value={locationForm.cmc || ''}
+              onChange={(event) => setLocationForm({ ...locationForm, cmc: event.target.value })}
+            />
+          </label>
+          <label>
+            PULSE INSIGHT
+            <select
+              className="input"
+              value={locationForm.usa_insight_pulse ? 'si' : 'no'}
+              onChange={(event) =>
+                setBooleanSelect(setLocationForm, 'usa_insight_pulse', event.target.value)
+              }
+            >
+              <option value="si">Si</option>
+              <option value="no">No</option>
+            </select>
+          </label>
+          <label>
+            Estado del local
+            <select
+              className="input"
+              value={locationForm.status || 'abierto'}
+              onChange={(event) => setLocationStatus(setLocationForm, event.target.value)}
             >
               {enums.locationStatus.map((status) => (
                 <option key={status} value={status}>
@@ -474,27 +492,41 @@ function LocationDetailPage() {
             </select>
           </label>
           <label>
-            <span>Usa NBO</span>
-            <input
-              type="checkbox"
-              checked={Boolean(locationForm.usa_nbo)}
-              onChange={(event) => setLocationForm({ ...locationForm, usa_nbo: event.target.checked })}
-            />
-          </label>
-          <label className="full-row">
-            Notas de red
-            <textarea
+            NBO
+            <select
               className="input"
-              rows="3"
-              value={locationForm.network_notes || ''}
-              onChange={(event) => setLocationForm({ ...locationForm, network_notes: event.target.value })}
+              value={locationForm.usa_nbo ? 'si' : 'no'}
+              onChange={(event) => setBooleanSelect(setLocationForm, 'usa_nbo', event.target.value)}
+            >
+              <option value="si">Si</option>
+              <option value="no">No</option>
+            </select>
+          </label>
+          <label>
+            Fecha de apertura
+            <input
+              type="date"
+              className="input"
+              value={locationForm.fecha_apertura || ''}
+              onChange={(event) => setLocationForm({ ...locationForm, fecha_apertura: event.target.value })}
             />
           </label>
+          {locationForm.status === 'cerrado' && (
+            <label>
+              Fecha de cierre
+              <input
+                type="date"
+                className="input"
+                value={locationForm.fecha_cierre || ''}
+                onChange={(event) => setLocationForm({ ...locationForm, fecha_cierre: event.target.value })}
+              />
+            </label>
+          )}
           <label className="full-row">
             Notas generales
             <textarea
               className="input"
-              rows="2"
+              rows="3"
               value={locationForm.notes || ''}
               onChange={(event) => setLocationForm({ ...locationForm, notes: event.target.value })}
             />
@@ -554,83 +586,69 @@ function LocationDetailPage() {
         <div className="section-head wrap">
           <h3>Dispositivos ({devices.length})</h3>
           <Link to={`/incidents?location_id=${numericLocationId}`} className="btn-link">
-            Registrar incidente del local
+            Registrar caso TeamViewer
           </Link>
         </div>
-        <table className="table compact">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Nombre</th>
-              <th>Rol</th>
-              <th>IP</th>
-              <th>TeamViewer</th>
-              <th>Windows</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {devices.map((device) => (
-              <tr key={device.id}>
-                <td>{device.id}</td>
-                <td>{device.name}</td>
-                <td>{device.device_role || '-'}</td>
-                <td>{device.ip_address || '-'}</td>
-                <td>{device.teamviewer_id || '-'}</td>
-                <td>{device.windows_version || '-'}</td>
-                <td>
-                  <div className="form-actions">
-                    <button type="button" className="btn-small" onClick={() => onCopyTeamviewerId(device)}>
-                      Copiar TV ID
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-small"
-                      onClick={() => onOpenTeamviewer(device)}
-                      disabled={runningActionKey === `tv-${device.id}`}
-                    >
-                      {runningActionKey === `tv-${device.id}` ? 'Abriendo...' : 'Abrir TeamViewer'}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-small"
-                      onClick={() => onPingDevice(device)}
-                      disabled={runningActionKey === `ping-${device.id}`}
-                    >
-                      {runningActionKey === `ping-${device.id}` ? 'Pingeando...' : 'Ping IP'}
-                    </button>
-                    <Link
-                      to={`/incidents?location_id=${numericLocationId}&device_id=${device.id}`}
-                      className="btn-link"
-                    >
-                      Incidente
-                    </Link>
-                  </div>
-                  <div className="form-actions">
-                    <button type="button" className="btn-small" onClick={() => onEditDevice(device)}>
-                      Editar
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-danger"
-                      onClick={() => onDeleteDevice(device)}
-                      disabled={deletingDeviceId === device.id}
-                    >
-                      {deletingDeviceId === device.id ? 'Eliminando...' : 'Eliminar'}
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {devices.length === 0 && (
+        <div className="table-wrap table-wrap-xl">
+          <table className="table compact">
+            <thead>
               <tr>
-                <td colSpan="7" className="empty-row">
-                  Sin dispositivos
-                </td>
+                <th>ID</th>
+                <th>Nombre</th>
+                <th>Rol</th>
+                <th>IP</th>
+                <th>TeamViewer</th>
+                <th>Windows</th>
+                <th>Acciones</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {devices.map((device) => (
+                <tr key={device.id}>
+                  <td>{device.id}</td>
+                  <td>{device.name}</td>
+                  <td>{device.device_role || '-'}</td>
+                  <td>{device.ip_address || '-'}</td>
+                  <td>{device.teamviewer_id || '-'}</td>
+                  <td>{device.windows_version || '-'}</td>
+                  <td>
+                    <div className="form-actions">
+                      <button type="button" className="btn-small" onClick={() => onCopyTeamviewerId(device)}>
+                        Copiar TV ID
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-small"
+                        onClick={() => onOpenTeamviewer(device)}
+                        disabled={runningActionKey === `tv-${device.id}`}
+                      >
+                        {runningActionKey === `tv-${device.id}` ? 'Abriendo...' : 'Abrir TeamViewer'}
+                      </button>
+                      <button type="button" className="btn-small" onClick={() => onEditDevice(device)}>
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-danger"
+                        onClick={() => onDeleteDevice(device)}
+                        disabled={deletingDeviceId === device.id}
+                      >
+                        {deletingDeviceId === device.id ? 'Eliminando...' : 'Eliminar'}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {devices.length === 0 && (
+                <tr>
+                  <td colSpan="7" className="empty-row">
+                    Sin dispositivos
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
 
         <form onSubmit={onCreateOrUpdateDevice} className="form-grid form-grid-3">
           <label>
@@ -737,104 +755,79 @@ function LocationDetailPage() {
       </section>
 
       <section className="section-card">
-        <h3>Incidentes ({incidents.length})</h3>
-        <table className="table compact">
-          <thead>
-            <tr>
-              <th>Fecha</th>
-              <th>Titulo</th>
-              <th>Estado</th>
-              <th>Categoria</th>
-            </tr>
-          </thead>
-          <tbody>
-            {lastIncidents.map((incident) => (
-              <tr key={incident.id}>
-                <td>{incident.incident_date}</td>
-                <td>{incident.title}</td>
-                <td>{incident.status}</td>
-                <td>{incident.category}</td>
-              </tr>
-            ))}
-            {incidents.length === 0 && (
-              <tr>
-                <td colSpan="4" className="empty-row">
-                  Sin incidentes
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </section>
+        <div className="section-head">
+          <h3>Resumen TeamViewer</h3>
+          <Link to={`/teamviewer-imported-cases?location_id=${numericLocationId}`} className="btn-link">
+            Ver todos
+          </Link>
+        </div>
 
-      <section className="section-card">
-        <h3>Notas Tecnicas ({notes.length})</h3>
-        <ul className="notes-list">
-          {notes.map((note) => (
-            <li key={note.id}>
-              <div>{note.note}</div>
-              <div className="form-actions">
-                <small>{note.created_at}</small>
-                <button
-                  className="btn-danger"
-                  onClick={() => onDeleteNote(note)}
-                  disabled={deletingNoteId === note.id}
-                >
-                  {deletingNoteId === note.id ? 'Eliminando...' : 'Eliminar'}
-                </button>
+        <div className="incident-summary-total">
+          <strong>{teamviewerCases.length}</strong>
+          <span>casos TeamViewer visibles para este local</span>
+        </div>
+
+        <div className="incident-summary-list">
+          {teamviewerCases.slice(0, 5).map((teamviewerCase) => (
+            <article key={teamviewerCase.id} className="incident-summary-item">
+              <div className="incident-summary-meta">
+                <small>{formatDateTime(teamviewerCase.started_at)}</small>
+                <span className="badge pending">TeamViewer</span>
               </div>
-            </li>
+              <strong>{teamviewerCase.problem_description || teamviewerCase.note_raw || 'Caso sin descripcion'}</strong>
+              <small>
+                Resuelto por: {resolveTeamviewerCaseTechnician(teamviewerCase)}
+              </small>
+              <small>
+                Solicitante: {teamviewerCase.requested_by || 'Sin solicitante'}
+              </small>
+              <Link
+                to={`/teamviewer-imported-cases?location_id=${numericLocationId}`}
+                className="btn-link"
+              >
+                Abrir casos
+              </Link>
+            </article>
           ))}
-          {notes.length === 0 && <li className="empty-row">Sin notas</li>}
-        </ul>
-
-        <form onSubmit={onCreateNote} className="inline-form">
-          <input
-            className="input"
-            value={noteText}
-            onChange={(event) => setNoteText(event.target.value)}
-            placeholder="Agregar nota tecnica"
-            required
-          />
-          <button className="btn-primary" type="submit" disabled={savingNote}>
-            {savingNote ? 'Guardando...' : 'Agregar Nota'}
-          </button>
-        </form>
+          {teamviewerCases.length === 0 && <div className="empty-row">Sin casos TeamViewer vinculados.</div>}
+        </div>
       </section>
 
       <section className="section-card full-width">
         <h3>Tareas ({tasks.length})</h3>
-        <table className="table compact">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Titulo</th>
-              <th>Prioridad</th>
-              <th>Estado</th>
-              <th>Vencimiento</th>
-            </tr>
-          </thead>
-          <tbody>
-            {tasks.map((task) => (
-              <tr key={task.id}>
-                <td>{task.id}</td>
-                <td>{task.title}</td>
-                <td>
-                  <span className={`badge ${task.priority}`}>{task.priority}</span>
-                </td>
-                <td>{task.status}</td>
-                <td>{task.due_date || '-'}</td>
-              </tr>
-            ))}
-            {tasks.length === 0 && (
+        <div className="table-wrap">
+          <table className="table compact">
+            <thead>
               <tr>
-                <td colSpan="5" className="empty-row">
-                  Sin tareas
-                </td>
+                <th>ID</th>
+                <th>Titulo</th>
+                <th>Prioridad</th>
+                <th>Estado</th>
+                <th>Vencimiento</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {tasks.map((task) => (
+                <tr key={task.id}>
+                  <td>{task.id}</td>
+                  <td>{task.title}</td>
+                  <td>
+                    <span className={`badge ${task.priority}`}>{task.priority}</span>
+                  </td>
+                  <td>{task.status}</td>
+                  <td>{task.due_date || '-'}</td>
+                </tr>
+              ))}
+              {tasks.length === 0 && (
+                <tr>
+                  <td colSpan="5" className="empty-row">
+                    Sin tareas
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
     </div>
   );

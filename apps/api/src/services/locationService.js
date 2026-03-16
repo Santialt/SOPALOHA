@@ -10,15 +10,68 @@ function toBoolean(value) {
   return false;
 }
 
-function normalizeLocationPayload(payload) {
+function isBlank(value) {
+  return value === undefined || value === null || String(value).trim() === '';
+}
+
+function normalizeDate(value) {
+  if (isBlank(value)) return null;
+  return String(value).trim();
+}
+
+function normalizeInteger(value) {
+  if (isBlank(value)) return null;
+  const numericValue = Number(value);
+  return Number.isInteger(numericValue) ? numericValue : null;
+}
+
+function normalizeStatusForStorage(value) {
+  if (value === 'cerrado' || value === 'inactive') return 'inactive';
+  return 'active';
+}
+
+function normalizeStatusForResponse(value) {
+  if (value === 'inactive' || value === 'cerrado') return 'cerrado';
+  return 'abierto';
+}
+
+function mapLocationForResponse(row) {
+  if (!row) return row;
+
+  return {
+    ...row,
+    status: normalizeStatusForResponse(row.status),
+    usa_nbo: Boolean(row.usa_nbo),
+    tiene_kitchen: Boolean(row.tiene_kitchen),
+    usa_insight_pulse: Boolean(row.usa_insight_pulse)
+  };
+}
+
+function normalizeLocationPayload(payload, existingLocation = null) {
+  const status = normalizeStatusForStorage(payload.status ?? existingLocation?.status);
+  const fechaApertura =
+    payload.fecha_apertura === undefined
+      ? normalizeDate(existingLocation?.fecha_apertura)
+      : normalizeDate(payload.fecha_apertura);
+  const fechaCierreBase =
+    payload.fecha_cierre === undefined
+      ? normalizeDate(existingLocation?.fecha_cierre)
+      : normalizeDate(payload.fecha_cierre);
+
   return {
     ...payload,
-    usa_nbo: toBoolean(payload.usa_nbo)
+    usa_nbo: toBoolean(payload.usa_nbo),
+    tiene_kitchen: toBoolean(payload.tiene_kitchen),
+    usa_insight_pulse: toBoolean(payload.usa_insight_pulse),
+    cantidad_licencias_aloha: normalizeInteger(payload.cantidad_licencias_aloha),
+    fecha_apertura: fechaApertura,
+    fecha_cierre: status === 'active' ? null : fechaCierreBase,
+    status
   };
 }
 
 function listLocations() {
-  return repository.findAll();
+  return repository.findAll().map(mapLocationForResponse);
 }
 
 function searchLocations(query) {
@@ -30,16 +83,18 @@ function searchLocations(query) {
 function getLocation(id) {
   const row = repository.findById(id);
   if (!row) throw httpError(404, 'Location not found');
-  return row;
+  return mapLocationForResponse(row);
 }
 
 function createLocation(payload) {
-  return repository.create(normalizeLocationPayload(payload));
+  return mapLocationForResponse(repository.create(normalizeLocationPayload(payload)));
 }
 
 function updateLocation(id, payload) {
-  getLocation(id);
-  return repository.update(id, normalizeLocationPayload(payload));
+  const existingLocation = repository.findById(id);
+  if (!existingLocation) throw httpError(404, 'Location not found');
+
+  return mapLocationForResponse(repository.update(id, normalizeLocationPayload(payload, existingLocation)));
 }
 
 function deleteLocation(id) {

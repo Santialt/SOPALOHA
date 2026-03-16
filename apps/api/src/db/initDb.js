@@ -1,10 +1,10 @@
-const fs = require('fs');
-const path = require('path');
-const db = require('./connection');
+const fs = require("fs");
+const path = require("path");
+const db = require("./connection");
 
-const INITIAL_ADMIN_EMAIL = 'saltamirano@kronsa.com.ar';
+const INITIAL_ADMIN_EMAIL = "saltamirano@kronsa.com.ar";
 const INITIAL_ADMIN_PASSWORD_HASH =
-  'scrypt$16384$8$1$de98d699cb43d0664debb90763b3f9d8$c17a14431a4de9349b7ea9730176097c017d0196bd4531991e5b4ff5b01f7d4ab92f52ec3123cafa2048b19a1f2834973aeab726e50d4a6a4bb8f77fea356fdf';
+  "scrypt$16384$8$1$de98d699cb43d0664debb90763b3f9d8$c17a14431a4de9349b7ea9730176097c017d0196bd4531991e5b4ff5b01f7d4ab92f52ec3123cafa2048b19a1f2834973aeab726e50d4a6a4bb8f77fea356fdf";
 
 function hasColumn(tableName, columnName) {
   const columns = db.prepare(`PRAGMA table_info(${tableName})`).all();
@@ -18,26 +18,44 @@ function ensureColumn(tableName, columnName, definition) {
 }
 
 function runMigrations() {
-  ensureColumn('locations', 'razon_social', 'TEXT');
-  ensureColumn('locations', 'cuit', 'TEXT');
-  ensureColumn('locations', 'llave_aloha', 'TEXT');
-  ensureColumn('locations', 'version_aloha', 'TEXT');
-  ensureColumn('locations', 'version_modulo_fiscal', 'TEXT');
-  ensureColumn('locations', 'usa_nbo', 'INTEGER NOT NULL DEFAULT 0 CHECK (usa_nbo IN (0, 1))');
-  ensureColumn('locations', 'network_notes', 'TEXT');
+  ensureColumn("locations", "razon_social", "TEXT");
+  ensureColumn("locations", "cuit", "TEXT");
+  ensureColumn("locations", "llave_aloha", "TEXT");
+  ensureColumn("locations", "version_aloha", "TEXT");
+  ensureColumn("locations", "version_modulo_fiscal", "TEXT");
+  ensureColumn(
+    "locations",
+    "usa_nbo",
+    "INTEGER NOT NULL DEFAULT 0 CHECK (usa_nbo IN (0, 1))",
+  );
+  ensureColumn("locations", "network_notes", "TEXT");
+  ensureColumn("locations", "cantidad_licencias_aloha", "INTEGER");
+  ensureColumn(
+    "locations",
+    "tiene_kitchen",
+    "INTEGER NOT NULL DEFAULT 0 CHECK (tiene_kitchen IN (0, 1))",
+  );
+  ensureColumn(
+    "locations",
+    "usa_insight_pulse",
+    "INTEGER NOT NULL DEFAULT 0 CHECK (usa_insight_pulse IN (0, 1))",
+  );
+  ensureColumn("locations", "cmc", "TEXT");
+  ensureColumn("locations", "fecha_apertura", "TEXT");
+  ensureColumn("locations", "fecha_cierre", "TEXT");
 
-  ensureColumn('devices', 'windows_version', 'TEXT');
-  ensureColumn('devices', 'ram_gb', 'REAL');
-  ensureColumn('devices', 'cpu', 'TEXT');
-  ensureColumn('devices', 'disk_type', 'TEXT');
-  ensureColumn('devices', 'device_role', 'TEXT');
-  ensureColumn('incidents', 'created_by', 'INTEGER');
-  ensureColumn('incidents', 'updated_by', 'INTEGER');
-  ensureColumn('tasks', 'created_by', 'INTEGER');
-  ensureColumn('tasks', 'updated_by', 'INTEGER');
-  ensureColumn('tasks', 'assigned_user_id', 'INTEGER');
-  ensureColumn('location_notes', 'created_by', 'INTEGER');
-  ensureColumn('location_notes', 'updated_by', 'INTEGER');
+  ensureColumn("devices", "windows_version", "TEXT");
+  ensureColumn("devices", "ram_gb", "REAL");
+  ensureColumn("devices", "cpu", "TEXT");
+  ensureColumn("devices", "disk_type", "TEXT");
+  ensureColumn("devices", "device_role", "TEXT");
+  ensureColumn("incidents", "created_by", "INTEGER");
+  ensureColumn("incidents", "updated_by", "INTEGER");
+  ensureColumn("tasks", "created_by", "INTEGER");
+  ensureColumn("tasks", "updated_by", "INTEGER");
+  ensureColumn("tasks", "assigned_user_id", "INTEGER");
+  ensureColumn("location_notes", "created_by", "INTEGER");
+  ensureColumn("location_notes", "updated_by", "INTEGER");
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (
@@ -107,18 +125,24 @@ function runMigrations() {
     CREATE INDEX IF NOT EXISTS idx_location_integrations_location_id ON location_integrations(location_id);
   `);
 
-  if (hasColumn('devices', 'password')) {
+  if (hasColumn("devices", "password")) {
     const scrubbedPasswords = db
-      .prepare("UPDATE devices SET password = NULL WHERE password IS NOT NULL AND trim(password) <> ''")
+      .prepare(
+        "UPDATE devices SET password = NULL WHERE password IS NOT NULL AND trim(password) <> ''",
+      )
       .run().changes;
 
     if (scrubbedPasswords > 0) {
-      console.warn(`[Security] Removed ${scrubbedPasswords} plaintext device password(s) from SQLite.`);
+      console.warn(
+        `[Security] Removed ${scrubbedPasswords} plaintext device password(s) from SQLite.`,
+      );
     }
   }
 
-  if (hasColumn('devices', 'device_role')) {
-    db.exec('CREATE INDEX IF NOT EXISTS idx_devices_role ON devices(device_role);');
+  if (hasColumn("devices", "device_role")) {
+    db.exec(
+      "CREATE INDEX IF NOT EXISTS idx_devices_role ON devices(device_role);",
+    );
   }
 
   db.exec(`
@@ -195,7 +219,9 @@ function runMigrations() {
     END;
   `);
 
-  const templateCount = db.prepare('SELECT COUNT(*) AS total FROM on_call_templates').get().total;
+  const templateCount = db
+    .prepare("SELECT COUNT(*) AS total FROM on_call_templates")
+    .get().total;
   if (templateCount === 0) {
     db.exec(`
       INSERT INTO on_call_templates (title, start_time, end_time, crosses_to_next_day) VALUES
@@ -205,7 +231,9 @@ function runMigrations() {
     `);
   }
 
-  const techniciansCount = db.prepare('SELECT COUNT(*) AS total FROM on_call_technicians').get().total;
+  const techniciansCount = db
+    .prepare("SELECT COUNT(*) AS total FROM on_call_technicians")
+    .get().total;
   if (techniciansCount === 0) {
     db.exec(`
       INSERT INTO on_call_technicians (name, is_active) VALUES
@@ -218,13 +246,15 @@ function runMigrations() {
 
 function ensureInitialAdminUser() {
   const existing = db
-    .prepare('SELECT id, password_hash FROM users WHERE lower(email) = lower(?)')
+    .prepare(
+      "SELECT id, password_hash FROM users WHERE lower(email) = lower(?)",
+    )
     .get(INITIAL_ADMIN_EMAIL);
   if (existing) {
-    if (!String(existing.password_hash || '').trim()) {
-      db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(
+    if (!String(existing.password_hash || "").trim()) {
+      db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(
         INITIAL_ADMIN_PASSWORD_HASH,
-        existing.id
+        existing.id,
       );
     }
     return;
@@ -234,27 +264,42 @@ function ensureInitialAdminUser() {
     `
     INSERT INTO users (name, email, password_hash, role, active)
     VALUES (?, ?, ?, 'admin', 1)
-  `
-  ).run('Administrador SOPALOHA', INITIAL_ADMIN_EMAIL, INITIAL_ADMIN_PASSWORD_HASH);
+  `,
+  ).run(
+    "Administrador SOPALOHA",
+    INITIAL_ADMIN_EMAIL,
+    INITIAL_ADMIN_PASSWORD_HASH,
+  );
 }
 
 function initDatabase() {
-  const schemaPath = path.resolve(__dirname, '../../../../docs/sqlite-mvp-schema.sql');
+  const schemaPath = path.resolve(
+    __dirname,
+    "../../../../docs/sqlite-mvp-schema.sql",
+  );
 
   if (!fs.existsSync(schemaPath)) {
     throw new Error(`Schema file not found at: ${schemaPath}`);
   }
 
-  const sql = fs.readFileSync(schemaPath, 'utf8');
+  const sql = fs.readFileSync(schemaPath, "utf8");
   db.exec(sql);
   runMigrations();
   ensureInitialAdminUser();
-  console.log('Database initialized successfully at data/support.db');
+  console.log(`Database initialized successfully at ${db.dbFilePath}`);
 }
 
-try {
-  initDatabase();
-} catch (error) {
-  console.error('Database initialization failed:', error.message);
-  process.exit(1);
+if (require.main === module) {
+  try {
+    initDatabase();
+  } catch (error) {
+    console.error("Database initialization failed:", error.message);
+    process.exit(1);
+  }
 }
+
+module.exports = {
+  ensureInitialAdminUser,
+  initDatabase,
+  runMigrations,
+};

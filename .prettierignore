@@ -1,0 +1,8 @@
+**/node_modules
+**/dist
+**/coverage
+**/.vite
+data
+apps/api/package-lock.json
+apps/web/package-lock.json
+package-lock.json

@@ -1,7 +1,7 @@
-export const THEME_STORAGE_KEY = 'sopaloha-theme';
+export const THEME_STORAGE_KEY = "sopaloha-theme";
 
-const THEME_LIGHT = 'light';
-const THEME_DARK = 'dark';
+const THEME_LIGHT = "light";
+const THEME_DARK = "dark";
 
 export function isTheme(value) {
   return value === THEME_LIGHT || value === THEME_DARK;
@@ -20,7 +20,10 @@ export function getPreferredTheme() {
   const stored = getStoredTheme();
   if (stored) return stored;
 
-  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+  if (
+    window.matchMedia &&
+    window.matchMedia("(prefers-color-scheme: dark)").matches
+  ) {
     return THEME_DARK;
   }
 
@@ -29,7 +32,7 @@ export function getPreferredTheme() {
 
 export function applyTheme(theme) {
   const safeTheme = isTheme(theme) ? theme : THEME_LIGHT;
-  document.documentElement.setAttribute('data-theme', safeTheme);
+  document.documentElement.setAttribute("data-theme", safeTheme);
 
   try {
     window.localStorage.setItem(THEME_STORAGE_KEY, safeTheme);

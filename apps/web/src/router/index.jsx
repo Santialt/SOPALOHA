@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import AppShell from '../components/AppShell';
 import AdminRoute from '../components/AdminRoute';
@@ -11,12 +11,10 @@ import IncidentsPage from '../pages/IncidentsPage';
 import LoginPage from '../pages/LoginPage';
 import TasksPage from '../pages/TasksPage';
 import UsersPage from '../pages/UsersPage';
-import LocationNotesPage from '../pages/LocationNotesPage';
 import TeamViewerImportPage from '../pages/TeamViewerImportPage';
 import TeamViewerExplorerPage from '../pages/TeamViewerExplorerPage';
 import OnCallPage from '../pages/OnCallPage';
-
-const TeamViewerImportedCasesPage = lazy(() => import('../pages/TeamViewerImportedCasesPage'));
+import TeamViewerImportedCasesPage from '../pages/TeamViewerImportedCasesPage';
 
 export function AppRouter() {
   return (
@@ -30,7 +28,6 @@ export function AppRouter() {
           <Route path="locations/:id" element={<LocationDetailPage />} />
           <Route path="incidents" element={<IncidentsPage />} />
           <Route path="tasks" element={<TasksPage />} />
-          <Route path="location-notes" element={<LocationNotesPage />} />
           <Route path="on-call" element={<OnCallPage />} />
           <Route path="teamviewer-explorer" element={<TeamViewerExplorerPage />} />
           <Route path="teamviewer-import" element={<TeamViewerImportPage />} />

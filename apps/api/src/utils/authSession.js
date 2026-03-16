@@ -78,7 +78,7 @@ function verifySessionToken(token) {
     }
 
     return payload;
-  } catch (error) {
+  } catch {
     return null;
   }
 }

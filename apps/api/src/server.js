@@ -1,19 +1,40 @@
-require('./db/initDb');
-const app = require('./app');
-const { logger } = require('./utils/logger');
+const app = require("./app");
+const { initDatabase } = require("./db/initDb");
+const { logger } = require("./utils/logger");
 
-const PORT = process.env.PORT || 3001;
+function startServer(options = {}) {
+  const port = Number(options.port ?? process.env.PORT ?? 3001);
+  initDatabase();
 
-const server = app.listen(PORT, () => {
-  logger.info('API server started', { port: Number(PORT) });
-});
+  return new Promise((resolve, reject) => {
+    const server = app.listen(port, () => {
+      logger.info("API server started", {
+        port: Number(server.address()?.port || port),
+      });
+      resolve(server);
+    });
 
-process.on('unhandledRejection', (error) => {
-  logger.error('Unhandled promise rejection', { error });
-});
+    server.on("error", reject);
+  });
+}
 
-process.on('uncaughtException', (error) => {
-  logger.error('Uncaught exception', { error });
-  server.close(() => process.exit(1));
-  setTimeout(() => process.exit(1), 5000).unref();
-});
+if (require.main === module) {
+  startServer()
+    .then((server) => {
+      process.on("unhandledRejection", (error) => {
+        logger.error("Unhandled promise rejection", { error });
+      });
+
+      process.on("uncaughtException", (error) => {
+        logger.error("Uncaught exception", { error });
+        server.close(() => process.exit(1));
+        setTimeout(() => process.exit(1), 5000).unref();
+      });
+    })
+    .catch((error) => {
+      logger.error("API server failed to start", { error });
+      process.exit(1);
+    });
+}
+
+module.exports = { startServer };

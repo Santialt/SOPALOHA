@@ -77,7 +77,7 @@ function parseRetryAfterMs(response) {
   return Math.min(Math.max(asDate - Date.now(), 0), 5000);
 }
 
-function createExternalServiceError({ status, message, code, retryable, details, cause }) {
+function createExternalServiceError({ message, code, retryable, details, cause }) {
   return httpError(502, message, {
     code,
     source: 'teamviewer',

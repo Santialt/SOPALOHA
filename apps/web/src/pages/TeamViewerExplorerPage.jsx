@@ -5,6 +5,12 @@ import InlineSuccess from '../components/InlineSuccess';
 import LoadingBlock from '../components/LoadingBlock';
 import { api } from '../services/api';
 
+function formatLocationStatus(status) {
+  if (status === 'inactive' || status === 'cerrado') return 'cerrado';
+  if (status === 'active' || status === 'abierto') return 'abierto';
+  return status || 'sin datos';
+}
+
 function TeamViewerExplorerPage() {
   const [explorer, setExplorer] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -172,13 +178,27 @@ function TeamViewerExplorerPage() {
   const locationForDetails = selectedDevice?.linked_location || selectedGroup?.linked_location || null;
   const hasLocation = Boolean(locationForDetails?.id);
   const linkedDevice = selectedDevice?.linked_device || null;
-  const incidentQuery = selectedDevice
-    ? `/incidents?location_id=${selectedDevice.location_id || ''}${
-        linkedDevice?.id ? `&device_id=${linkedDevice.id}` : ''
-      }`
-    : selectedGroup?.location_id
-      ? `/incidents?location_id=${selectedGroup.location_id}`
-      : '/incidents';
+  const incidentQuery = (() => {
+    const params = new URLSearchParams();
+    const groupId = selectedGroup?.group_id || '';
+
+    if (groupId) {
+      params.set('teamviewer_group_id', groupId);
+    }
+
+    if (selectedDevice?.location_id) {
+      params.set('location_id', String(selectedDevice.location_id));
+    } else if (selectedGroup?.location_id) {
+      params.set('location_id', String(selectedGroup.location_id));
+    }
+
+    if (linkedDevice?.id) {
+      params.set('device_id', String(linkedDevice.id));
+    }
+
+    const queryString = params.toString();
+    return queryString ? `/incidents?${queryString}` : '/incidents';
+  })();
 
   return (
     <div className="teamviewer-explorer-page">
@@ -286,6 +306,7 @@ function TeamViewerExplorerPage() {
               <h3>Ficha del local</h3>
               <div className="key-value-grid">
                 <div><strong>name:</strong> {locationForDetails?.name || 'sin datos'}</div>
+                <div><strong>company_name:</strong> {locationForDetails?.company_name || 'sin datos'}</div>
                 <div><strong>razon_social:</strong> {locationForDetails?.razon_social || 'sin datos'}</div>
                 <div><strong>cuit:</strong> {locationForDetails?.cuit || 'sin datos'}</div>
                 <div><strong>llave_aloha:</strong> {locationForDetails?.llave_aloha || 'sin datos'}</div>
@@ -295,7 +316,10 @@ function TeamViewerExplorerPage() {
                   {locationForDetails?.version_modulo_fiscal || 'sin datos'}
                 </div>
                 <div><strong>usa_nbo:</strong> {locationForDetails ? (locationForDetails.usa_nbo ? 'si' : 'no') : 'sin datos'}</div>
-                <div><strong>network_notes:</strong> {locationForDetails?.network_notes || 'sin datos'}</div>
+                <div><strong>address:</strong> {locationForDetails?.address || 'sin datos'}</div>
+                <div><strong>city:</strong> {locationForDetails?.city || 'sin datos'}</div>
+                <div><strong>phone:</strong> {locationForDetails?.phone || 'sin datos'}</div>
+                <div><strong>status:</strong> {formatLocationStatus(locationForDetails?.status)}</div>
               </div>
 
               <div className="form-actions">

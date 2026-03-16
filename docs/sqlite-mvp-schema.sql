@@ -23,6 +23,12 @@ CREATE TABLE IF NOT EXISTS locations (
   status TEXT NOT NULL DEFAULT 'active'
     CHECK (status IN ('active', 'inactive')),
   notes TEXT,
+  cantidad_licencias_aloha INTEGER,
+  tiene_kitchen INTEGER NOT NULL DEFAULT 0 CHECK (tiene_kitchen IN (0, 1)),
+  usa_insight_pulse INTEGER NOT NULL DEFAULT 0 CHECK (usa_insight_pulse IN (0, 1)),
+  cmc TEXT,
+  fecha_apertura TEXT,
+  fecha_cierre TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );

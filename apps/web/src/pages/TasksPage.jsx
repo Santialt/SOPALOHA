@@ -933,60 +933,62 @@ function TasksPage() {
             </div>
           </div>
         ) : (
-          <table className="table compact">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Titulo</th>
-                <th>Local</th>
-                <th>Estado</th>
-                <th>Prioridad</th>
-                <th>Asignado</th>
-                <th>Vence</th>
-                <th>Programada</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {tasks.map((task) => {
-                const location = locations.find((item) => item.id === task.location_id);
-                return (
-                  <tr key={task.id}>
-                    <td>{task.id}</td>
-                    <td>{task.title}</td>
-                    <td>{location?.name || '-'}</td>
-                    <td><span className={`badge ${task.status}`}>{task.status}</span></td>
-                    <td><span className={`badge ${task.priority}`}>{task.priority}</span></td>
-                    <td>{task.assigned_to || '-'}</td>
-                    <td>{task.due_date || '-'}</td>
-                    <td>{normalizeDatetimeInput(task.scheduled_for) || '-'}</td>
-                    <td>
-                      <div className="form-actions">
-                        <button className="btn-secondary" onClick={() => onEdit(task)}>
-                          Editar
-                        </button>
-                        <button className="btn-secondary" onClick={() => setSelectedTaskId(task.id)}>
-                          Comentarios
-                        </button>
-                        <button
-                          className="btn-danger"
-                          onClick={() => onDelete(task)}
-                          disabled={deletingTaskId === task.id}
-                        >
-                          {deletingTaskId === task.id ? 'Eliminando...' : 'Eliminar'}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-              {tasks.length === 0 && (
+          <div className="table-wrap table-wrap-xl">
+            <table className="table compact">
+              <thead>
                 <tr>
-                  <td colSpan="9" className="empty-row">Sin tareas</td>
+                  <th>ID</th>
+                  <th>Titulo</th>
+                  <th>Local</th>
+                  <th>Estado</th>
+                  <th>Prioridad</th>
+                  <th>Asignado</th>
+                  <th>Vence</th>
+                  <th>Programada</th>
+                  <th>Acciones</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {tasks.map((task) => {
+                  const location = locations.find((item) => item.id === task.location_id);
+                  return (
+                    <tr key={task.id}>
+                      <td>{task.id}</td>
+                      <td>{task.title}</td>
+                      <td>{location?.name || '-'}</td>
+                      <td><span className={`badge ${task.status}`}>{task.status}</span></td>
+                      <td><span className={`badge ${task.priority}`}>{task.priority}</span></td>
+                      <td>{task.assigned_to || '-'}</td>
+                      <td>{task.due_date || '-'}</td>
+                      <td>{normalizeDatetimeInput(task.scheduled_for) || '-'}</td>
+                      <td>
+                        <div className="form-actions">
+                          <button className="btn-secondary" onClick={() => onEdit(task)}>
+                            Editar
+                          </button>
+                          <button className="btn-secondary" onClick={() => setSelectedTaskId(task.id)}>
+                            Comentarios
+                          </button>
+                          <button
+                            className="btn-danger"
+                            onClick={() => onDelete(task)}
+                            disabled={deletingTaskId === task.id}
+                          >
+                            {deletingTaskId === task.id ? 'Eliminando...' : 'Eliminar'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {tasks.length === 0 && (
+                  <tr>
+                    <td colSpan="9" className="empty-row">Sin tareas</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
 
