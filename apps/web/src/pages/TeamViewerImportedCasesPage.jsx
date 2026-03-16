@@ -213,7 +213,7 @@ function TeamViewerImportedCasesPage() {
   }
 
   return (
-    <div>
+    <div className="page-stack">
       <section className="section-card">
         <h2>Incidentes TeamViewer</h2>
         <small>Importacion automatica, alta manual y visualizacion centralizada de casos TeamViewer.</small>
@@ -337,22 +337,24 @@ function TeamViewerImportedCasesPage() {
       {discarded.length > 0 && (
         <section className="section-card">
           <h2>Descartados (muestra)</h2>
-          <table className="table compact">
-            <thead>
-              <tr>
-                <th>External ID</th>
-                <th>Motivo</th>
-              </tr>
-            </thead>
-            <tbody>
-              {discarded.slice(0, 20).map((row, index) => (
-                <tr key={`${row.external_connection_id || 'no-id'}-${index}`}>
-                  <td>{row.external_connection_id || '-'}</td>
-                  <td>{row.reason}</td>
+          <div className="table-wrap">
+            <table className="table compact">
+              <thead>
+                <tr>
+                  <th>External ID</th>
+                  <th>Motivo</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {discarded.slice(0, 20).map((row, index) => (
+                  <tr key={`${row.external_connection_id || 'no-id'}-${index}`}>
+                    <td>{row.external_connection_id || '-'}</td>
+                    <td>{row.reason}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </section>
       )}
 
@@ -435,54 +437,56 @@ function TeamViewerImportedCasesPage() {
           <LoadingBlock label="Actualizando casos..." />
         ) : (
           <>
-            <table className="table compact">
-              <thead>
-                <tr>
-                  <th>Fecha inicio</th>
-                  <th>Fecha fin</th>
-                  <th>Tecnico</th>
-                  <th>Grupo</th>
-                  <th>Local</th>
-                  <th>Solicitante</th>
-                  <th>Descripcion del problema</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => {
-                  const resolvedLocationId = row.resolved_location_id || row.location_id || null;
-                  const location = resolvedLocationId
-                    ? locations.find((item) => item.id === resolvedLocationId)
-                    : null;
-                  return (
-                    <tr key={row.id}>
-                      <td>{formatDateTime(row.started_at)}</td>
-                      <td>{formatDateTime(row.ended_at)}</td>
-                      <td>{resolveTechnicianFromCase(row)}</td>
-                      <td>{row.teamviewer_group_name || '-'}</td>
-                      <td>{location?.name || row.resolved_location_name || row.teamviewer_group_name || '-'}</td>
-                      <td>{row.requested_by || '-'}</td>
-                      <td>{row.problem_description || '-'}</td>
-                      <td>
-                        <button
-                          type="button"
-                          className="btn-danger"
-                          onClick={() => onDeleteCase(row)}
-                          disabled={runningActionCaseId === row.id}
-                        >
-                          Eliminar
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-                {rows.length === 0 && (
+            <div className="table-wrap table-wrap-xl">
+              <table className="table compact">
+                <thead>
                   <tr>
-                    <td colSpan="8" className="empty-row">Sin resultados para los filtros actuales.</td>
+                    <th>Fecha inicio</th>
+                    <th>Fecha fin</th>
+                    <th>Tecnico</th>
+                    <th>Grupo</th>
+                    <th>Local</th>
+                    <th>Solicitante</th>
+                    <th>Descripcion del problema</th>
+                    <th>Acciones</th>
                   </tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {rows.map((row) => {
+                    const resolvedLocationId = row.resolved_location_id || row.location_id || null;
+                    const location = resolvedLocationId
+                      ? locations.find((item) => item.id === resolvedLocationId)
+                      : null;
+                    return (
+                      <tr key={row.id}>
+                        <td>{formatDateTime(row.started_at)}</td>
+                        <td>{formatDateTime(row.ended_at)}</td>
+                        <td>{resolveTechnicianFromCase(row)}</td>
+                        <td>{row.teamviewer_group_name || '-'}</td>
+                        <td>{location?.name || row.resolved_location_name || row.teamviewer_group_name || '-'}</td>
+                        <td>{row.requested_by || '-'}</td>
+                        <td>{row.problem_description || '-'}</td>
+                        <td>
+                          <button
+                            type="button"
+                            className="btn-danger"
+                            onClick={() => onDeleteCase(row)}
+                            disabled={runningActionCaseId === row.id}
+                          >
+                            Eliminar
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {rows.length === 0 && (
+                    <tr>
+                      <td colSpan="8" className="empty-row">Sin resultados para los filtros actuales.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
 
             <div className="form-actions">
               <button

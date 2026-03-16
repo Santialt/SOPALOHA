@@ -231,63 +231,65 @@ function LocationsPage() {
           </div>
         )}
 
-        <table className="table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Nombre</th>
-              <th>Empresa</th>
-              <th>CUIT</th>
-              <th>Aloha</th>
-              <th>Ciudad</th>
-              <th>Estado</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((location) => (
-              <tr
-                key={location.id}
-                ref={(node) => {
-                  if (node) {
-                    rowRefs.current.set(location.id, node);
-                  } else {
-                    rowRefs.current.delete(location.id);
-                  }
-                }}
-                onClick={() => navigate(`/locations/${location.id}`)}
-                className={`row-clickable ${validSelectedId === location.id ? 'row-highlighted' : ''}`}
-              >
-                <td>{location.id}</td>
-                <td>{location.name}</td>
-                <td>{location.company_name || '-'}</td>
-                <td>{location.cuit || '-'}</td>
-                <td>{location.version_aloha || '-'}</td>
-                <td>{location.city || '-'}</td>
-                <td><span className={`badge ${location.status}`}>{location.status}</span></td>
-                <td>
-                  <div className="form-actions">
-                    <button className="btn-small" onClick={(event) => onEdit(location, event)}>
-                      Editar
-                    </button>
-                    <button
-                      className="btn-danger"
-                      onClick={(event) => onDelete(location, event)}
-                      disabled={deletingId === location.id}
-                    >
-                      {deletingId === location.id ? 'Eliminando...' : 'Eliminar'}
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {filtered.length === 0 && (
+        <div className="table-wrap table-wrap-wide">
+          <table className="table">
+            <thead>
               <tr>
-                <td colSpan="8" className="empty-row">Sin resultados</td>
+                <th>ID</th>
+                <th>Nombre</th>
+                <th>Empresa</th>
+                <th>CUIT</th>
+                <th>Aloha</th>
+                <th>Ciudad</th>
+                <th>Estado</th>
+                <th>Acciones</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filtered.map((location) => (
+                <tr
+                  key={location.id}
+                  ref={(node) => {
+                    if (node) {
+                      rowRefs.current.set(location.id, node);
+                    } else {
+                      rowRefs.current.delete(location.id);
+                    }
+                  }}
+                  onClick={() => navigate(`/locations/${location.id}`)}
+                  className={`row-clickable ${validSelectedId === location.id ? 'row-highlighted' : ''}`}
+                >
+                  <td>{location.id}</td>
+                  <td>{location.name}</td>
+                  <td>{location.company_name || '-'}</td>
+                  <td>{location.cuit || '-'}</td>
+                  <td>{location.version_aloha || '-'}</td>
+                  <td>{location.city || '-'}</td>
+                  <td><span className={`badge ${location.status}`}>{location.status}</span></td>
+                  <td>
+                    <div className="form-actions">
+                      <button className="btn-small" onClick={(event) => onEdit(location, event)}>
+                        Editar
+                      </button>
+                      <button
+                        className="btn-danger"
+                        onClick={(event) => onDelete(location, event)}
+                        disabled={deletingId === location.id}
+                      >
+                        {deletingId === location.id ? 'Eliminando...' : 'Eliminar'}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan="8" className="empty-row">Sin resultados</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <section className="section-card">

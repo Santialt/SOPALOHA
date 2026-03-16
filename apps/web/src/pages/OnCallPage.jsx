@@ -484,33 +484,35 @@ function OnCallPage() {
             </div>
           </form>
 
-          <table className="table compact">
-            <thead>
-              <tr>
-                <th>Nombre</th>
-                <th>Activo</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {technicians.map((tech) => (
-                <tr key={tech.id}>
-                  <td>{tech.name}</td>
-                  <td>{tech.is_active ? 'Si' : 'No'}</td>
-                  <td>
-                    <button type="button" className="btn-secondary" onClick={() => onEditTechnician(tech)}>
-                      Editar
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {technicians.length === 0 && (
+          <div className="table-wrap">
+            <table className="table compact">
+              <thead>
                 <tr>
-                  <td colSpan="3" className="empty-row">Sin tecnicos</td>
+                  <th>Nombre</th>
+                  <th>Activo</th>
+                  <th>Acciones</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {technicians.map((tech) => (
+                  <tr key={tech.id}>
+                    <td>{tech.name}</td>
+                    <td>{tech.is_active ? 'Si' : 'No'}</td>
+                    <td>
+                      <button type="button" className="btn-secondary" onClick={() => onEditTechnician(tech)}>
+                        Editar
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {technicians.length === 0 && (
+                  <tr>
+                    <td colSpan="3" className="empty-row">Sin tecnicos</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </section>
 
         <section className="section-card">
@@ -568,37 +570,39 @@ function OnCallPage() {
             </div>
           </form>
 
-          <table className="table compact">
-            <thead>
-              <tr>
-                <th>Titulo</th>
-                <th>Inicio</th>
-                <th>Fin</th>
-                <th>Cruza dia</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {templates.map((template) => (
-                <tr key={template.id}>
-                  <td>{template.title}</td>
-                  <td>{template.start_time}</td>
-                  <td>{template.end_time}</td>
-                  <td>{template.crosses_to_next_day ? 'Si' : 'No'}</td>
-                  <td>
-                    <button type="button" className="btn-secondary" onClick={() => onEditTemplate(template)}>
-                      Editar
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {templates.length === 0 && (
+          <div className="table-wrap">
+            <table className="table compact">
+              <thead>
                 <tr>
-                  <td colSpan="5" className="empty-row">Sin plantillas</td>
+                  <th>Titulo</th>
+                  <th>Inicio</th>
+                  <th>Fin</th>
+                  <th>Cruza dia</th>
+                  <th>Acciones</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {templates.map((template) => (
+                  <tr key={template.id}>
+                    <td>{template.title}</td>
+                    <td>{template.start_time}</td>
+                    <td>{template.end_time}</td>
+                    <td>{template.crosses_to_next_day ? 'Si' : 'No'}</td>
+                    <td>
+                      <button type="button" className="btn-secondary" onClick={() => onEditTemplate(template)}>
+                        Editar
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {templates.length === 0 && (
+                  <tr>
+                    <td colSpan="5" className="empty-row">Sin plantillas</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </section>
 
         <section className="section-card">
@@ -700,51 +704,53 @@ function OnCallPage() {
           <div className="section-head">
             <h2>Listado de guardias</h2>
           </div>
-          <table className="table compact">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Titulo</th>
-                <th>Principal</th>
-                <th>Backup</th>
-                <th>Inicio</th>
-                <th>Fin</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {shifts.map((shift) => (
-                <tr key={shift.id}>
-                  <td>{shift.id}</td>
-                  <td>{shift.title}</td>
-                  <td>{shift.assigned_to}</td>
-                  <td>{shift.backup_assigned_to || '-'}</td>
-                  <td>{normalizeDatetimeInput(shift.start_at) || '-'}</td>
-                  <td>{normalizeDatetimeInput(shift.end_at) || '-'}</td>
-                  <td>
-                    <div className="form-actions">
-                      <button className="btn-secondary" onClick={() => onEditShift(shift)}>
-                        Editar
-                      </button>
-                      <button
-                        type="button"
-                        className="btn-danger"
-                        onClick={() => onDeleteShift(shift)}
-                        disabled={deletingShiftId === shift.id}
-                      >
-                        {deletingShiftId === shift.id ? 'Eliminando...' : 'Eliminar'}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {shifts.length === 0 && (
+          <div className="table-wrap table-wrap-wide">
+            <table className="table compact">
+              <thead>
                 <tr>
-                  <td colSpan="7" className="empty-row">Sin guardias</td>
+                  <th>ID</th>
+                  <th>Titulo</th>
+                  <th>Principal</th>
+                  <th>Backup</th>
+                  <th>Inicio</th>
+                  <th>Fin</th>
+                  <th>Acciones</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {shifts.map((shift) => (
+                  <tr key={shift.id}>
+                    <td>{shift.id}</td>
+                    <td>{shift.title}</td>
+                    <td>{shift.assigned_to}</td>
+                    <td>{shift.backup_assigned_to || '-'}</td>
+                    <td>{normalizeDatetimeInput(shift.start_at) || '-'}</td>
+                    <td>{normalizeDatetimeInput(shift.end_at) || '-'}</td>
+                    <td>
+                      <div className="form-actions">
+                        <button className="btn-secondary" onClick={() => onEditShift(shift)}>
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-danger"
+                          onClick={() => onDeleteShift(shift)}
+                          disabled={deletingShiftId === shift.id}
+                        >
+                          {deletingShiftId === shift.id ? 'Eliminando...' : 'Eliminar'}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {shifts.length === 0 && (
+                  <tr>
+                    <td colSpan="7" className="empty-row">Sin guardias</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </section>
       </div>
 

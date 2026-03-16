@@ -42,7 +42,7 @@ function DashboardPage() {
   if (loading) return <LoadingBlock label="Cargando dashboard..." />;
 
   return (
-    <div>
+    <div className="page-stack">
       <InlineError message={error} />
 
       <div className="card-grid">

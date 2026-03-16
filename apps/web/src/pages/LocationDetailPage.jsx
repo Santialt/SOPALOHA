@@ -589,64 +589,66 @@ function LocationDetailPage() {
             Registrar caso TeamViewer
           </Link>
         </div>
-        <table className="table compact">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Nombre</th>
-              <th>Rol</th>
-              <th>IP</th>
-              <th>TeamViewer</th>
-              <th>Windows</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {devices.map((device) => (
-              <tr key={device.id}>
-                <td>{device.id}</td>
-                <td>{device.name}</td>
-                <td>{device.device_role || '-'}</td>
-                <td>{device.ip_address || '-'}</td>
-                <td>{device.teamviewer_id || '-'}</td>
-                <td>{device.windows_version || '-'}</td>
-                <td>
-                  <div className="form-actions">
-                    <button type="button" className="btn-small" onClick={() => onCopyTeamviewerId(device)}>
-                      Copiar TV ID
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-small"
-                      onClick={() => onOpenTeamviewer(device)}
-                      disabled={runningActionKey === `tv-${device.id}`}
-                    >
-                      {runningActionKey === `tv-${device.id}` ? 'Abriendo...' : 'Abrir TeamViewer'}
-                    </button>
-                    <button type="button" className="btn-small" onClick={() => onEditDevice(device)}>
-                      Editar
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-danger"
-                      onClick={() => onDeleteDevice(device)}
-                      disabled={deletingDeviceId === device.id}
-                    >
-                      {deletingDeviceId === device.id ? 'Eliminando...' : 'Eliminar'}
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {devices.length === 0 && (
+        <div className="table-wrap table-wrap-xl">
+          <table className="table compact">
+            <thead>
               <tr>
-                <td colSpan="7" className="empty-row">
-                  Sin dispositivos
-                </td>
+                <th>ID</th>
+                <th>Nombre</th>
+                <th>Rol</th>
+                <th>IP</th>
+                <th>TeamViewer</th>
+                <th>Windows</th>
+                <th>Acciones</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {devices.map((device) => (
+                <tr key={device.id}>
+                  <td>{device.id}</td>
+                  <td>{device.name}</td>
+                  <td>{device.device_role || '-'}</td>
+                  <td>{device.ip_address || '-'}</td>
+                  <td>{device.teamviewer_id || '-'}</td>
+                  <td>{device.windows_version || '-'}</td>
+                  <td>
+                    <div className="form-actions">
+                      <button type="button" className="btn-small" onClick={() => onCopyTeamviewerId(device)}>
+                        Copiar TV ID
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-small"
+                        onClick={() => onOpenTeamviewer(device)}
+                        disabled={runningActionKey === `tv-${device.id}`}
+                      >
+                        {runningActionKey === `tv-${device.id}` ? 'Abriendo...' : 'Abrir TeamViewer'}
+                      </button>
+                      <button type="button" className="btn-small" onClick={() => onEditDevice(device)}>
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-danger"
+                        onClick={() => onDeleteDevice(device)}
+                        disabled={deletingDeviceId === device.id}
+                      >
+                        {deletingDeviceId === device.id ? 'Eliminando...' : 'Eliminar'}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {devices.length === 0 && (
+                <tr>
+                  <td colSpan="7" className="empty-row">
+                    Sin dispositivos
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
 
         <form onSubmit={onCreateOrUpdateDevice} className="form-grid form-grid-3">
           <label>
@@ -793,37 +795,39 @@ function LocationDetailPage() {
 
       <section className="section-card full-width">
         <h3>Tareas ({tasks.length})</h3>
-        <table className="table compact">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Titulo</th>
-              <th>Prioridad</th>
-              <th>Estado</th>
-              <th>Vencimiento</th>
-            </tr>
-          </thead>
-          <tbody>
-            {tasks.map((task) => (
-              <tr key={task.id}>
-                <td>{task.id}</td>
-                <td>{task.title}</td>
-                <td>
-                  <span className={`badge ${task.priority}`}>{task.priority}</span>
-                </td>
-                <td>{task.status}</td>
-                <td>{task.due_date || '-'}</td>
-              </tr>
-            ))}
-            {tasks.length === 0 && (
+        <div className="table-wrap">
+          <table className="table compact">
+            <thead>
               <tr>
-                <td colSpan="5" className="empty-row">
-                  Sin tareas
-                </td>
+                <th>ID</th>
+                <th>Titulo</th>
+                <th>Prioridad</th>
+                <th>Estado</th>
+                <th>Vencimiento</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {tasks.map((task) => (
+                <tr key={task.id}>
+                  <td>{task.id}</td>
+                  <td>{task.title}</td>
+                  <td>
+                    <span className={`badge ${task.priority}`}>{task.priority}</span>
+                  </td>
+                  <td>{task.status}</td>
+                  <td>{task.due_date || '-'}</td>
+                </tr>
+              ))}
+              {tasks.length === 0 && (
+                <tr>
+                  <td colSpan="5" className="empty-row">
+                    Sin tareas
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
     </div>
   );
