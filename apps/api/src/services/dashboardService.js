@@ -1,6 +1,5 @@
 const dashboardRepository = require('../repositories/dashboardRepository');
 const locationRepository = require('../repositories/locationRepository');
-const incidentService = require('./incidentService');
 const taskService = require('./taskService');
 
 function formatDateOnly(date) {
@@ -18,19 +17,22 @@ function getMonthLookbackStart(days = 30) {
 
 function getSummary() {
   const incidentTotals = dashboardRepository.getIncidentStatusTotals();
+  const importedCaseTotals = dashboardRepository.getImportedCaseTotals();
   const lastMonthStart = getMonthLookbackStart(30);
   const topLocations = dashboardRepository.findTopIncidentLocationsByMonthStart(lastMonthStart, 5);
   const categoryBreakdown = dashboardRepository.findIncidentCategoryBreakdownByMonthStart(lastMonthStart);
   const mostFrequentCategory = categoryBreakdown[0] || null;
+  const totalCases = incidentTotals.total + importedCaseTotals.total;
+  const inProgressCases = incidentTotals.open + importedCaseTotals.total;
 
   return {
     locations: locationRepository.countAll(),
-    incidents: incidentService.countIncidents(),
+    incidents: totalCases,
     tasks: taskService.countTasks(),
     incidentMetrics: {
-      totalCases: incidentTotals.total,
+      totalCases,
       resolvedCases: incidentTotals.closed,
-      inProgressCases: incidentTotals.open,
+      inProgressCases,
       activeStatusKey: 'open',
       resolvedStatusKey: 'closed',
       lastMonthWindow: {

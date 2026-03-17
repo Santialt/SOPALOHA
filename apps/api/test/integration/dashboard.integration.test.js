@@ -107,6 +107,76 @@ test("GET /dashboard/summary returns operational incident metrics", async () => 
         user.id,
         user.id,
       );
+    harness.db
+      .prepare(
+        `
+          INSERT INTO teamviewer_imported_cases (
+            external_connection_id,
+            started_at,
+            ended_at,
+            duration_seconds,
+            technician_username,
+            technician_display_name,
+            teamviewer_group_name,
+            note_raw,
+            problem_description,
+            requested_by,
+            location_id,
+            linked_incident_id,
+            raw_payload_json
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+      )
+      .run(
+        "tv-open-1",
+        withinWindow.toISOString(),
+        withinWindow.toISOString(),
+        300,
+        "tech1",
+        "Dashboard Tech",
+        "Local Centro",
+        "POS no responde - Soporte",
+        "POS no responde",
+        "Soporte",
+        locationA,
+        null,
+        "{}",
+      );
+    harness.db
+      .prepare(
+        `
+          INSERT INTO teamviewer_imported_cases (
+            external_connection_id,
+            started_at,
+            ended_at,
+            duration_seconds,
+            technician_username,
+            technician_display_name,
+            teamviewer_group_name,
+            note_raw,
+            problem_description,
+            requested_by,
+            location_id,
+            linked_incident_id,
+            raw_payload_json
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+      )
+      .run(
+        "tv-linked-1",
+        withinWindow.toISOString(),
+        withinWindow.toISOString(),
+        180,
+        "tech1",
+        "Dashboard Tech",
+        "Local Norte",
+        "Caja congelada - Operacion",
+        "Caja congelada",
+        "Operacion",
+        locationB,
+        1,
+        "{}",
+      );
 
     const loginResult = await harness.login(
       credentials.email,
@@ -122,10 +192,10 @@ test("GET /dashboard/summary returns operational incident metrics", async () => 
 
     assert.equal(result.status, 200);
     assert.equal(result.body.locations, 2);
-    assert.equal(result.body.incidents, 4);
-    assert.deepEqual(result.body.incidentMetrics.totalCases, 4);
+    assert.equal(result.body.incidents, 5);
+    assert.deepEqual(result.body.incidentMetrics.totalCases, 5);
     assert.deepEqual(result.body.incidentMetrics.resolvedCases, 2);
-    assert.deepEqual(result.body.incidentMetrics.inProgressCases, 2);
+    assert.deepEqual(result.body.incidentMetrics.inProgressCases, 3);
     assert.equal(result.body.incidentMetrics.activeStatusKey, "open");
     assert.equal(result.body.incidentMetrics.resolvedStatusKey, "closed");
     assert.equal(result.body.incidentMetrics.lastMonthWindow.days, 30);
@@ -133,7 +203,7 @@ test("GET /dashboard/summary returns operational incident metrics", async () => 
     assert.deepEqual(result.body.incidentMetrics.topLocations[0], {
       location_id: locationA,
       location_name: "Local Centro",
-      incident_count: 2,
+      incident_count: 3,
     });
     assert.deepEqual(result.body.incidentMetrics.mostFrequentCategory, {
       category: "aloha",
