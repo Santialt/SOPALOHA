@@ -22,6 +22,22 @@ function formatDateTime(value) {
   return date.toLocaleString('es-AR');
 }
 
+function buildActiveFiltersSummary(filters, defaults) {
+  const parts = [];
+
+  if (String(filters.location_id || '') !== String(defaults.location_id || '')) parts.push('local');
+  if (filters.from_date !== defaults.from_date || filters.to_date !== defaults.to_date) parts.push('rango de fechas');
+  if (filters.technician.trim() !== defaults.technician.trim()) parts.push('tecnico');
+  if (filters.group.trim() !== defaults.group.trim()) parts.push('grupo');
+  if (filters.keyword.trim() !== defaults.keyword.trim()) parts.push('texto');
+
+  if (parts.length === 0) {
+    return 'Filtros en valores operativos por defecto.';
+  }
+
+  return `Filtros activos: ${parts.join(', ')}.`;
+}
+
 function resolveTechnicianFromCase(row) {
   if (row.technician_display_name) return row.technician_display_name;
   if (row.raw_payload_json) {
@@ -147,6 +163,8 @@ function TeamViewerImportedCasesPage() {
   );
 
   const hasMore = rows.length === PAGE_SIZE;
+  const listSummaryLabel = rows.length === 1 ? '1 caso' : `${rows.length} casos`;
+  const activeFiltersSummary = buildActiveFiltersSummary(listFilters, defaultListFilters);
 
   const onImport = async () => {
     setImporting(true);
@@ -228,7 +246,7 @@ function TeamViewerImportedCasesPage() {
   return (
     <div className="page-stack">
       <section className="section-card">
-        <h2>Incidentes TeamViewer</h2>
+        <h2>Casos TeamViewer</h2>
         <small>Importacion automatica, alta manual y visualizacion centralizada de casos TeamViewer.</small>
       </section>
 
@@ -375,9 +393,13 @@ function TeamViewerImportedCasesPage() {
         <div className="section-head">
           <h2>Casos TeamViewer</h2>
           <small>
-            {rows.length} cargados en esta pagina
-            {listFilters.location_id ? ' con local filtrado' : ''}
+            Mostrando {listSummaryLabel} en esta pagina.
           </small>
+        </div>
+
+        <div className="incident-summary-total">
+          <strong>{rows.length}</strong>
+          <span>{activeFiltersSummary}</span>
         </div>
 
         <div className="form-grid form-grid-3">
@@ -457,7 +479,7 @@ function TeamViewerImportedCasesPage() {
             }}
             disabled={loading}
           >
-            Limpiar filtros
+            Restablecer filtros
           </button>
         </div>
 
