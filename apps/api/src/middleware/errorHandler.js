@@ -44,9 +44,10 @@ function errorHandler(err, req, res, next) {
         : 500;
   const requestId = req.requestId || 'unknown';
   const message =
-    status >= 500 && normalizedError.expose !== true
+    normalizedError.clientMessage ||
+    (status >= 500 && normalizedError.expose !== true
       ? 'Internal server error'
-      : normalizedError.message || 'Request could not be processed';
+      : normalizedError.message || 'Request could not be processed');
   const level = status >= 500 ? 'error' : 'warn';
 
   logger[level]('Request failed', {
