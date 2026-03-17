@@ -3,7 +3,6 @@ const { URL } = require('url');
 const { httpError } = require('../utils/httpError');
 const { logger } = require('../utils/logger');
 
-const warnedMissingApiKey = { value: false };
 const DEFAULT_ALLOWED_ORIGINS = [
   'http://localhost:5173',
   'http://127.0.0.1:5173',
@@ -26,6 +25,10 @@ function parseAllowedOrigins() {
     .filter(Boolean);
 
   return new Set(configured.length > 0 ? configured : DEFAULT_ALLOWED_ORIGINS);
+}
+
+function extractConfiguredApiKey() {
+  return String(process.env.INTERNAL_API_KEY || '').trim();
 }
 
 function normalizeRemoteAddress(value) {
@@ -67,6 +70,29 @@ function isAllowedOrigin(origin, allowedOrigins) {
   } catch {
     return false;
   }
+}
+
+function getExplicitRequestOrigin(req) {
+  const allowedOrigins = parseAllowedOrigins();
+  const candidates = [req.headers.origin, req.headers.referer];
+
+  for (const candidate of candidates) {
+    if (!candidate) {
+      continue;
+    }
+
+    try {
+      const parsed = new URL(candidate);
+      const normalizedOrigin = `${parsed.protocol}//${parsed.host}`;
+      if (allowedOrigins.has(normalizedOrigin)) {
+        return normalizedOrigin;
+      }
+    } catch {
+      // Ignore malformed headers and continue checking the next candidate.
+    }
+  }
+
+  return null;
 }
 
 function setSecurityHeaders(req, res, next) {
@@ -113,14 +139,9 @@ function corsMiddleware() {
 }
 
 function hasValidApiKey(req) {
-  const configuredApiKey = String(process.env.INTERNAL_API_KEY || '').trim();
+  const configuredApiKey = extractConfiguredApiKey();
 
   if (!configuredApiKey) {
-    if (!warnedMissingApiKey.value) {
-      logger.warn('INTERNAL_API_KEY is not configured. Falling back to private-network-only access.');
-      warnedMissingApiKey.value = true;
-    }
-
     return null;
   }
 
@@ -139,32 +160,37 @@ function hasValidApiKey(req) {
 
 function requireInternalAccess(req, res, next) {
   const apiKeyStatus = hasValidApiKey(req);
-  const remoteAddress = req.socket?.remoteAddress;
 
   if (apiKeyStatus === true) {
     return next();
   }
 
-  if (apiKeyStatus === null && isLoopbackOrPrivateAddress(remoteAddress)) {
+  if (getExplicitRequestOrigin(req)) {
     return next();
+  }
+
+  if (apiKeyStatus === null) {
+    logger.warn('Rejected request without explicit internal access configuration', {
+      request_id: req.requestId
+    });
   }
 
   return next(httpError(401, 'Unauthorized internal API request'));
 }
 
 function requireSensitiveAccess(req, res, next) {
-  const remoteAddress = req.socket?.remoteAddress;
   const apiKeyStatus = hasValidApiKey(req);
+  const explicitOrigin = getExplicitRequestOrigin(req);
 
-  if (!isLoopbackOrPrivateAddress(remoteAddress)) {
-    return next(httpError(403, 'Sensitive action is allowed only from the internal network'));
+  if (apiKeyStatus === true || explicitOrigin) {
+    return next();
   }
 
   if (apiKeyStatus === false) {
     return next(httpError(401, 'Sensitive action requires a valid internal API key'));
   }
 
-  return next();
+  return next(httpError(403, 'Sensitive action requires explicit internal access configuration'));
 }
 
 module.exports = {
@@ -173,5 +199,6 @@ module.exports = {
   requireSensitiveAccess,
   setSecurityHeaders,
   isPrivateIpv4,
-  isLoopbackOrPrivateAddress
+  isLoopbackOrPrivateAddress,
+  getExplicitRequestOrigin
 };

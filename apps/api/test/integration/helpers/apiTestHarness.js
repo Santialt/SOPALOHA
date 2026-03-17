@@ -29,7 +29,9 @@ function createApiHarness(options = {}) {
   process.env.SQLITE_DB_PATH = sqliteDbPath;
   process.env.AUTH_SESSION_SECRET =
     options.authSessionSecret || "sopaloha-integration-secret";
-  process.env.INTERNAL_API_KEY = "";
+  process.env.INTERNAL_API_KEY = options.internalApiKey || "";
+  process.env.CORS_ALLOWED_ORIGINS =
+    options.corsAllowedOrigins || "http://localhost:5173";
   process.env.AUTH_LOGIN_RATE_LIMIT_MAX = String(
     options.authLoginRateLimitMax || "500",
   );
@@ -98,7 +100,13 @@ function createApiHarness(options = {}) {
   }
 
   async function request(method, route, options = {}) {
-    const headers = { ...(options.headers || {}) };
+    const headers = {
+      Origin: "http://localhost:5173",
+      ...(options.headers || {}),
+    };
+    if (headers.Origin === null) {
+      delete headers.Origin;
+    }
     let body = options.body;
 
     if (
