@@ -104,6 +104,7 @@ function LocationsPage() {
         .includes(term);
     });
   }, [locations, search, validSelectedId]);
+  const hasActiveSearch = search.trim().length > 0;
 
   useEffect(() => {
     if (!selectedLocationFromState || validSelectedId) return;
@@ -207,13 +208,20 @@ function LocationsPage() {
                 Local enfocado: {selectedLocationFromState?.name || `#${validSelectedId}`}
               </small>
             )}
+            {!validSelectedId && (
+              <small>
+                {filtered.length} resultado(s)
+                {hasActiveSearch ? ` para "${search.trim()}"` : ` de ${locations.length} locales`}
+              </small>
+            )}
           </div>
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Buscar por nombre, CUIT, llave Aloha, ciudad, direccion o telefono"
+            placeholder="Filtrar por nombre, CUIT, key Aloha, ciudad o telefono"
             className="input"
             disabled={Boolean(validSelectedId)}
+            aria-label="Filtrar listado de locales"
           />
         </div>
 
@@ -257,7 +265,15 @@ function LocationsPage() {
                     }
                   }}
                   onClick={() => navigate(`/locations/${location.id}`)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      navigate(`/locations/${location.id}`);
+                    }
+                  }}
                   className={`row-clickable ${validSelectedId === location.id ? 'row-highlighted' : ''}`}
+                  tabIndex={0}
+                  aria-label={`Abrir detalle del local ${location.name}`}
                 >
                   <td>{location.id}</td>
                   <td>{location.name}</td>
@@ -293,7 +309,14 @@ function LocationsPage() {
       </section>
 
       <section className="section-card">
-        <h2>{editingId ? `Editar local #${editingId}` : 'Crear local'}</h2>
+        <div className="section-head wrap">
+          <div>
+            <h2>{editingId ? `Editar local #${editingId}` : 'Crear local'}</h2>
+            <small className="panel-caption">
+              Carga primero identificacion y estado. Completa el resto solo si aporta soporte operativo.
+            </small>
+          </div>
+        </div>
 
         <form onSubmit={onSubmit} className="form-grid">
           <label>
@@ -495,7 +518,7 @@ function LocationsPage() {
 
           <div className="form-actions">
             <button className="btn-primary" disabled={saving} type="submit">
-              {saving ? 'Guardando...' : editingId ? 'Actualizar' : 'Crear'}
+              {saving ? 'Guardando...' : editingId ? 'Guardar cambios del local' : 'Crear local'}
             </button>
             {editingId && (
               <button

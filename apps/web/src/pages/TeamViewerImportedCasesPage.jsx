@@ -79,6 +79,19 @@ function TeamViewerImportedCasesPage() {
       keyword: ''
     };
   });
+  const defaultListFilters = useMemo(() => {
+    const now = new Date();
+    const from = new Date(now);
+    from.setDate(now.getDate() - 30);
+    return {
+      location_id: prefillLocationId,
+      from_date: toDateInputValue(from),
+      to_date: toDateInputValue(now),
+      technician: '',
+      group: '',
+      keyword: ''
+    };
+  }, [prefillLocationId]);
 
   const [manualForm, setManualForm] = useState(() => {
     const now = new Date();
@@ -91,14 +104,14 @@ function TeamViewerImportedCasesPage() {
     };
   });
 
-  const loadRows = async (offset = pageOffset) => {
+  const loadRows = async (offset = pageOffset, filters = listFilters) => {
     setLoading(true);
     setError('');
 
     try {
       const [casesData, locationsData, explorerData] = await Promise.all([
         api.getTeamviewerImportedCases({
-          ...listFilters,
+          ...filters,
           limit: PAGE_SIZE,
           offset
         }),
@@ -361,7 +374,10 @@ function TeamViewerImportedCasesPage() {
       <section className="section-card">
         <div className="section-head">
           <h2>Casos TeamViewer</h2>
-          <small>{rows.length} cargados en esta pagina</small>
+          <small>
+            {rows.length} cargados en esta pagina
+            {listFilters.location_id ? ' con local filtrado' : ''}
+          </small>
         </div>
 
         <div className="form-grid form-grid-3">
@@ -430,6 +446,18 @@ function TeamViewerImportedCasesPage() {
         <div className="form-actions">
           <button type="button" className="btn-primary" onClick={onApplyFilters} disabled={loading}>
             Aplicar filtros
+          </button>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={async () => {
+              setListFilters(defaultListFilters);
+              setPageOffset(0);
+              await loadRows(0, defaultListFilters);
+            }}
+            disabled={loading}
+          >
+            Limpiar filtros
           </button>
         </div>
 

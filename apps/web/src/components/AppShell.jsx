@@ -17,7 +17,7 @@ const navItems = [
 
 const pageTitles = {
   '/dashboard': 'Dashboard Operativo',
-  '/locations': 'Gestion de Locales',
+  '/locations': 'Gestion de locales',
   '/incidents': 'Incidentes',
   '/tasks': 'Tareas',
   '/on-call': 'Guardias',
@@ -28,7 +28,7 @@ const pageTitles = {
 
 function resolveTitle(pathname) {
   if (pathname.startsWith('/locations/')) {
-    return 'Detalle de Local';
+    return 'Detalle de local';
   }
 
   return pageTitles[pathname] || 'Panel SOPALOHA';
@@ -60,10 +60,14 @@ function AppShell() {
 
   return (
     <div className={`app-shell ${sidebarOpen ? 'sidebar-open' : ''}`}>
-      <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
+      <a href="#main-content" className="skip-link">
+        Saltar al contenido principal
+      </a>
+
+      <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`} id="primary-sidebar">
         <div className="sidebar-brand">SOPALOHA</div>
         <div className="sidebar-subtitle">OPS Console / Aloha POS</div>
-        <nav className="sidebar-nav">
+        <nav className="sidebar-nav" aria-label="Navegacion principal">
           {visibleNavItems.map((item) => (
             <NavLink
               key={item.to}
@@ -76,7 +80,7 @@ function AppShell() {
         </nav>
       </aside>
 
-      <main className="main-content">
+      <main className="main-content" id="main-content">
         <header className="main-header">
           <div className="main-header-inner">
             <div className="header-title-block">
@@ -86,6 +90,7 @@ function AppShell() {
                   className="sidebar-toggle"
                   onClick={() => setSidebarOpen((current) => !current)}
                   aria-expanded={sidebarOpen}
+                  aria-controls="primary-sidebar"
                   aria-label="Abrir menu de navegacion"
                 >
                   Menu
@@ -94,7 +99,7 @@ function AppShell() {
                   <h1>{headerTitle}</h1>
                   <div className="header-subtitle">
                     Mesa interna de soporte POS / Aloha
-                    {user ? ` · ${user.name} (${user.role})` : ''}
+                    {user ? ` - ${user.name} (${user.role})` : ''}
                   </div>
                 </div>
               </div>
@@ -110,7 +115,7 @@ function AppShell() {
                   Tema: {theme === 'dark' ? 'Oscuro' : 'Claro'}
                 </button>
                 <button type="button" className="btn-secondary" onClick={onLogout}>
-                  Logout
+                  Cerrar sesion
                 </button>
               </div>
             </div>
