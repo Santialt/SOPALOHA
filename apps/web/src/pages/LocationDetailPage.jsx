@@ -67,13 +67,40 @@ function resolveTeamviewerCaseTechnician(row) {
 function mapLocationToForm(location) {
   return {
     ...defaultLocationForm,
-    ...location,
+    name: location.name || '',
+    company_name: location.company_name || '',
+    razon_social: location.razon_social || '',
+    cuit: location.cuit || '',
+    llave_aloha: location.llave_aloha || '',
+    version_aloha: location.version_aloha || '',
+    version_modulo_fiscal: location.version_modulo_fiscal || '',
+    address: location.address || '',
+    city: location.city || '',
+    phone: location.phone || '',
+    cmc: location.cmc || '',
+    notes: location.notes || '',
+    status: location.status || 'abierto',
     usa_nbo: Boolean(location.usa_nbo),
     tiene_kitchen: Boolean(location.tiene_kitchen),
     usa_insight_pulse: Boolean(location.usa_insight_pulse),
     cantidad_licencias_aloha: location.cantidad_licencias_aloha ?? '',
     fecha_apertura: location.fecha_apertura || '',
     fecha_cierre: location.fecha_cierre || ''
+  };
+}
+
+function buildDevicePayload(locationId, form) {
+  return {
+    location_id: locationId,
+    name: form.name,
+    device_role: form.device_role,
+    ip_address: form.ip_address,
+    teamviewer_id: form.teamviewer_id,
+    windows_version: form.windows_version,
+    ram_gb: form.ram_gb,
+    cpu: form.cpu,
+    disk_type: form.disk_type,
+    notes: form.notes
   };
 }
 
@@ -160,7 +187,7 @@ function LocationDetailPage() {
     setSuccess('');
 
     try {
-      const updated = await api.updateLocation(id, locationForm);
+      const updated = await api.updateLocation(id, mapLocationToForm(locationForm));
       setLocation(updated);
       setLocationForm(mapLocationToForm(updated));
       setSuccess('Ficha tecnica actualizada.');
@@ -214,14 +241,10 @@ function LocationDetailPage() {
     setSuccess('');
 
     try {
-      const payload = {
-        location_id: numericLocationId,
-        ...deviceForm
-      };
+      const payload = buildDevicePayload(numericLocationId, deviceForm);
 
       if (editingDeviceId) {
-        const current = devices.find((item) => item.id === editingDeviceId);
-        await api.updateDevice(editingDeviceId, { ...current, ...payload });
+        await api.updateDevice(editingDeviceId, payload);
         setSuccess(`Dispositivo #${editingDeviceId} actualizado.`);
       } else {
         await api.createDevice(payload);
