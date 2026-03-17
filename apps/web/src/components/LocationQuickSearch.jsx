@@ -154,7 +154,7 @@ function LocationQuickSearch() {
         role="combobox"
       />
 
-      <div id={statusId} className="location-quick-search-meta" aria-live="polite">
+      <div id={statusId} className="visually-hidden" aria-live="polite">
         {!hasQuery && 'Enter para abrir el local directo.'}
         {shouldShowHint && 'Escribi al menos 2 caracteres para reducir ruido.'}
         {!loading && hasQuery && !shouldShowHint && results.length > 0 && `${results.length} resultado(s).`}
