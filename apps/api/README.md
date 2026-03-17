@@ -41,6 +41,16 @@ npm run admin:create -- admin@example.com "Administrador SOPALOHA"
 npm run dev
 ```
 
+Configuracion recomendada en `apps/api/.env`:
+
+```env
+SQLITE_DB_PATH=data/support.db
+```
+
+Con ese valor, la API usa la SQLite canonica en la raiz del repo:
+
+- `C:\SOPALOHA\data\support.db`
+
 Servidor:
 - `http://localhost:3001`
 

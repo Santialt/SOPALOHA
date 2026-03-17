@@ -6,8 +6,11 @@
   - Node.js 20 o superior
   - Acceso de lectura/escritura a `data/`
   - TeamViewer instalado solo si se va a usar `POST /support-actions/teamviewer/open` en esa maquina
+- Base canonica recomendada:
+  - `C:\SOPALOHA\data\support.db`
 - Variables minimas en `apps/api/.env`:
   - `PORT`
+  - `SQLITE_DB_PATH=data/support.db` o ruta absoluta equivalente
   - `AUTH_SESSION_SECRET`
   - `INTERNAL_API_KEY`
   - `CORS_ALLOWED_ORIGINS`
@@ -15,6 +18,7 @@
   - `TEAMVIEWER_REPORTS_API_TOKEN` si se usa import de casos
   - `TEAMVIEWER_TIMEOUT_MS` y `TEAMVIEWER_MAX_RETRIES` para tuning fino
 - Inicio recomendado:
+  - configurar `SQLITE_DB_PATH=data/support.db`
   - `npm install --prefix apps/api`
   - `npm install --prefix apps/web`
   - `npm run db:init --prefix apps/api`
