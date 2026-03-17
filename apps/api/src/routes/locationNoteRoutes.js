@@ -1,5 +1,6 @@
 const express = require('express');
 const controller = require('../controllers/locationNoteController');
+const { requireRole } = require('../middleware/auth');
 const { validateBody } = require('../middleware/validate');
 
 const router = express.Router();
@@ -11,6 +12,6 @@ const locationNoteRules = [
 
 router.get('/', controller.getLocationNotes);
 router.post('/', validateBody(locationNoteRules), controller.createLocationNote);
-router.delete('/:id', controller.deleteLocationNote);
+router.delete('/:id', requireRole('admin'), controller.deleteLocationNote);
 
 module.exports = router;

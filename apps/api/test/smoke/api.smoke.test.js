@@ -12,6 +12,7 @@ process.env.PORT = "0";
 process.env.SQLITE_DB_PATH = sqliteDbPath;
 process.env.AUTH_SESSION_SECRET = "sopaloha-smoke-secret";
 process.env.INTERNAL_API_KEY = "";
+process.env.CORS_ALLOWED_ORIGINS = "http://localhost:5173";
 process.env.AUTH_LOGIN_RATE_LIMIT_MAX = "500";
 process.env.TEAMVIEWER_API_TOKEN = "";
 process.env.TEAMVIEWER_REPORTS_API_TOKEN = "";
@@ -68,7 +69,7 @@ test("el API responde health y permite login basico con DB temporal", async (t) 
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Internal-Api-Key": "",
+      Origin: "http://localhost:5173",
     },
     body: JSON.stringify({
       email: seededEmail,
@@ -88,7 +89,7 @@ test("el API responde health y permite login basico con DB temporal", async (t) 
   const meResponse = await fetch(`${baseUrl}/auth/me`, {
     headers: {
       Cookie: sessionCookie,
-      "X-Internal-Api-Key": "",
+      Origin: "http://localhost:5173",
     },
   });
 
