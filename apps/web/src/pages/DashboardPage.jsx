@@ -123,38 +123,38 @@ function DashboardPage() {
             <div>
               <h2>Resumen operativo</h2>
               <small className="panel-caption">
-                Vista inicial de incidentes y carga reciente para soporte tecnico.
+                Prioriza carga reciente y puntos de atencion para abrir la jornada sin revisar varias pantallas.
               </small>
             </div>
             <div className="dashboard-window-chip">
-              Ultimos {incidentMetrics.lastMonthWindow?.days || 30} dias
+              Ventana activa: ultimos {incidentMetrics.lastMonthWindow?.days || 30} dias
             </div>
           </div>
           <div className="card-grid dashboard-kpi-grid">
             <StatCard
-              label="Casos totales"
+              label="Casos en la ventana"
               value={incidentMetrics.totalCases ?? stats.incidents}
               tone="primary"
-              helper="Historico general de incidentes"
+              helper="Incidentes detectados en el periodo mostrado"
             />
             <StatCard
               label="Casos finalizados"
               value={incidentMetrics.resolvedCases ?? 0}
               tone="success"
-              helper="Incidentes con estado closed"
+              helper="Resueltos dentro de la ventana activa"
             />
             <StatCard
               label="Casos en progreso"
               value={incidentMetrics.inProgressCases ?? 0}
               tone="warning"
-              helper="Aproximado con estado open"
+              helper="Siguen abiertos y requieren seguimiento"
             />
             <StatCard
               label="Locales"
               value={stats.locations}
               tone="neutral"
               helper="Locales registrados"
-              accent={`${stats.tasks} tareas operativas`}
+              accent={`${stats.tasks} tareas operativas totales`}
             />
           </div>
         </div>
@@ -205,26 +205,21 @@ function DashboardPage() {
             <div className="dashboard-brief-card">
               <span>Base total de casos</span>
               <strong>{stats.incidents}</strong>
-              <small>Conteo historico usado por el resto del modulo.</small>
+              <small>Historico total, distinto de la ventana operativa mostrada arriba.</small>
             </div>
             <div className="dashboard-brief-card">
-              <span>Estado activo real</span>
+              <span>Estado activo usado</span>
               <strong>{incidentMetrics.activeStatusKey || 'open'}</strong>
-              <small>El modelo actual no define `in_progress`; se usa `open`.</small>
+              <small>Hoy el sistema considera activo el estado `open`.</small>
             </div>
             <div className="dashboard-brief-card">
-              <span>Clasificacion usada</span>
+              <span>Clasificacion disponible</span>
               <strong>category</strong>
-              <small>Se prioriza categoria porque es un campo controlado en SQLite.</small>
+              <small>Se usa para comparar volumen y repetir patrones por tipo.</small>
             </div>
           </div>
         </article>
       </section>
-
-      <div className="card-grid">
-        <StatCard label="Incidentes" value={stats.incidents} tone="warning" helper="Total historico" />
-        <StatCard label="Tareas" value={stats.tasks} tone="neutral" helper="Pendientes y cerradas" />
-      </div>
 
       <CurrentOnCallBlock shift={currentShift} error={onCallError} />
 
@@ -235,11 +230,11 @@ function DashboardPage() {
         </div>
         <div className="quick-links">
           <Link to="/locations" className="btn-link">Ver locales</Link>
-          <Link to="/incidents" className="btn-link">Casos TeamViewer</Link>
+          <Link to="/incidents" className="btn-link">Ver incidentes TeamViewer</Link>
           <Link to="/tasks" className="btn-link">Gestionar tareas</Link>
-          <Link to="/on-call" className="btn-link">Gestionar guardias</Link>
+          <Link to="/on-call" className="btn-link">Ver guardia actual</Link>
           <Link to="/teamviewer-explorer" className="btn-link">TeamViewer Explorer</Link>
-          <Link to="/teamviewer-import" className="btn-link">TeamViewer Import</Link>
+          <Link to="/teamviewer-import" className="btn-link">Importar TeamViewer</Link>
         </div>
       </section>
     </div>
