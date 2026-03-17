@@ -13,6 +13,7 @@ const originalEnv = {
   TEAMVIEWER_MAX_RETRIES: process.env.TEAMVIEWER_MAX_RETRIES,
 };
 const realFetch = global.fetch;
+const realSetTimeout = global.setTimeout;
 
 function restoreEnv() {
   for (const [key, value] of Object.entries(originalEnv)) {
@@ -57,6 +58,7 @@ function textResponse(body, options = {}) {
 
 test.afterEach(() => {
   global.fetch = realFetch;
+  global.setTimeout = realSetTimeout;
   restoreEnv();
   delete require.cache[modulePath];
 });
@@ -139,6 +141,36 @@ test("fetchDevices retries rate-limited responses once and honors retry-after wh
 
   assert.equal(calls.length, 2);
   assert.deepEqual(devices, [{ id: "device-1" }]);
+});
+
+test("fetchDevices uses exponential backoff for retryable upstream failures without retry-after", async () => {
+  const client = loadClient({
+    TEAMVIEWER_MAX_RETRIES: 2,
+  });
+
+  const delays = [];
+  global.setTimeout = (callback, ms, ...args) => {
+    delays.push(ms);
+    callback(...args);
+    return { unref() {} };
+  };
+
+  let callCount = 0;
+  global.fetch = async () => {
+    callCount += 1;
+    if (callCount < 3) {
+      return jsonResponse({ error: "busy" }, { status: 503 });
+    }
+
+    return jsonResponse({ devices: [{ id: "device-exp" }] });
+  };
+
+  const devices = await client.fetchDevices();
+
+  assert.equal(callCount, 3);
+  assert.deepEqual(devices, [{ id: "device-exp" }]);
+  assert.ok(delays.includes(300));
+  assert.ok(delays.includes(600));
 });
 
 test("fetchDevices retries a single 5xx response and stops after the configured max retries", async () => {
@@ -290,6 +322,39 @@ test("fetchConnectionReports paginates through report pages and stops on repeate
     ["c1", "c2", "c3"],
   );
   assert.deepEqual(offsets, [0, 2, 3]);
+});
+
+test("fetchConnectionReports stops on non-increasing pagination offsets", async () => {
+  const client = loadClient({
+    TEAMVIEWER_MAX_RETRIES: 0,
+  });
+
+  const offsets = [];
+  global.fetch = async (url) => {
+    const parsedUrl = new URL(String(url));
+    const offset = Number(parsedUrl.searchParams.get("offset"));
+    offsets.push(offset);
+
+    if (offset === 0) {
+      return jsonResponse({
+        records: [{ id: "c1", start_time: "2026-03-10T10:00:00Z" }],
+        pagination: { next_offset: 0 },
+      });
+    }
+
+    return jsonResponse({ records: [] });
+  };
+
+  const rows = await client.fetchConnectionReports({
+    from_date: "2026-03-01T00:00:00.000Z",
+    to_date: "2026-03-31T23:59:59.999Z",
+  });
+
+  assert.deepEqual(
+    rows.map((row) => row.id),
+    ["c1"],
+  );
+  assert.deepEqual(offsets, [0]);
 });
 
 test("fetchConnectionReports does not retry alternate query strategies for upstream auth failures", async () => {

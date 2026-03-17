@@ -6,6 +6,17 @@ function isBlank(value) {
   return value === undefined || value === null || String(value).trim() === '';
 }
 
+function sanitizeText(value) {
+  return Array.from(String(value || ''))
+    .map((char) => {
+      const code = char.charCodeAt(0);
+      return (code <= 31 || code === 127) ? ' ' : char;
+    })
+    .join('')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function pickFirst(source, candidateKeys) {
   const sourceObject = source || {};
 
@@ -60,7 +71,7 @@ function normalizeDurationSeconds(value, startedAt, endedAt) {
 }
 
 function parseNoteStrict(noteRaw) {
-  const note = String(noteRaw || '').trim();
+  const note = sanitizeText(noteRaw);
   if (!note) {
     return { valid: false, reason: 'empty_note' };
   }
@@ -113,9 +124,9 @@ function normalizeListFilters(filters = {}) {
     from_date: null,
     to_date: null,
     location_id: null,
-    group: isBlank(filters.group) ? null : String(filters.group).trim(),
-    technician: isBlank(filters.technician) ? null : String(filters.technician).trim(),
-    keyword: isBlank(filters.keyword) ? null : String(filters.keyword).trim()
+    group: isBlank(filters.group) ? null : sanitizeText(filters.group),
+    technician: isBlank(filters.technician) ? null : sanitizeText(filters.technician),
+    keyword: isBlank(filters.keyword) ? null : sanitizeText(filters.keyword)
   };
 
   if (!isBlank(filters.from_date)) {
@@ -181,7 +192,7 @@ function normalizeRawConnection(rawConnection) {
     'report_id',
     'reportId'
   ]);
-  const externalConnectionId = isBlank(externalConnectionIdRaw) ? null : String(externalConnectionIdRaw).trim();
+  const externalConnectionId = isBlank(externalConnectionIdRaw) ? null : sanitizeText(externalConnectionIdRaw);
 
   const startedAt = normalizeDateTime(
     pickFirst(rawConnection, [
@@ -209,7 +220,7 @@ function normalizeRawConnection(rawConnection) {
   );
 
   const noteRawCandidate = pickFirst(rawConnection, ['note', 'notes', 'comment', 'description', 'COMMENTS', 'COMMENT']);
-  const noteRaw = isBlank(noteRawCandidate) ? '' : String(noteRawCandidate).trim();
+  const noteRaw = isBlank(noteRawCandidate) ? '' : sanitizeText(noteRawCandidate);
 
   const teamviewerGroupNameCandidate = pickFirst(rawConnection, [
     'group_name',
@@ -223,7 +234,7 @@ function normalizeRawConnection(rawConnection) {
   ]);
   const teamviewerGroupName = isBlank(teamviewerGroupNameCandidate)
     ? null
-    : String(teamviewerGroupNameCandidate).trim();
+    : sanitizeText(teamviewerGroupNameCandidate);
 
   const technicianUsernameCandidate = pickFirst(rawConnection, [
     'technician_username',
@@ -256,10 +267,10 @@ function normalizeRawConnection(rawConnection) {
     started_at: startedAt,
     ended_at: endedAt,
     duration_seconds: durationSeconds,
-    technician_username: isBlank(technicianUsernameCandidate) ? null : String(technicianUsernameCandidate).trim(),
+    technician_username: isBlank(technicianUsernameCandidate) ? null : sanitizeText(technicianUsernameCandidate),
     technician_display_name: isBlank(technicianDisplayNameCandidate)
       ? null
-      : String(technicianDisplayNameCandidate).trim(),
+      : sanitizeText(technicianDisplayNameCandidate),
     teamviewer_group_name: teamviewerGroupName,
     note_raw: noteRaw,
     location_id: null,
@@ -391,12 +402,12 @@ function createManualImportedCase(payload = {}) {
     throw httpError(400, 'ended_at must be a valid datetime');
   }
 
-  const teamviewerGroupName = String(payload.teamviewer_group_name || '').trim();
+  const teamviewerGroupName = sanitizeText(payload.teamviewer_group_name);
   if (!teamviewerGroupName) {
     throw httpError(400, 'teamviewer_group_name is required');
   }
 
-  const noteRaw = String(payload.note_raw || '').trim();
+  const noteRaw = sanitizeText(payload.note_raw);
   const parsed = parseNoteStrict(noteRaw);
   if (!parsed.valid) {
     throw httpError(400, `Invalid note format: ${parsed.reason}`);
@@ -408,10 +419,10 @@ function createManualImportedCase(payload = {}) {
     started_at: startedAt,
     ended_at: endedAt,
     duration_seconds: normalizeDurationSeconds(payload.duration_seconds, startedAt, endedAt),
-    technician_username: isBlank(payload.technician_username) ? null : String(payload.technician_username).trim(),
+    technician_username: isBlank(payload.technician_username) ? null : sanitizeText(payload.technician_username),
     technician_display_name: isBlank(payload.technician_display_name)
       ? null
-      : String(payload.technician_display_name).trim(),
+      : sanitizeText(payload.technician_display_name),
     teamviewer_group_name: teamviewerGroupName,
     note_raw: noteRaw,
     problem_description: parsed.problem_description,
