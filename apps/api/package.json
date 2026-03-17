@@ -7,6 +7,7 @@
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "db:init": "node src/db/initDb.js",
+    "admin:create": "node scripts/create-admin.js",
     "db:backup": "node scripts/backup-db.js",
     "lint": "node ../../node_modules/eslint/bin/eslint.js src test --ext .js",
     "format:check:phase1": "node ../../node_modules/prettier/bin/prettier.cjs --check \"src/server.js\" \"src/db/**/*.js\" \"test/**/*.js\" \"package.json\"",
@@ -16,7 +17,8 @@
   "dependencies": {
     "better-sqlite3": "^11.7.0",
     "dotenv": "^17.3.1",
-    "express": "^4.21.2"
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.1"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"

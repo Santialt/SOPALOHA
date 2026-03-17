@@ -12,6 +12,7 @@ process.env.PORT = "0";
 process.env.SQLITE_DB_PATH = sqliteDbPath;
 process.env.AUTH_SESSION_SECRET = "sopaloha-smoke-secret";
 process.env.INTERNAL_API_KEY = "";
+process.env.AUTH_LOGIN_RATE_LIMIT_MAX = "500";
 process.env.TEAMVIEWER_API_TOKEN = "";
 process.env.TEAMVIEWER_REPORTS_API_TOKEN = "";
 process.env.TEAMVIEWER_TIMEOUT_MS = "15000";

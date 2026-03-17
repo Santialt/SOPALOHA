@@ -1,21 +1,20 @@
 const crypto = require('crypto');
-const { logger } = require('./logger');
 
 const SESSION_COOKIE_NAME = 'sopaloha_session';
-const warnedMissingSecret = { value: false };
+let cachedSessionSecret = null;
 
-function getSessionSecret() {
+function requireSessionSecret() {
+  if (cachedSessionSecret) {
+    return cachedSessionSecret;
+  }
+
   const configured = String(process.env.AUTH_SESSION_SECRET || '').trim();
-  if (configured) {
-    return configured;
+  if (!configured) {
+    throw new Error('AUTH_SESSION_SECRET must be defined');
   }
 
-  if (!warnedMissingSecret.value) {
-    logger.warn('AUTH_SESSION_SECRET is not configured. Using a local development fallback secret.');
-    warnedMissingSecret.value = true;
-  }
-
-  return 'sopaloha-local-session-secret';
+  cachedSessionSecret = configured;
+  return cachedSessionSecret;
 }
 
 function base64UrlEncode(value) {
@@ -36,7 +35,7 @@ function base64UrlDecode(value) {
 
 function sign(value) {
   return crypto
-    .createHmac('sha256', getSessionSecret())
+    .createHmac('sha256', requireSessionSecret())
     .update(value)
     .digest('base64')
     .replace(/\+/g, '-')
@@ -119,6 +118,7 @@ function clearSessionCookie(res) {
 
 module.exports = {
   SESSION_COOKIE_NAME,
+  requireSessionSecret,
   clearSessionCookie,
   createSessionToken,
   parseCookies,

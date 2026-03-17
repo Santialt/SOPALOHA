@@ -7,6 +7,17 @@ function isBlank(value) {
 function validateBody(rules) {
   return (req, res, next) => {
     const errors = [];
+    const allowedFields = new Set(rules.map((rule) => rule.field));
+
+    if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+      return next(httpError(400, 'Request body must be a JSON object'));
+    }
+
+    for (const field of Object.keys(req.body)) {
+      if (!allowedFields.has(field)) {
+        errors.push(`Field '${field}' is not allowed`);
+      }
+    }
 
     for (const rule of rules) {
       const value = req.body[rule.field];

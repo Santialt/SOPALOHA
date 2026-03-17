@@ -8,9 +8,11 @@ const router = express.Router();
 
 const taskRules = [
   { field: 'title', required: true },
+  { field: 'description' },
   { field: 'location_id', type: 'integer' },
   { field: 'device_id', type: 'integer' },
   { field: 'incident_id', type: 'integer' },
+  { field: 'assigned_to' },
   { field: 'assigned_user_id', type: 'integer' },
   { field: 'status', allowedValues: ['pending', 'in_progress', 'blocked', 'done', 'cancelled'] },
   { field: 'priority', allowedValues: ['low', 'medium', 'high', 'critical'] },
@@ -19,15 +21,21 @@ const taskRules = [
     field: 'scheduled_for',
     pattern: /^\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2})?)?$/,
     patternDescription: 'YYYY-MM-DD o YYYY-MM-DDTHH:MM'
-  }
+  },
+  { field: 'task_type' }
 ];
 
-router.get('/', controller.getTasks);
-router.get('/:id', controller.getTaskById);
-router.get('/:id/comments', commentController.listTaskComments);
-router.post('/:id/comments', validateBody([{ field: 'comment', required: true }]), commentController.createTaskComment);
-router.post('/', validateBody(taskRules), controller.createTask);
-router.put('/:id', validateBody(taskRules), controller.updateTask);
+router.get('/', requireRole('tech'), controller.getTasks);
+router.get('/:id', requireRole('tech'), controller.getTaskById);
+router.get('/:id/comments', requireRole('tech'), commentController.listTaskComments);
+router.post(
+  '/:id/comments',
+  requireRole('tech'),
+  validateBody([{ field: 'comment', required: true }]),
+  commentController.createTaskComment
+);
+router.post('/', requireRole('tech'), validateBody(taskRules), controller.createTask);
+router.put('/:id', requireRole('tech'), validateBody(taskRules), controller.updateTask);
 router.delete('/:id', requireRole('admin'), controller.deleteTask);
 
 module.exports = router;
