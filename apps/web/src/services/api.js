@@ -1,5 +1,4 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
-const INTERNAL_API_KEY = import.meta.env.VITE_INTERNAL_API_KEY || '';
 const DEFAULT_TIMEOUT_MS = 15000;
 
 function buildApiError(data, fallbackMessage) {
@@ -23,7 +22,6 @@ async function request(path, options = {}) {
       credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
-        ...(INTERNAL_API_KEY ? { 'X-Internal-Api-Key': INTERNAL_API_KEY } : {}),
         ...(options.headers || {})
       },
       ...options,

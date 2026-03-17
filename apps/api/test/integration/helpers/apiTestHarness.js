@@ -30,6 +30,9 @@ function createApiHarness(options = {}) {
   process.env.AUTH_SESSION_SECRET =
     options.authSessionSecret || "sopaloha-integration-secret";
   process.env.INTERNAL_API_KEY = "";
+  process.env.AUTH_LOGIN_RATE_LIMIT_MAX = String(
+    options.authLoginRateLimitMax || "500",
+  );
   process.env.TEAMVIEWER_API_TOKEN = options.teamviewerApiToken || "";
   process.env.TEAMVIEWER_REPORTS_API_TOKEN =
     options.teamviewerReportsApiToken || "";

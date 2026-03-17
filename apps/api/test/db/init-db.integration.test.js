@@ -81,6 +81,7 @@ test("SQLite initialization is idempotent and upgrades a legacy schema safely", 
   process.env.NODE_ENV = "test";
   process.env.SQLITE_DB_PATH = sqliteDbPath;
   process.env.AUTH_SESSION_SECRET = "sopaloha-db-init-secret";
+  process.env.AUTH_LOGIN_RATE_LIMIT_MAX = "500";
 
   const db = require("../../src/db/connection");
   const { initDatabase } = require("../../src/db/initDb");
@@ -116,10 +117,8 @@ test("SQLite initialization is idempotent and upgrades a legacy schema safely", 
   assert.equal(legacyDevice.device_role, "other");
 
   const adminUsers = db
-    .prepare(
-      "SELECT COUNT(*) AS total FROM users WHERE role = 'admin' AND lower(email) = lower(?)",
-    )
-    .get("saltamirano@kronsa.com.ar");
+    .prepare("SELECT COUNT(*) AS total FROM users WHERE role = 'admin'")
+    .get();
   const templateCount = db
     .prepare("SELECT COUNT(*) AS total FROM on_call_templates")
     .get();
@@ -127,7 +126,7 @@ test("SQLite initialization is idempotent and upgrades a legacy schema safely", 
     .prepare("SELECT COUNT(*) AS total FROM on_call_technicians")
     .get();
 
-  assert.equal(adminUsers.total, 1);
+  assert.equal(adminUsers.total, 0);
   assert.equal(templateCount.total, 3);
   assert.equal(technicianCount.total, 3);
 });

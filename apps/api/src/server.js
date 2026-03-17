@@ -1,9 +1,11 @@
 const app = require("./app");
 const { initDatabase } = require("./db/initDb");
+const { requireSessionSecret } = require("./utils/authSession");
 const { logger } = require("./utils/logger");
 
 function startServer(options = {}) {
   const port = Number(options.port ?? process.env.PORT ?? 3001);
+  requireSessionSecret();
   initDatabase();
 
   return new Promise((resolve, reject) => {

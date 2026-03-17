@@ -147,6 +147,21 @@ test("Phase 2.1 hardening covers session edges, current authorization policy, an
         },
       );
       assert.equal(adminCreateLocation.status, 201);
+      const techLocationId = adminCreateLocation.body.id;
+
+      const adminCreateDevice = await harness.authedRequest(
+        adminUser,
+        "POST",
+        "/devices",
+        {
+          body: {
+            location_id: techLocationId,
+            name: "Admin Device",
+            type: "server",
+          },
+        },
+      );
+      assert.equal(adminCreateDevice.status, 201);
 
       const techCreateLocation = await harness.authedRequest(
         techUser,
@@ -158,9 +173,7 @@ test("Phase 2.1 hardening covers session edges, current authorization policy, an
           },
         },
       );
-      assert.equal(techCreateLocation.status, 201);
-
-      const techLocationId = techCreateLocation.body.id;
+      assert.equal(techCreateLocation.status, 403);
 
       const techCreateDevice = await harness.authedRequest(
         techUser,
@@ -174,7 +187,7 @@ test("Phase 2.1 hardening covers session edges, current authorization policy, an
           },
         },
       );
-      assert.equal(techCreateDevice.status, 201);
+      assert.equal(techCreateDevice.status, 403);
 
       const techCreateIncident = await harness.authedRequest(
         techUser,
@@ -183,7 +196,7 @@ test("Phase 2.1 hardening covers session edges, current authorization policy, an
         {
           body: {
             location_id: techLocationId,
-            device_id: techCreateDevice.body.id,
+            device_id: adminCreateDevice.body.id,
             incident_date: "2026-03-14T09:00",
             title: "Tech Incident",
             description: "Created by tech user",
@@ -200,7 +213,7 @@ test("Phase 2.1 hardening covers session edges, current authorization policy, an
           body: {
             title: "Tech Task",
             location_id: techLocationId,
-            device_id: techCreateDevice.body.id,
+            device_id: adminCreateDevice.body.id,
           },
         },
       );
@@ -257,7 +270,7 @@ test("Phase 2.1 hardening covers session edges, current authorization policy, an
           body: {
             title: "Tech Task Updated",
             location_id: techLocationId,
-            device_id: techCreateDevice.body.id,
+            device_id: adminCreateDevice.body.id,
             status: "in_progress",
           },
         },
@@ -271,7 +284,7 @@ test("Phase 2.1 hardening covers session edges, current authorization policy, an
         {
           body: {
             location_id: techLocationId,
-            device_id: techCreateDevice.body.id,
+            device_id: adminCreateDevice.body.id,
             incident_date: "2026-03-14T09:30",
             title: "Tech Incident Updated",
             description: "Updated by tech user",
@@ -283,7 +296,7 @@ test("Phase 2.1 hardening covers session edges, current authorization policy, an
       const techUpdateDevice = await harness.authedRequest(
         techUser,
         "PUT",
-        `/devices/${techCreateDevice.body.id}`,
+        `/devices/${adminCreateDevice.body.id}`,
         {
           body: {
             location_id: techLocationId,
@@ -292,7 +305,7 @@ test("Phase 2.1 hardening covers session edges, current authorization policy, an
           },
         },
       );
-      assert.equal(techUpdateDevice.status, 200);
+      assert.equal(techUpdateDevice.status, 403);
 
       const techUpdateLocation = await harness.authedRequest(
         techUser,
@@ -304,7 +317,7 @@ test("Phase 2.1 hardening covers session edges, current authorization policy, an
           },
         },
       );
-      assert.equal(techUpdateLocation.status, 200);
+      assert.equal(techUpdateLocation.status, 403);
     },
   );
 

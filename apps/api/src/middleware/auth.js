@@ -50,12 +50,14 @@ function requireAuth(req, res, next) {
 }
 
 function requireRole(role) {
+  const allowedRoles = role === 'tech' ? new Set(['tech', 'admin']) : new Set([role]);
+
   return (req, res, next) => {
     if (!req.user) {
       return next(httpError(401, 'Authentication required'));
     }
 
-    if (req.user.role !== role) {
+    if (!allowedRoles.has(req.user.role)) {
       return next(httpError(403, 'Forbidden'));
     }
 

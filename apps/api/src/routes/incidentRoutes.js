@@ -17,17 +17,24 @@ const incidentRules = [
   },
   { field: 'title', required: true },
   { field: 'description', required: true },
+  { field: 'solution' },
   { field: 'category', allowedValues: ['network', 'sql', 'aloha', 'printer', 'fiscal', 'hardware', 'other'] },
   { field: 'status', allowedValues: ['open', 'closed'] },
-  { field: 'time_spent_minutes', type: 'integer' }
+  { field: 'time_spent_minutes', type: 'integer' },
+  { field: 'notes' }
 ];
 
-router.get('/', controller.getIncidents);
-router.post('/', validateBody(incidentRules), controller.createIncident);
-router.get('/:id/comments', commentController.listIncidentComments);
-router.post('/:id/comments', validateBody([{ field: 'comment', required: true }]), commentController.createIncidentComment);
-router.get('/:id', controller.getIncidentById);
-router.put('/:id', validateBody(incidentRules), controller.updateIncident);
+router.get('/', requireRole('tech'), controller.getIncidents);
+router.post('/', requireRole('tech'), validateBody(incidentRules), controller.createIncident);
+router.get('/:id/comments', requireRole('tech'), commentController.listIncidentComments);
+router.post(
+  '/:id/comments',
+  requireRole('tech'),
+  validateBody([{ field: 'comment', required: true }]),
+  commentController.createIncidentComment
+);
+router.get('/:id', requireRole('tech'), controller.getIncidentById);
+router.put('/:id', requireRole('tech'), validateBody(incidentRules), controller.updateIncident);
 router.delete('/:id', requireRole('admin'), controller.deleteIncident);
 
 module.exports = router;

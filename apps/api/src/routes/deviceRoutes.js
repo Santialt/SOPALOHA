@@ -32,13 +32,26 @@ const deviceRules = [
   { field: 'name', required: true },
   { field: 'type', allowedValues: deviceTypeValues },
   { field: 'device_role', allowedValues: deviceRoleValues },
-  { field: 'ram_gb', type: 'number' }
+  { field: 'ip_address' },
+  { field: 'teamviewer_id' },
+  { field: 'windows_version' },
+  { field: 'ram_gb', type: 'number' },
+  { field: 'cpu' },
+  { field: 'disk_type' },
+  { field: 'username' },
+  { field: 'operating_system' },
+  { field: 'sql_version' },
+  { field: 'sql_instance' },
+  { field: 'aloha_path' },
+  { field: 'brand' },
+  { field: 'model' },
+  { field: 'notes' }
 ];
 
-router.get('/', controller.getDevices);
-router.post('/', validateBody(deviceRules), controller.createDevice);
-router.get('/:id', controller.getDeviceById);
-router.put('/:id', validateBody(deviceRules), controller.updateDevice);
+router.get('/', requireRole('tech'), controller.getDevices);
+router.post('/', requireRole('admin'), validateBody(deviceRules), controller.createDevice);
+router.get('/:id', requireRole('tech'), controller.getDeviceById);
+router.put('/:id', requireRole('admin'), validateBody(deviceRules), controller.updateDevice);
 router.delete('/:id', requireRole('admin'), controller.deleteDevice);
 
 module.exports = router;

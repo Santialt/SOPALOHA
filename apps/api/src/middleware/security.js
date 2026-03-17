@@ -60,13 +60,10 @@ function isAllowedOrigin(origin, allowedOrigins) {
     return true;
   }
 
-  if (allowedOrigins.has(origin)) {
-    return true;
-  }
-
   try {
     const parsed = new URL(origin);
-    return isLoopbackOrPrivateAddress(parsed.hostname);
+    const normalizedOrigin = `${parsed.protocol}//${parsed.host}`;
+    return allowedOrigins.has(normalizedOrigin);
   } catch {
     return false;
   }

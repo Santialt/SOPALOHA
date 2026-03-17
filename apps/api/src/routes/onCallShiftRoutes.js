@@ -8,6 +8,7 @@ const router = express.Router();
 const shiftRules = [
   { field: 'title', required: true },
   { field: 'assigned_to', required: true },
+  { field: 'backup_assigned_to' },
   {
     field: 'start_at',
     required: true,
@@ -19,7 +20,8 @@ const shiftRules = [
     required: true,
     pattern: /^\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2})?)?$/,
     patternDescription: 'YYYY-MM-DD o YYYY-MM-DDTHH:MM'
-  }
+  },
+  { field: 'notes' }
 ];
 
 router.get('/', controller.getShifts);

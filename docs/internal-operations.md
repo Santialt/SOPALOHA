@@ -8,6 +8,7 @@
   - TeamViewer instalado solo si se va a usar `POST /support-actions/teamviewer/open` en esa maquina
 - Variables minimas en `apps/api/.env`:
   - `PORT`
+  - `AUTH_SESSION_SECRET`
   - `INTERNAL_API_KEY`
   - `CORS_ALLOWED_ORIGINS`
   - `TEAMVIEWER_API_TOKEN`
@@ -17,6 +18,7 @@
   - `npm install --prefix apps/api`
   - `npm install --prefix apps/web`
   - `npm run db:init --prefix apps/api`
+  - `npm run admin:create --prefix apps/api -- admin@example.com "Administrador SOPALOHA"`
   - `npm run build --prefix apps/web`
   - `npm run start --prefix apps/api`
 

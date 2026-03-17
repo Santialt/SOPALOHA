@@ -23,9 +23,10 @@ apps/api/
 ## Hardening interno
 
 - `GET /health` sigue abierto.
-- El resto de la API acepta solo origenes `localhost` o los definidos en `CORS_ALLOWED_ORIGINS`.
+- El resto de la API acepta solo origenes explicitamente definidos en `CORS_ALLOWED_ORIGINS`.
 - Sin `INTERNAL_API_KEY`, la API queda limitada a loopback y red privada.
 - Con `INTERNAL_API_KEY`, la API exige `X-Internal-Api-Key` o `Authorization: Bearer`.
+- `AUTH_SESSION_SECRET` es obligatorio. Si falta, la API no inicia.
 - `POST /support-actions/ping` y `POST /support-actions/teamviewer/open` requieren red interna y, si existe, API key valida.
 - `devices.password` queda deprecado: ya no se devuelve ni se persiste, y los valores legados se limpian al iniciar la API.
 
@@ -36,6 +37,7 @@ Desde `apps/api`:
 ```bash
 npm install
 npm run db:init
+npm run admin:create -- admin@example.com "Administrador SOPALOHA"
 npm run dev
 ```
 
