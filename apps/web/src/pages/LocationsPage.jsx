@@ -56,6 +56,10 @@ function setBooleanSelect(setter, field, value) {
   }));
 }
 
+function isRowActionTarget(target) {
+  return target instanceof HTMLElement && Boolean(target.closest('button, a, input, select, textarea'));
+}
+
 function LocationsPage() {
   const navigate = useNavigate();
   const routeLocation = useLocation();
@@ -105,6 +109,7 @@ function LocationsPage() {
     });
   }, [locations, search, validSelectedId]);
   const hasActiveSearch = search.trim().length > 0;
+  const locationCountLabel = filtered.length === 1 ? '1 local' : `${filtered.length} locales`;
 
   useEffect(() => {
     if (!selectedLocationFromState || validSelectedId) return;
@@ -210,8 +215,8 @@ function LocationsPage() {
             )}
             {!validSelectedId && (
               <small>
-                {filtered.length} resultado(s)
-                {hasActiveSearch ? ` para "${search.trim()}"` : ` de ${locations.length} locales`}
+                {locationCountLabel}
+                {hasActiveSearch ? ` para "${search.trim()}"` : ` de ${locations.length} registrados`}
               </small>
             )}
           </div>
@@ -266,12 +271,15 @@ function LocationsPage() {
                   }}
                   onClick={() => navigate(`/locations/${location.id}`)}
                   onKeyDown={(event) => {
+                    if (event.target !== event.currentTarget || isRowActionTarget(event.target)) {
+                      return;
+                    }
                     if (event.key === 'Enter' || event.key === ' ') {
                       event.preventDefault();
                       navigate(`/locations/${location.id}`);
                     }
                   }}
-                  className={`row-clickable ${validSelectedId === location.id ? 'row-highlighted' : ''}`}
+                  className={`row-clickable ${validSelectedId === location.id ? 'row-highlighted row-selected' : ''}`}
                   tabIndex={0}
                   aria-label={`Abrir detalle del local ${location.name}`}
                 >

@@ -22,6 +22,15 @@ function LocationQuickSearch() {
     if (!query.trim()) {
       setResults([]);
       setLoading(false);
+      setOpen(false);
+      setActiveIndex(-1);
+      return undefined;
+    }
+
+    if (query.trim().length < 2) {
+      setResults([]);
+      setLoading(false);
+      setOpen(true);
       setActiveIndex(-1);
       return undefined;
     }
@@ -108,8 +117,11 @@ function LocationQuickSearch() {
       event.preventDefault();
     }
 
-    if (event.key === 'Enter' && activeIndex >= 0 && results[activeIndex]) {
-      onSelect(results[activeIndex]);
+    if (event.key === 'Enter') {
+      const targetItem = activeIndex >= 0 && results[activeIndex] ? results[activeIndex] : results[0];
+      if (targetItem) {
+        onSelect(targetItem);
+      }
       event.preventDefault();
     }
 
@@ -119,9 +131,10 @@ function LocationQuickSearch() {
     }
   };
 
-  const showDropdown = open && (loading || query.trim().length > 0);
-  const hasQuery = query.trim().length > 0;
-  const shouldShowHint = query.trim().length > 0 && query.trim().length < 2;
+  const trimmedQuery = query.trim();
+  const hasQuery = trimmedQuery.length > 0;
+  const shouldShowHint = hasQuery && trimmedQuery.length < 2;
+  const showDropdown = open && (loading || hasQuery);
 
   return (
     <div className="location-quick-search" ref={containerRef}>
@@ -155,9 +168,9 @@ function LocationQuickSearch() {
       />
 
       <div id={statusId} className="visually-hidden" aria-live="polite">
-        {!hasQuery && 'Enter para abrir el local directo.'}
+        {!hasQuery && 'Escribi al menos 2 caracteres para buscar un local.'}
         {shouldShowHint && 'Escribi al menos 2 caracteres para reducir ruido.'}
-        {!loading && hasQuery && !shouldShowHint && results.length > 0 && `${results.length} resultado(s).`}
+        {!loading && hasQuery && !shouldShowHint && results.length > 0 && `${results.length} resultado(s). Enter abre el primero.`}
         {!loading && hasQuery && !shouldShowHint && results.length === 0 && 'Sin coincidencias.'}
         {loading && 'Buscando locales...'}
       </div>
@@ -165,7 +178,7 @@ function LocationQuickSearch() {
       {showDropdown && (
         <div className="location-quick-search-dropdown" id={listboxId} role="listbox">
           {shouldShowHint && (
-            <div className="location-quick-search-status">Segui escribiendo para acotar la busqueda.</div>
+            <div className="location-quick-search-status">Escribi al menos 2 caracteres para buscar.</div>
           )}
 
           {!shouldShowHint && loading && (

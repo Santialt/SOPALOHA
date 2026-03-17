@@ -24,12 +24,16 @@ const MONTH_OPTIONS = [
 ];
 
 const statusLabels = {
-  pending: 'Pending',
-  in_progress: 'In Progress',
-  blocked: 'Blocked',
-  done: 'Done',
-  cancelled: 'Cancelled'
+  pending: 'Pendiente',
+  in_progress: 'En progreso',
+  blocked: 'Bloqueada',
+  done: 'Resuelta',
+  cancelled: 'Cancelada'
 };
+
+function formatOperationalStatus(status) {
+  return statusLabels[status] || status || '-';
+}
 
 const monthFormatter = new Intl.DateTimeFormat('es-AR', { month: 'long', year: 'numeric' });
 const dayFormatter = new Intl.DateTimeFormat('es-AR', { day: '2-digit', month: '2-digit' });
@@ -292,7 +296,7 @@ function TasksPage() {
       setTasks((prevTasks) =>
         prevTasks.map((item) => (item.id === task.id ? { ...item, status: nextStatus } : item))
       );
-      setSuccess(`Estado de tarea #${task.id} actualizado a ${nextStatus}.`);
+      setSuccess(`Estado de tarea #${task.id} actualizado a ${formatOperationalStatus(nextStatus)}.`);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -515,7 +519,7 @@ function TasksPage() {
               onChange={(event) => setForm({ ...form, status: event.target.value })}
             >
               {enums.operationalTaskStatus.map((status) => (
-                <option key={status} value={status}>{status}</option>
+                <option key={status} value={status}>{formatOperationalStatus(status)}</option>
               ))}
             </select>
           </label>
@@ -706,7 +710,7 @@ function TasksPage() {
               >
                 <option value="">Todos los estados</option>
                 {enums.operationalTaskStatus.map((status) => (
-                  <option key={status} value={status}>{status}</option>
+                  <option key={status} value={status}>{formatOperationalStatus(status)}</option>
                 ))}
               </select>
             )}
@@ -771,7 +775,7 @@ function TasksPage() {
                             <span>Vence: {task.due_date || '-'}</span>
                           </div>
                           <div className="kanban-card-actions">
-                            <span className={`badge ${task.status}`}>{task.status}</span>
+                            <span className={`badge ${task.status}`}>{formatOperationalStatus(task.status)}</span>
                             <button className="btn-secondary" onClick={() => onEdit(task)}>
                               Editar
                             </button>
@@ -925,7 +929,7 @@ function TasksPage() {
                       <strong>#{task.id}</strong>
                       <span>{task.title}</span>
                       <small>{movingTaskToCalendarId === task.id ? 'Asignando fecha...' : draggingUndatedTaskId === task.id ? 'Solta en un dia del calendario' : 'Arrastrar al calendario'}</small>
-                      <span className={`badge ${task.status}`}>{task.status}</span>
+                      <span className={`badge ${task.status}`}>{formatOperationalStatus(task.status)}</span>
                     </button>
                   ))}
                 </div>
@@ -956,7 +960,7 @@ function TasksPage() {
                       <td>{task.id}</td>
                       <td>{task.title}</td>
                       <td>{location?.name || '-'}</td>
-                      <td><span className={`badge ${task.status}`}>{task.status}</span></td>
+                      <td><span className={`badge ${task.status}`}>{formatOperationalStatus(task.status)}</span></td>
                       <td><span className={`badge ${task.priority}`}>{task.priority}</span></td>
                       <td>{task.assigned_to || '-'}</td>
                       <td>{task.due_date || '-'}</td>

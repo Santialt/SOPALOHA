@@ -7,7 +7,7 @@ import LocationQuickSearch from './LocationQuickSearch';
 const navItems = [
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/locations', label: 'Locales' },
-  { to: '/incidents', label: 'Incidentes' },
+  { to: '/incidents', label: 'Casos TeamViewer' },
   { to: '/tasks', label: 'Tareas' },
   { to: '/on-call', label: 'Guardias' },
   { to: '/teamviewer-explorer', label: 'TeamViewer Explorer' },
@@ -18,7 +18,7 @@ const navItems = [
 const pageTitles = {
   '/dashboard': 'Dashboard Operativo',
   '/locations': 'Gestion de locales',
-  '/incidents': 'Incidentes',
+  '/incidents': 'Casos TeamViewer',
   '/tasks': 'Tareas',
   '/on-call': 'Guardias',
   '/teamviewer-explorer': 'TeamViewer Explorer',

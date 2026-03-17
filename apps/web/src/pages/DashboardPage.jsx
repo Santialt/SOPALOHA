@@ -20,6 +20,13 @@ function formatCategory(category) {
   return CATEGORY_LABELS[category] || category || 'Sin categoria';
 }
 
+function formatWindowStart(value) {
+  if (!value) return '-';
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString('es-AR');
+}
+
 function HorizontalBarChart({ items, valueKey, labelKey, emptyLabel }) {
   const maxValue = items.reduce((highest, item) => Math.max(highest, Number(item[valueKey] || 0)), 0);
 
@@ -123,34 +130,31 @@ function DashboardPage() {
             <div>
               <h2>Resumen operativo</h2>
               <small className="panel-caption">
-                Prioriza carga reciente y puntos de atencion para abrir la jornada sin revisar varias pantallas.
+                KPI generales arriba y analitica reciente abajo para abrir la jornada sin revisar varias pantallas.
               </small>
-            </div>
-            <div className="dashboard-window-chip">
-              Ventana activa: ultimos {incidentMetrics.lastMonthWindow?.days || 30} dias
             </div>
           </div>
           <div className="card-grid dashboard-kpi-grid">
             <StatCard
-              label="Casos en la ventana"
+              label="Casos totales"
               value={incidentMetrics.totalCases ?? stats.incidents}
               tone="primary"
-              helper="Incidentes detectados en el periodo mostrado"
+              helper="Base total de incidentes registrados"
             />
             <StatCard
-              label="Casos finalizados"
+              label="Casos cerrados totales"
               value={incidentMetrics.resolvedCases ?? 0}
               tone="success"
-              helper="Resueltos dentro de la ventana activa"
+              helper="Total historico con estado cerrado"
             />
             <StatCard
-              label="Casos en progreso"
+              label="Casos abiertos actuales"
               value={incidentMetrics.inProgressCases ?? 0}
               tone="warning"
-              helper="Siguen abiertos y requieren seguimiento"
+              helper="Total actual con estado activo"
             />
             <StatCard
-              label="Locales"
+              label="Locales registrados"
               value={stats.locations}
               tone="neutral"
               helper="Locales registrados"
@@ -183,7 +187,12 @@ function DashboardPage() {
           <div className="section-head">
             <div>
               <h2>Locales con mas incidentes</h2>
-              <small className="panel-caption">Ranking por incidentes creados en los ultimos 30 dias</small>
+              <small className="panel-caption">
+                Ranking por incidentes creados en los ultimos {incidentMetrics.lastMonthWindow?.days || 30} dias
+              </small>
+            </div>
+            <div className="dashboard-window-chip">
+              Ventana analitica: ultimos {incidentMetrics.lastMonthWindow?.days || 30} dias
             </div>
           </div>
           <HorizontalBarChart
@@ -198,24 +207,24 @@ function DashboardPage() {
           <div className="section-head">
             <div>
               <h2>Lectura rapida</h2>
-              <small className="panel-caption">Indicadores utiles para abrir la jornada</small>
+              <small className="panel-caption">Contexto operativo sin duplicar KPIs principales</small>
             </div>
           </div>
           <div className="dashboard-brief-grid">
             <div className="dashboard-brief-card">
-              <span>Base total de casos</span>
-              <strong>{stats.incidents}</strong>
-              <small>Historico total, distinto de la ventana operativa mostrada arriba.</small>
+              <span>Ventana analitica desde</span>
+              <strong>{formatWindowStart(incidentMetrics.lastMonthWindow?.since)}</strong>
+              <small>Fecha base usada para rankings y clasificacion reciente.</small>
             </div>
             <div className="dashboard-brief-card">
               <span>Estado activo usado</span>
               <strong>{incidentMetrics.activeStatusKey || 'open'}</strong>
-              <small>Hoy el sistema considera activo el estado `open`.</small>
+              <small>Referencia tecnica para interpretar los casos en progreso.</small>
             </div>
             <div className="dashboard-brief-card">
               <span>Clasificacion disponible</span>
               <strong>category</strong>
-              <small>Se usa para comparar volumen y repetir patrones por tipo.</small>
+              <small>Se usa para detectar volumen y repeticion por tipo de incidente.</small>
             </div>
           </div>
         </article>
@@ -230,7 +239,7 @@ function DashboardPage() {
         </div>
         <div className="quick-links">
           <Link to="/locations" className="btn-link">Ver locales</Link>
-          <Link to="/incidents" className="btn-link">Ver incidentes TeamViewer</Link>
+          <Link to="/incidents" className="btn-link">Ver casos TeamViewer</Link>
           <Link to="/tasks" className="btn-link">Gestionar tareas</Link>
           <Link to="/on-call" className="btn-link">Ver guardia actual</Link>
           <Link to="/teamviewer-explorer" className="btn-link">TeamViewer Explorer</Link>
