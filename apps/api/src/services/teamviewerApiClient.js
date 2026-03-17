@@ -4,6 +4,9 @@ const { logger } = require('../utils/logger');
 const TEAMVIEWER_BASE_URL = process.env.TEAMVIEWER_API_BASE_URL || 'https://webapi.teamviewer.com/api/v1';
 const TEAMVIEWER_TIMEOUT_MS = Number(process.env.TEAMVIEWER_TIMEOUT_MS || 15000);
 const TEAMVIEWER_MAX_RETRIES = Number(process.env.TEAMVIEWER_MAX_RETRIES || 1);
+const TEAMVIEWER_BASE_BACKOFF_MS = 300;
+const TEAMVIEWER_MAX_BACKOFF_MS = 5000;
+const TEAMVIEWER_MAX_PAGES = 100;
 
 function getTeamviewerToken() {
   const token = String(process.env.TEAMVIEWER_API_TOKEN || '').trim();
@@ -66,7 +69,7 @@ function parseRetryAfterMs(response) {
 
   const asNumber = Number(raw);
   if (Number.isFinite(asNumber) && asNumber >= 0) {
-    return Math.min(asNumber * 1000, 5000);
+    return Math.min(asNumber * 1000, TEAMVIEWER_MAX_BACKOFF_MS);
   }
 
   const asDate = Date.parse(raw);
@@ -74,7 +77,16 @@ function parseRetryAfterMs(response) {
     return null;
   }
 
-  return Math.min(Math.max(asDate - Date.now(), 0), 5000);
+  return Math.min(Math.max(asDate - Date.now(), 0), TEAMVIEWER_MAX_BACKOFF_MS);
+}
+
+function getRetryDelayMs(attempt, response) {
+  const retryAfterMs = response ? parseRetryAfterMs(response) : null;
+  if (retryAfterMs !== null) {
+    return retryAfterMs;
+  }
+
+  return Math.min(TEAMVIEWER_BASE_BACKOFF_MS * 2 ** attempt, TEAMVIEWER_MAX_BACKOFF_MS);
 }
 
 function createExternalServiceError({ message, code, retryable, details, cause }) {
@@ -167,7 +179,7 @@ async function fetchJson(pathname, query = {}, options = {}) {
           throw error;
         }
 
-        const waitMs = parseRetryAfterMs(response) ?? 300 * (attempt + 1);
+        const waitMs = getRetryDelayMs(attempt, response);
         logger.warn('Retrying TeamViewer request after upstream error', {
           path: pathWithQuery,
           attempt: attempt + 1,
@@ -186,7 +198,7 @@ async function fetchJson(pathname, query = {}, options = {}) {
         throw error;
       }
 
-      const waitMs = 300 * (attempt + 1);
+      const waitMs = getRetryDelayMs(attempt);
       logger.warn('Retrying TeamViewer request after transient failure', {
         path: pathWithQuery,
         attempt: attempt + 1,
@@ -256,12 +268,12 @@ function getPaginationOffset(payload) {
 
 async function fetchConnectionReportsByQueryStrategy(range, queryMapping) {
   const pageSize = 1000;
-  const maxPages = 100;
   const rows = [];
   let offset = 0;
   const seenPageSignatures = new Set();
+  let reachedPageLimit = true;
 
-  for (let page = 0; page < maxPages; page += 1) {
+  for (let page = 0; page < TEAMVIEWER_MAX_PAGES; page += 1) {
     const query = {
       [queryMapping.fromKey]: range.from_date,
       [queryMapping.toKey]: range.to_date,
@@ -284,6 +296,7 @@ async function fetchConnectionReportsByQueryStrategy(range, queryMapping) {
         page,
         signature
       });
+      reachedPageLimit = false;
       break;
     }
     seenPageSignatures.add(signature);
@@ -291,12 +304,16 @@ async function fetchConnectionReportsByQueryStrategy(range, queryMapping) {
     rows.push(...pageRows);
 
     if (pageRows.length === 0) {
+      reachedPageLimit = false;
       break;
     }
 
     const nextOffset = getPaginationOffset(payload);
     if (nextOffset === null) {
-      if (pageRows.length < pageSize) break;
+      if (pageRows.length < pageSize) {
+        reachedPageLimit = false;
+        break;
+      }
       offset += pageSize;
       continue;
     }
@@ -306,9 +323,17 @@ async function fetchConnectionReportsByQueryStrategy(range, queryMapping) {
         current_offset: offset,
         next_offset: nextOffset
       });
+      reachedPageLimit = false;
       break;
     }
     offset = nextOffset;
+  }
+
+  if (reachedPageLimit) {
+    logger.warn('TeamViewer pagination page limit reached, stopping report fetch', {
+      max_pages: TEAMVIEWER_MAX_PAGES,
+      last_offset: offset
+    });
   }
 
   return rows;

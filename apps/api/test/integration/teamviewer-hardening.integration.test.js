@@ -48,7 +48,7 @@ function createTeamviewerFetchMock() {
   };
 }
 
-test("TeamViewer backend hardening covers preview, import, degradation, and current route authorization", async (t) => {
+test("TeamViewer backend hardening covers preview, import, degradation, and route authorization", async (t) => {
   const teamviewerFetch = createTeamviewerFetchMock();
   teamviewerFetch.install();
 
@@ -83,7 +83,7 @@ test("TeamViewer backend hardening covers preview, import, degradation, and curr
   });
 
   await t.test(
-    "unauthenticated TeamViewer routes are rejected and current authenticated tech access remains allowed",
+    "unauthenticated TeamViewer routes are rejected, tech keeps read-only access, and admin can import",
     async () => {
       teamviewerFetch.reset();
 
@@ -187,8 +187,16 @@ test("TeamViewer backend hardening covers preview, import, degradation, and curr
         },
       );
 
-      const importResult = await harness.authedRequest(
+      const techImportResult = await harness.authedRequest(
         techUser,
+        "POST",
+        "/teamviewer/import",
+      );
+      assert.equal(techImportResult.status, 403);
+      assert.equal(techImportResult.body.message, "Forbidden");
+
+      const importResult = await harness.authedRequest(
+        adminUser,
         "POST",
         "/teamviewer/import",
       );
@@ -215,7 +223,7 @@ test("TeamViewer backend hardening covers preview, import, degradation, and curr
   );
 
   await t.test(
-    "TeamViewer imported-case flows handle pagination, duplicates, partial payloads, and current tech mutation access",
+    "TeamViewer imported-case flows require admin mutations while preserving read-only access",
     async () => {
       teamviewerFetch.reset();
 
@@ -294,9 +302,23 @@ test("TeamViewer backend hardening covers preview, import, degradation, and curr
           },
         },
       );
+      assert.equal(importCasesResult.status, 403);
+      assert.equal(importCasesResult.body.message, "Forbidden");
 
-      assert.equal(importCasesResult.status, 200);
-      assert.deepEqual(importCasesResult.body.summary, {
+      const adminImportCasesResult = await harness.authedRequest(
+        adminUser,
+        "POST",
+        "/teamviewer/import-cases",
+        {
+          body: {
+            from_date: "2026-03-01",
+            to_date: "2026-03-31",
+          },
+        },
+      );
+
+      assert.equal(adminImportCasesResult.status, 200);
+      assert.deepEqual(adminImportCasesResult.body.summary, {
         total_received: 5,
         total_with_note: 5,
         total_valid_format: 2,
@@ -306,7 +328,7 @@ test("TeamViewer backend hardening covers preview, import, degradation, and curr
         total_out_of_range_from_api: 1,
       });
       assert.deepEqual(
-        importCasesResult.body.discarded.map((row) => row.reason).sort(),
+        adminImportCasesResult.body.discarded.map((row) => row.reason).sort(),
         ["missing_required_fields", "missing_separator"],
       );
 
@@ -336,15 +358,37 @@ test("TeamViewer backend hardening covers preview, import, degradation, and curr
           },
         },
       );
-      assert.equal(manualCase.status, 201);
-      assert.equal(manualCase.body.teamviewer_group_name, "Local Reused");
+      assert.equal(manualCase.status, 403);
+
+      const adminManualCase = await harness.authedRequest(
+        adminUser,
+        "POST",
+        "/teamviewer/imported-cases",
+        {
+          body: {
+            started_at: "2026-03-11T09:00:00Z",
+            ended_at: "2026-03-11T09:10:00Z",
+            teamviewer_group_name: "Local Reused",
+            note_raw: "Impresora sin papel - Sofia",
+          },
+        },
+      );
+      assert.equal(adminManualCase.status, 201);
+      assert.equal(adminManualCase.body.teamviewer_group_name, "Local Reused");
 
       const deleteManualCase = await harness.authedRequest(
         techUser,
         "DELETE",
-        `/teamviewer/imported-cases/${manualCase.body.id}`,
+        `/teamviewer/imported-cases/${adminManualCase.body.id}`,
       );
-      assert.equal(deleteManualCase.status, 204);
+      assert.equal(deleteManualCase.status, 403);
+
+      const adminDeleteManualCase = await harness.authedRequest(
+        adminUser,
+        "DELETE",
+        `/teamviewer/imported-cases/${adminManualCase.body.id}`,
+      );
+      assert.equal(adminDeleteManualCase.status, 204);
     },
   );
 

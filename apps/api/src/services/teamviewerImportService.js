@@ -7,7 +7,14 @@ const ROLE_RULES = [
 ];
 
 function normalizeString(value) {
-  return String(value || '').trim();
+  return Array.from(String(value || ''))
+    .map((char) => {
+      const code = char.charCodeAt(0);
+      return (code <= 31 || code === 127) ? ' ' : char;
+    })
+    .join('')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function normalizeKey(value) {
