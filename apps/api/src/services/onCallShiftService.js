@@ -1,4 +1,5 @@
 const repository = require('../repositories/onCallShiftRepository');
+const userRepository = require('../repositories/userRepository');
 const { httpError } = require('../utils/httpError');
 
 function isBlank(value) {
@@ -8,6 +9,18 @@ function isBlank(value) {
 function normalizeDateTime(value) {
   if (isBlank(value)) return '';
   return String(value).trim().replace(' ', 'T');
+}
+
+function normalizeOptionalInteger(value, fallbackValue = null) {
+  if (value === undefined) return fallbackValue;
+  if (value === null || value === '') return null;
+
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw httpError(400, 'assigned_user_id and backup_assigned_user_id must be positive integers');
+  }
+
+  return parsed;
 }
 
 function parseDateTime(value) {
@@ -22,13 +35,39 @@ function parseDateTime(value) {
   return parsed;
 }
 
+function getAssignableOnCallUser(userId, fieldName) {
+  if (userId === null) return null;
+
+  const user = userRepository.findById(userId);
+  if (!user || !user.active || user.role !== 'tech') {
+    throw httpError(400, `${fieldName} is invalid or inactive`);
+  }
+
+  return user;
+}
+
 function normalizePayload(payload, existing = {}) {
+  const assignedUserId = normalizeOptionalInteger(payload.assigned_user_id, existing.assigned_user_id ?? null);
+  const backupAssignedUserId = normalizeOptionalInteger(
+    payload.backup_assigned_user_id,
+    existing.backup_assigned_user_id ?? null
+  );
+  const assignedUser = getAssignableOnCallUser(assignedUserId, 'assigned_user_id');
+  const backupAssignedUser = getAssignableOnCallUser(
+    backupAssignedUserId,
+    'backup_assigned_user_id'
+  );
+  const fallbackAssignedTo = String(payload.assigned_to ?? existing.assigned_to ?? '').trim();
+  const fallbackBackupAssignedTo = isBlank(payload.backup_assigned_to)
+    ? null
+    : String(payload.backup_assigned_to).trim();
+
   return {
     title: String(payload.title ?? existing.title ?? '').trim(),
-    assigned_to: String(payload.assigned_to ?? existing.assigned_to ?? '').trim(),
-    backup_assigned_to: isBlank(payload.backup_assigned_to)
-      ? null
-      : String(payload.backup_assigned_to).trim(),
+    assigned_user_id: assignedUser ? assignedUser.id : null,
+    assigned_to: assignedUser ? assignedUser.name : fallbackAssignedTo,
+    backup_assigned_user_id: backupAssignedUser ? backupAssignedUser.id : null,
+    backup_assigned_to: backupAssignedUser ? backupAssignedUser.name : fallbackBackupAssignedTo,
     start_at: normalizeDateTime(payload.start_at ?? existing.start_at),
     end_at: normalizeDateTime(payload.end_at ?? existing.end_at),
     notes: isBlank(payload.notes) ? null : String(payload.notes).trim()
@@ -37,9 +76,21 @@ function normalizePayload(payload, existing = {}) {
 
 function validateShift(shift) {
   if (!shift.title) throw httpError(400, 'Field title is required');
-  if (!shift.assigned_to) throw httpError(400, 'Field assigned_to is required');
+  if (!shift.assigned_to) {
+    throw httpError(400, 'Either assigned_user_id or assigned_to is required');
+  }
   if (!shift.start_at) throw httpError(400, 'Field start_at is required');
   if (!shift.end_at) throw httpError(400, 'Field end_at is required');
+  if (shift.backup_assigned_user_id && shift.backup_assigned_user_id === shift.assigned_user_id) {
+    throw httpError(400, 'backup_assigned_user_id must be different from assigned_user_id');
+  }
+  if (
+    shift.backup_assigned_to &&
+    shift.assigned_to &&
+    shift.backup_assigned_to.trim().toLowerCase() === shift.assigned_to.trim().toLowerCase()
+  ) {
+    throw httpError(400, 'Backup assignee must be different from the primary assignee');
+  }
 
   const start = parseDateTime(shift.start_at);
   const end = parseDateTime(shift.end_at);

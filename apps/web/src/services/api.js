@@ -83,7 +83,7 @@ export const api = {
   getCurrentUser: () => request('/auth/me'),
 
   getUsers: (filters = {}) => request(`/users${buildQuery(filters)}`),
-  getAssignableUsers: () => request('/users/assignable'),
+  getAssignableUsers: (filters = {}) => request(`/users/assignable${buildQuery(filters)}`),
   getUserById: (id) => request(`/users/${id}`),
   createUser: (payload) => request('/users', { method: 'POST', body: JSON.stringify(payload) }),
   updateUser: (id, payload) => request(`/users/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),

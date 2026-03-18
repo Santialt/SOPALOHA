@@ -415,7 +415,7 @@ test("critical operational CRUD flows work against a temporary SQLite database",
         {
           body: {
             title: "Turno invalido",
-            assigned_to: "Tecnico 1",
+            assigned_user_id: seededTech.id,
             start_at: createLocalDateTimeString(activeEnd),
             end_at: createLocalDateTimeString(activeStart),
           },
@@ -435,8 +435,8 @@ test("critical operational CRUD flows work against a temporary SQLite database",
         {
           body: {
             title: "Turno Guardia Actual",
-            assigned_to: "Tecnico 1",
-            backup_assigned_to: "Tecnico 2",
+            assigned_user_id: seededTech.id,
+            backup_assigned_user_id: seededAdmin.id,
             start_at: createLocalDateTimeString(activeStart),
             end_at: createLocalDateTimeString(activeEnd),
             notes: "Cobertura operativa",
@@ -444,9 +444,32 @@ test("critical operational CRUD flows work against a temporary SQLite database",
         },
       );
 
-      assert.equal(createResult.status, 201);
-      assert.equal(createResult.body.title, "Turno Guardia Actual");
-      shiftId = createResult.body.id;
+      assert.equal(createResult.status, 400);
+      assert.equal(
+        createResult.body.message,
+        "backup_assigned_user_id is invalid or inactive",
+      );
+
+      const validCreateResult = await harness.authedRequest(
+        adminUser,
+        "POST",
+        "/on-call-shifts",
+        {
+          body: {
+            title: "Turno Guardia Actual",
+            assigned_user_id: seededTech.id,
+            start_at: createLocalDateTimeString(activeStart),
+            end_at: createLocalDateTimeString(activeEnd),
+            notes: "Cobertura operativa",
+          },
+        },
+      );
+
+      assert.equal(validCreateResult.status, 201);
+      assert.equal(validCreateResult.body.title, "Turno Guardia Actual");
+      assert.equal(validCreateResult.body.assigned_user_id, seededTech.id);
+      assert.equal(validCreateResult.body.assigned_to, seededTech.name);
+      shiftId = validCreateResult.body.id;
 
       const currentResult = await harness.authedRequest(
         adminUser,
@@ -455,7 +478,7 @@ test("critical operational CRUD flows work against a temporary SQLite database",
       );
       assert.equal(currentResult.status, 200);
       assert.equal(currentResult.body.id, shiftId);
-      assert.equal(currentResult.body.assigned_to, "Tecnico 1");
+      assert.equal(currentResult.body.assigned_to, seededTech.name);
 
       const updateResult = await harness.authedRequest(
         adminUser,
@@ -464,8 +487,8 @@ test("critical operational CRUD flows work against a temporary SQLite database",
         {
           body: {
             title: "Turno Guardia Actualizado",
-            assigned_to: "Tecnico 2",
-            backup_assigned_to: "Tecnico 3",
+            assigned_user_id: seededTech.id,
+            backup_assigned_to: "Backup Legacy",
             start_at: createLocalDateTimeString(activeStart),
             end_at: createLocalDateTimeString(activeEnd),
             notes: "Cobertura ajustada",
@@ -475,7 +498,28 @@ test("critical operational CRUD flows work against a temporary SQLite database",
 
       assert.equal(updateResult.status, 200);
       assert.equal(updateResult.body.title, "Turno Guardia Actualizado");
-      assert.equal(updateResult.body.assigned_to, "Tecnico 2");
+      assert.equal(updateResult.body.assigned_to, seededTech.name);
+      assert.equal(updateResult.body.backup_assigned_to, "Backup Legacy");
+
+      const legacyCreateResult = await harness.authedRequest(
+        adminUser,
+        "POST",
+        "/on-call-shifts",
+        {
+          body: {
+            title: "Turno Legacy",
+            assigned_to: "Tecnico Historico",
+            backup_assigned_to: "Backup Historico",
+            start_at: "2026-02-10T08:00",
+            end_at: "2026-02-10T16:00",
+          },
+        },
+      );
+
+      assert.equal(legacyCreateResult.status, 201);
+      assert.equal(legacyCreateResult.body.assigned_user_id, null);
+      assert.equal(legacyCreateResult.body.assigned_to, "Tecnico Historico");
+      assert.equal(legacyCreateResult.body.backup_assigned_to, "Backup Historico");
     },
   );
 

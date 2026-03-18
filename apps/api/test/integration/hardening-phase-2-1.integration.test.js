@@ -226,7 +226,7 @@ test("Phase 2.1 hardening covers session edges, current authorization policy, an
         {
           body: {
             title: "Tech Shift",
-            assigned_to: "Tecnico 1",
+            assigned_user_id: seededTech.id,
             start_at: "2026-03-14T08:00",
             end_at: "2026-03-14T16:00",
           },
@@ -421,7 +421,7 @@ test("Phase 2.1 hardening covers session edges, current authorization policy, an
         {
           body: {
             title: "Blocked Tech Shift",
-            assigned_to: "Tecnico 1",
+            assigned_user_id: seededTech.id,
             start_at: "2026-03-14T08:00",
             end_at: "2026-03-14T16:00",
           },
@@ -462,7 +462,7 @@ test("Phase 2.1 hardening covers session edges, current authorization policy, an
         {
           body: {
             title: "Admin Shift",
-            assigned_to: "Tecnico 1",
+            assigned_user_id: seededTech.id,
             start_at: "2026-03-15T08:00",
             end_at: "2026-03-15T16:00",
           },
@@ -821,7 +821,7 @@ test("Phase 2.1 hardening covers session edges, current authorization policy, an
         {
           body: {
             title: "Invalid shift date",
-            assigned_to: "Tecnico 1",
+            assigned_user_id: seededTech.id,
             start_at: "14-03-2026 09:00",
             end_at: "2026-03-14T17:00",
           },
@@ -833,7 +833,28 @@ test("Phase 2.1 hardening covers session edges, current authorization policy, an
         /Field 'start_at' has invalid format/,
       );
 
-      const blankAssignedTo = await harness.authedRequest(
+      const invalidAssignableUser = await harness.authedRequest(
+        adminUser,
+        "POST",
+        "/on-call-shifts",
+        {
+          body: {
+            title: "Invalid on-call user",
+            assigned_user_id: seededAdmin.id,
+            start_at: createLocalDateTimeString(
+              new Date("2026-03-14T09:00:00"),
+            ),
+            end_at: createLocalDateTimeString(new Date("2026-03-14T17:00:00")),
+          },
+        },
+      );
+      assert.equal(invalidAssignableUser.status, 400);
+      assert.equal(
+        invalidAssignableUser.body.message,
+        "assigned_user_id is invalid or inactive",
+      );
+
+      const blankLegacyAndUser = await harness.authedRequest(
         adminUser,
         "POST",
         "/on-call-shifts",
@@ -848,10 +869,10 @@ test("Phase 2.1 hardening covers session edges, current authorization policy, an
           },
         },
       );
-      assert.equal(blankAssignedTo.status, 400);
-      assert.match(
-        blankAssignedTo.body.message,
-        /Field 'assigned_to' is required/,
+      assert.equal(blankLegacyAndUser.status, 400);
+      assert.equal(
+        blankLegacyAndUser.body.message,
+        "Either assigned_user_id or assigned_to is required",
       );
     },
   );

@@ -7,7 +7,9 @@ const router = express.Router();
 
 const shiftRules = [
   { field: 'title', required: true },
-  { field: 'assigned_to', required: true },
+  { field: 'assigned_user_id', type: 'integer' },
+  { field: 'assigned_to' },
+  { field: 'backup_assigned_user_id', type: 'integer' },
   { field: 'backup_assigned_to' },
   {
     field: 'start_at',
