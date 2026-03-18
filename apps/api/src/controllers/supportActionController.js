@@ -1,6 +1,10 @@
+const { execFile } = require('child_process');
+const { promisify } = require('util');
 const { httpError } = require('../utils/httpError');
 const { isPrivateIpv4 } = require('../middleware/security');
 const { logger } = require('../utils/logger');
+
+const execFileAsync = promisify(execFile);
 
 function isInternalPingTarget(value) {
   const normalized = String(value || '').trim().toLowerCase();
