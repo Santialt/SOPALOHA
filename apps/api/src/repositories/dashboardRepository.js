@@ -20,6 +20,76 @@ function getIncidentStatusTotals() {
   };
 }
 
+function getTaskStatusTotals() {
+  const row = db
+    .prepare(
+      `
+      SELECT
+        COUNT(*) AS total,
+        SUM(CASE WHEN status IN ('pending', 'in_progress', 'blocked') THEN 1 ELSE 0 END) AS open,
+        SUM(CASE WHEN status IN ('done', 'cancelled') THEN 1 ELSE 0 END) AS closed
+      FROM tasks
+    `
+    )
+    .get();
+
+  return {
+    total: row?.total || 0,
+    open: row?.open || 0,
+    closed: row?.closed || 0
+  };
+}
+
+function findOpenTasksWithDueDatePreview(today, limit = 5) {
+  return db
+    .prepare(
+      `
+      SELECT
+        tasks.id,
+        tasks.title,
+        tasks.status,
+        tasks.priority,
+        tasks.due_date,
+        tasks.location_id,
+        locations.name AS location_name
+      FROM tasks
+      LEFT JOIN locations ON locations.id = tasks.location_id
+      WHERE tasks.status IN ('pending', 'in_progress', 'blocked')
+        AND tasks.due_date IS NOT NULL
+        AND trim(tasks.due_date) <> ''
+      ORDER BY
+        CASE WHEN date(tasks.due_date) < date(@today) THEN 0 ELSE 1 END ASC,
+        date(tasks.due_date) ASC,
+        tasks.id DESC
+      LIMIT @limit
+    `
+    )
+    .all({ today, limit });
+}
+
+function findOpenTasksWithoutDueDatePreview(limit = 5) {
+  return db
+    .prepare(
+      `
+      SELECT
+        tasks.id,
+        tasks.title,
+        tasks.status,
+        tasks.priority,
+        tasks.due_date,
+        tasks.location_id,
+        locations.name AS location_name
+      FROM tasks
+      LEFT JOIN locations ON locations.id = tasks.location_id
+      WHERE tasks.status IN ('pending', 'in_progress', 'blocked')
+        AND (tasks.due_date IS NULL OR trim(tasks.due_date) = '')
+      ORDER BY tasks.id DESC
+      LIMIT @limit
+    `
+    )
+    .all({ limit });
+}
+
 function getImportedCaseTotals() {
   const row = db
     .prepare(
@@ -104,6 +174,9 @@ function findIncidentCategoryBreakdownByMonthStart(sinceDate) {
 
 module.exports = {
   getIncidentStatusTotals,
+  getTaskStatusTotals,
+  findOpenTasksWithDueDatePreview,
+  findOpenTasksWithoutDueDatePreview,
   getImportedCaseTotals,
   findTopIncidentLocationsByMonthStart,
   findIncidentCategoryBreakdownByMonthStart

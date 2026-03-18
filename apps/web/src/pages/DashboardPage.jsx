@@ -27,6 +27,37 @@ function formatWindowStart(value) {
   return date.toLocaleDateString('es-AR');
 }
 
+const TASK_STATUS_LABELS = {
+  pending: 'Pendiente',
+  in_progress: 'En progreso',
+  blocked: 'Bloqueada',
+  done: 'Resuelta',
+  cancelled: 'Cancelada'
+};
+
+function formatTaskStatus(status) {
+  return TASK_STATUS_LABELS[status] || status || '-';
+}
+
+function formatTaskDueDate(value) {
+  if (!value) return 'Sin vencimiento';
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString('es-AR');
+}
+
+function getTaskDueTone(value) {
+  if (!value) return 'neutral';
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const dueDate = new Date(`${value}T00:00:00`);
+
+  if (Number.isNaN(dueDate.getTime())) return 'neutral';
+  if (dueDate < today) return 'danger';
+  if (dueDate.getTime() === today.getTime()) return 'warning';
+  return 'neutral';
+}
+
 function HorizontalBarChart({ items, valueKey, labelKey, emptyLabel }) {
   const maxValue = items.reduce((highest, item) => Math.max(highest, Number(item[valueKey] || 0)), 0);
 
@@ -64,10 +95,15 @@ function DashboardPage() {
     locations: 0,
     incidents: 0,
     tasks: 0,
+    taskMetrics: {
+      totalTasks: 0,
+      openTasks: 0,
+      closedTasks: 0,
+      urgentTasksPreview: [],
+      urgentTasksPreviewMode: 'due_date'
+    },
     incidentMetrics: {
       totalCases: 0,
-      resolvedCases: 0,
-      inProgressCases: 0,
       lastMonthWindow: { days: 30, since: '' },
       topLocations: [],
       categoryBreakdown: [],
@@ -105,7 +141,9 @@ function DashboardPage() {
   if (loading) return <LoadingBlock label="Cargando dashboard..." />;
 
   const incidentMetrics = stats.incidentMetrics || {};
+  const taskMetrics = stats.taskMetrics || {};
   const topLocations = incidentMetrics.topLocations || [];
+  const urgentTasksPreview = taskMetrics.urgentTasksPreview || [];
   const categoryBreakdown = (incidentMetrics.categoryBreakdown || []).map((item) => ({
     ...item,
     label: formatCategory(item.category)
@@ -139,26 +177,25 @@ function DashboardPage() {
               label="Casos totales"
               value={incidentMetrics.totalCases ?? stats.incidents}
               tone="primary"
-              helper="Base total de incidentes registrados"
+              helper="Incidentes + imported cases no vinculados"
             />
             <StatCard
-              label="Casos cerrados totales"
-              value={incidentMetrics.resolvedCases ?? 0}
-              tone="success"
-              helper="Total historico con estado cerrado"
-            />
-            <StatCard
-              label="Casos abiertos actuales"
-              value={incidentMetrics.inProgressCases ?? 0}
-              tone="warning"
-              helper="Total actual con estado activo"
-            />
-            <StatCard
-              label="Locales registrados"
-              value={stats.locations}
+              label="Tareas totales"
+              value={taskMetrics.totalTasks ?? stats.tasks}
               tone="neutral"
-              helper="Locales registrados"
-              accent={`${stats.tasks} tareas operativas totales`}
+              helper="Base total de tareas operativas"
+            />
+            <StatCard
+              label="Tareas abiertas"
+              value={taskMetrics.openTasks ?? 0}
+              tone="warning"
+              helper="pending + in_progress + blocked"
+            />
+            <StatCard
+              label="Tareas cerradas"
+              value={taskMetrics.closedTasks ?? 0}
+              tone="success"
+              helper="done + cancelled"
             />
           </div>
         </div>
@@ -206,10 +243,37 @@ function DashboardPage() {
         <article className="section-card">
           <div className="section-head">
             <div>
-              <h2>Lectura rapida</h2>
-              <small className="panel-caption">Contexto operativo sin duplicar KPIs principales</small>
+              <h2>Tareas urgentes o proximas a vencer</h2>
+              <small className="panel-caption">
+                Solo tareas abiertas. Si hay vencimiento definido, se muestran primero las vencidas y luego las proximas.
+              </small>
             </div>
           </div>
+          {urgentTasksPreview.length ? (
+            <div className="dashboard-task-preview-list">
+              {urgentTasksPreview.map((task) => {
+                const dueTone = getTaskDueTone(task.due_date);
+
+                return (
+                  <Link key={task.id} to="/tasks" className="dashboard-task-preview-item">
+                    <div className="dashboard-task-preview-head">
+                      <strong>{task.title}</strong>
+                      <span className={`dashboard-task-preview-due tone-${dueTone}`}>
+                        {formatTaskDueDate(task.due_date)}
+                      </span>
+                    </div>
+                    <div className="dashboard-task-preview-meta">
+                      <span>{formatTaskStatus(task.status)}</span>
+                      <span>{task.location_name || 'Sin local'}</span>
+                      <span>{task.priority || 'medium'}</span>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="dashboard-empty-state">No hay tareas abiertas para priorizar en el dashboard.</div>
+          )}
           <div className="dashboard-brief-grid">
             <div className="dashboard-brief-card">
               <span>Ventana analitica desde</span>
@@ -217,14 +281,18 @@ function DashboardPage() {
               <small>Fecha base usada para rankings y clasificacion reciente.</small>
             </div>
             <div className="dashboard-brief-card">
-              <span>Estado activo usado</span>
-              <strong>{incidentMetrics.activeStatusKey || 'open'}</strong>
-              <small>Referencia tecnica para interpretar los casos en progreso.</small>
+              <span>Locales registrados</span>
+              <strong>{stats.locations}</strong>
+              <small>Base actual de locales disponibles en SOPALOHA.</small>
             </div>
             <div className="dashboard-brief-card">
-              <span>Clasificacion disponible</span>
-              <strong>category</strong>
-              <small>Se usa para detectar volumen y repeticion por tipo de incidente.</small>
+              <span>Modo del preview</span>
+              <strong>
+                {taskMetrics.urgentTasksPreviewMode === 'undated' ? 'Sin fecha' : 'Por vencimiento'}
+              </strong>
+              <small>
+                Las tareas sin `due_date` solo aparecen si no existen abiertas con vencimiento.
+              </small>
             </div>
           </div>
         </article>
