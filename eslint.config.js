@@ -13,6 +13,7 @@ const webLegacyNoUnusedVarsFiles = [
   "apps/web/src/components/ProtectedRoute.jsx",
   "apps/web/src/pages/DashboardPage.jsx",
   "apps/web/src/pages/IncidentsPage.jsx",
+  "apps/web/src/pages/AlohaMasterPage.jsx",
   "apps/web/src/pages/LocationDetailPage.jsx",
   "apps/web/src/pages/LocationsPage.jsx",
   "apps/web/src/pages/LoginPage.jsx",

@@ -39,6 +39,7 @@ function runMigrations() {
   ensureColumn("locations", "cmc", "TEXT");
   ensureColumn("locations", "fecha_apertura", "TEXT");
   ensureColumn("locations", "fecha_cierre", "TEXT");
+  ensureColumn("locations", "country", "TEXT");
 
   ensureColumn("devices", "windows_version", "TEXT");
   ensureColumn("devices", "ram_gb", "REAL");

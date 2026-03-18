@@ -16,6 +16,7 @@ const initialForm = {
   version_modulo_fiscal: '',
   usa_nbo: false,
   city: '',
+  country: '',
   address: '',
   phone: '',
   cantidad_licencias_aloha: '',
@@ -31,7 +32,20 @@ const initialForm = {
 function mapLocationToForm(location) {
   return {
     ...initialForm,
-    ...location,
+    name: location.name || '',
+    company_name: location.company_name || '',
+    razon_social: location.razon_social || '',
+    cuit: location.cuit || '',
+    llave_aloha: location.llave_aloha || '',
+    version_aloha: location.version_aloha || '',
+    version_modulo_fiscal: location.version_modulo_fiscal || '',
+    country: location.country || '',
+    city: location.city || '',
+    address: location.address || '',
+    phone: location.phone || '',
+    cmc: location.cmc || '',
+    status: location.status || 'abierto',
+    notes: location.notes || '',
     usa_nbo: Boolean(location.usa_nbo),
     tiene_kitchen: Boolean(location.tiene_kitchen),
     usa_insight_pulse: Boolean(location.usa_insight_pulse),
@@ -98,6 +112,7 @@ function LocationsPage() {
         location.llave_aloha,
         location.version_aloha,
         location.city,
+        location.country,
         location.address,
         location.phone,
         location.cmc
@@ -370,6 +385,15 @@ function LocationsPage() {
               className="input"
               value={form.city}
               onChange={(event) => setForm({ ...form, city: event.target.value })}
+            />
+          </label>
+
+          <label>
+            Pais
+            <input
+              className="input"
+              value={form.country}
+              onChange={(event) => setForm({ ...form, country: event.target.value })}
             />
           </label>
 

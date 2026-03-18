@@ -18,6 +18,7 @@ const defaultLocationForm = {
   usa_nbo: false,
   address: '',
   city: '',
+  country: '',
   phone: '',
   cantidad_licencias_aloha: '',
   tiene_kitchen: false,
@@ -77,6 +78,7 @@ function mapLocationToForm(location) {
     version_modulo_fiscal: location.version_modulo_fiscal || '',
     address: location.address || '',
     city: location.city || '',
+    country: location.country || '',
     phone: location.phone || '',
     cmc: location.cmc || '',
     notes: location.notes || '',
@@ -477,6 +479,14 @@ function LocationDetailPage() {
               className="input"
               value={locationForm.city || ''}
               onChange={(event) => setLocationForm({ ...locationForm, city: event.target.value })}
+            />
+          </label>
+          <label>
+            Pais
+            <input
+              className="input"
+              value={locationForm.country || ''}
+              onChange={(event) => setLocationForm({ ...locationForm, country: event.target.value })}
             />
           </label>
           <label>
