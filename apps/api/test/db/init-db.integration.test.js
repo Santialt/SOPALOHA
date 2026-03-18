@@ -104,7 +104,9 @@ test("SQLite initialization is idempotent and upgrades a legacy schema safely", 
   const importedCaseColumns = db
     .prepare("PRAGMA table_info(teamviewer_imported_cases)")
     .all();
-  const onCallShiftColumns = db.prepare("PRAGMA table_info(on_call_shifts)").all();
+  const onCallShiftColumns = db
+    .prepare("PRAGMA table_info(on_call_shifts)")
+    .all();
 
   assert.ok(locationColumns.some((column) => column.name === "llave_aloha"));
   assert.ok(locationColumns.some((column) => column.name === "usa_nbo"));
@@ -120,7 +122,9 @@ test("SQLite initialization is idempotent and upgrades a legacy schema safely", 
     onCallShiftColumns.some((column) => column.name === "assigned_user_id"),
   );
   assert.ok(
-    onCallShiftColumns.some((column) => column.name === "backup_assigned_user_id"),
+    onCallShiftColumns.some(
+      (column) => column.name === "backup_assigned_user_id",
+    ),
   );
 
   const legacyDevice = db

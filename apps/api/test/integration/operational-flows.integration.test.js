@@ -519,7 +519,10 @@ test("critical operational CRUD flows work against a temporary SQLite database",
       assert.equal(legacyCreateResult.status, 201);
       assert.equal(legacyCreateResult.body.assigned_user_id, null);
       assert.equal(legacyCreateResult.body.assigned_to, "Tecnico Historico");
-      assert.equal(legacyCreateResult.body.backup_assigned_to, "Backup Historico");
+      assert.equal(
+        legacyCreateResult.body.backup_assigned_to,
+        "Backup Historico",
+      );
     },
   );
 
