@@ -299,24 +299,54 @@ test("GET /dashboard/summary returns operational dashboard metrics without infer
     assert.equal(result.body.taskMetrics.closedTasks, 2);
     assert.equal(result.body.taskMetrics.urgentTasksPreviewMode, "due_date");
     assert.equal(result.body.taskMetrics.urgentTasksPreview.length, 2);
-    assert.equal(result.body.taskMetrics.urgentTasksPreview[0].title, "Resolver fiscal vencida");
-    assert.equal(result.body.taskMetrics.urgentTasksPreview[0].status, "pending");
-    assert.equal(result.body.taskMetrics.urgentTasksPreview[0].priority, "critical");
+    assert.equal(
+      result.body.taskMetrics.urgentTasksPreview[0].title,
+      "Resolver fiscal vencida",
+    );
+    assert.equal(
+      result.body.taskMetrics.urgentTasksPreview[0].status,
+      "pending",
+    );
+    assert.equal(
+      result.body.taskMetrics.urgentTasksPreview[0].priority,
+      "critical",
+    );
     assert.equal(
       result.body.taskMetrics.urgentTasksPreview[0].due_date,
       formatDateOnly(new Date(now.getTime() - 86400000)),
     );
-    assert.equal(result.body.taskMetrics.urgentTasksPreview[0].location_id, locationA);
-    assert.equal(result.body.taskMetrics.urgentTasksPreview[0].location_name, "Local Centro");
-    assert.equal(result.body.taskMetrics.urgentTasksPreview[1].title, "Validar router");
-    assert.equal(result.body.taskMetrics.urgentTasksPreview[1].status, "in_progress");
-    assert.equal(result.body.taskMetrics.urgentTasksPreview[1].priority, "high");
+    assert.equal(
+      result.body.taskMetrics.urgentTasksPreview[0].location_id,
+      locationA,
+    );
+    assert.equal(
+      result.body.taskMetrics.urgentTasksPreview[0].location_name,
+      "Local Centro",
+    );
+    assert.equal(
+      result.body.taskMetrics.urgentTasksPreview[1].title,
+      "Validar router",
+    );
+    assert.equal(
+      result.body.taskMetrics.urgentTasksPreview[1].status,
+      "in_progress",
+    );
+    assert.equal(
+      result.body.taskMetrics.urgentTasksPreview[1].priority,
+      "high",
+    );
     assert.equal(
       result.body.taskMetrics.urgentTasksPreview[1].due_date,
       formatDateOnly(new Date(now.getTime() + 86400000)),
     );
-    assert.equal(result.body.taskMetrics.urgentTasksPreview[1].location_id, locationB);
-    assert.equal(result.body.taskMetrics.urgentTasksPreview[1].location_name, "Local Norte");
+    assert.equal(
+      result.body.taskMetrics.urgentTasksPreview[1].location_id,
+      locationB,
+    );
+    assert.equal(
+      result.body.taskMetrics.urgentTasksPreview[1].location_name,
+      "Local Norte",
+    );
     assert.equal(result.body.incidentMetrics.lastMonthWindow.days, 30);
     assert.equal(result.body.incidentMetrics.topLocations.length, 2);
     assert.deepEqual(result.body.incidentMetrics.topLocations[0], {
@@ -391,7 +421,10 @@ test("GET /dashboard/summary falls back to undated open tasks when no open task 
     assert.equal(result.body.taskMetrics.closedTasks, 0);
     assert.equal(result.body.taskMetrics.urgentTasksPreviewMode, "undated");
     assert.equal(result.body.taskMetrics.urgentTasksPreview.length, 1);
-    assert.equal(result.body.taskMetrics.urgentTasksPreview[0].title, "Tarea abierta sin fecha");
+    assert.equal(
+      result.body.taskMetrics.urgentTasksPreview[0].title,
+      "Tarea abierta sin fecha",
+    );
     assert.equal(result.body.taskMetrics.urgentTasksPreview[0].due_date, null);
   } finally {
     await harness.stop();
