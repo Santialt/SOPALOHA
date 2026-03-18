@@ -358,26 +358,9 @@ test("GET /dashboard/summary returns operational dashboard metrics without infer
       category: "aloha",
       incidentCount: 2,
     });
-  } finally {
-    await harness.stop();
-  }
-});
 
-test("GET /dashboard/summary falls back to undated open tasks when no open task has due_date", async () => {
-  const harness = createApiHarness({ prefix: "sopaloha-dashboard-undated-" });
-
-  try {
-    await harness.start();
-
-    const credentials = {
-      name: "Dashboard Tech",
-      email: "dashboard-undated@example.com",
-      password: "Secret123!",
-      role: "admin",
-    };
-    const user = harness.seedUser(credentials);
-
-    const locationId = harness.db
+    harness.db.prepare("DELETE FROM tasks").run();
+    const locationC = harness.db
       .prepare(
         `INSERT INTO locations (name, status) VALUES ('Local Sur', 'active')`,
       )
@@ -394,7 +377,7 @@ test("GET /dashboard/summary falls back to undated open tasks when no open task 
       .run(
         "Tarea abierta sin fecha",
         "Detalle",
-        locationId,
+        locationC,
         "blocked",
         "high",
         null,
@@ -403,29 +386,29 @@ test("GET /dashboard/summary falls back to undated open tasks when no open task 
         user.id,
       );
 
-    const loginResult = await harness.login(
-      credentials.email,
-      credentials.password,
-    );
-    assert.equal(loginResult.status, 200);
-
-    const result = await harness.requestWithSession(
+    const undatedResult = await harness.requestWithSession(
       "GET",
       "/dashboard/summary",
       loginResult.sessionCookie,
     );
 
-    assert.equal(result.status, 200);
-    assert.equal(result.body.taskMetrics.totalTasks, 1);
-    assert.equal(result.body.taskMetrics.openTasks, 1);
-    assert.equal(result.body.taskMetrics.closedTasks, 0);
-    assert.equal(result.body.taskMetrics.urgentTasksPreviewMode, "undated");
-    assert.equal(result.body.taskMetrics.urgentTasksPreview.length, 1);
+    assert.equal(undatedResult.status, 200);
+    assert.equal(undatedResult.body.taskMetrics.totalTasks, 1);
+    assert.equal(undatedResult.body.taskMetrics.openTasks, 1);
+    assert.equal(undatedResult.body.taskMetrics.closedTasks, 0);
     assert.equal(
-      result.body.taskMetrics.urgentTasksPreview[0].title,
+      undatedResult.body.taskMetrics.urgentTasksPreviewMode,
+      "undated",
+    );
+    assert.equal(undatedResult.body.taskMetrics.urgentTasksPreview.length, 1);
+    assert.equal(
+      undatedResult.body.taskMetrics.urgentTasksPreview[0].title,
       "Tarea abierta sin fecha",
     );
-    assert.equal(result.body.taskMetrics.urgentTasksPreview[0].due_date, null);
+    assert.equal(
+      undatedResult.body.taskMetrics.urgentTasksPreview[0].due_date,
+      null,
+    );
   } finally {
     await harness.stop();
   }
