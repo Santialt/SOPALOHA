@@ -366,32 +366,32 @@ test("TeamViewer backend hardening covers preview, import, degradation, and rout
         techUser,
         "POST",
         "/teamviewer/imported-cases",
-          {
-            body: {
-              started_at: "2026-03-11T09:00:00Z",
-              ended_at: "2026-03-11T09:10:00Z",
-              technician_user_id: techUserRecord.id,
-              teamviewer_group_name: "Local Reused",
-              note_raw: "Impresora sin papel - Sofia",
-            },
+        {
+          body: {
+            started_at: "2026-03-11T09:00:00Z",
+            ended_at: "2026-03-11T09:10:00Z",
+            technician_user_id: techUserRecord.id,
+            teamviewer_group_name: "Local Reused",
+            note_raw: "Impresora sin papel - Sofia",
           },
-        );
+        },
+      );
       assert.equal(manualCase.status, 403);
 
       const adminManualCase = await harness.authedRequest(
         adminUser,
         "POST",
         "/teamviewer/imported-cases",
-          {
-            body: {
-              started_at: "2026-03-11T09:00:00Z",
-              ended_at: "2026-03-11T09:10:00Z",
-              technician_user_id: techUserRecord.id,
-              teamviewer_group_name: "Local Reused",
-              note_raw: "Impresora sin papel - Sofia",
-            },
+        {
+          body: {
+            started_at: "2026-03-11T09:00:00Z",
+            ended_at: "2026-03-11T09:10:00Z",
+            technician_user_id: techUserRecord.id,
+            teamviewer_group_name: "Local Reused",
+            note_raw: "Impresora sin papel - Sofia",
           },
-        );
+        },
+      );
       assert.equal(adminManualCase.status, 201);
       assert.equal(adminManualCase.body.teamviewer_group_name, "Local Reused");
       assert.equal(adminManualCase.body.technician_user_id, techUserRecord.id);
