@@ -44,15 +44,11 @@ function emptyForm() {
     title: '',
     description: '',
     location_id: '',
-    device_id: '',
-    incident_id: '',
     status: 'pending',
     priority: 'medium',
-    assigned_to: '',
     assigned_user_id: '',
     due_date: '',
-    scheduled_for: '',
-    task_type: 'general'
+    scheduled_for: ''
   };
 }
 
@@ -128,16 +124,19 @@ function buildTaskUpdatePayload(task, nextStatus) {
     title: task.title || '',
     description: task.description || null,
     location_id: task.location_id ?? null,
-    device_id: task.device_id ?? null,
-    incident_id: task.incident_id ?? null,
     status: nextStatus,
     priority: task.priority || 'medium',
-    assigned_to: task.assigned_to || null,
-    assigned_user_id: task.assigned_user_id ?? null,
     due_date: task.due_date || null,
-    scheduled_for: task.scheduled_for || null,
-    task_type: task.task_type || 'general'
+    scheduled_for: task.scheduled_for || null
   };
+}
+
+function getTaskAssigneeLabel(task) {
+  return task.assigned_user_name || task.assignment_display_name || task.assigned_to || '-';
+}
+
+function hasSelectableAssignedUser(task, users) {
+  return Boolean(task?.assigned_user_id && users.some((user) => user.id === task.assigned_user_id));
 }
 
 function TasksPage() {
@@ -159,9 +158,8 @@ function TasksPage() {
 
   const [tasks, setTasks] = useState([]);
   const [locations, setLocations] = useState([]);
-  const [devices, setDevices] = useState([]);
-  const [incidents, setIncidents] = useState([]);
   const [users, setUsers] = useState([]);
+  const [assignmentDirty, setAssignmentDirty] = useState(false);
 
   const [filters, setFilters] = useState({ status: '', priority: '', location_id: '' });
   const [form, setForm] = useState(emptyForm());
@@ -169,13 +167,19 @@ function TasksPage() {
     viewMode === 'kanban'
       ? { priority: filters.priority, location_id: filters.location_id }
       : filters;
+  const editingTask = useMemo(
+    () => tasks.find((task) => task.id === editingTaskId) || null,
+    [tasks, editingTaskId]
+  );
+  const editingTaskHistoricalAssignee =
+    editingTask && !hasSelectableAssignedUser(editingTask, users)
+      ? getTaskAssigneeLabel(editingTask)
+      : '';
 
   const { load, loading, error, setError } = useDataLoader(async () => {
     const requests = [
       api.getTasks(effectiveFilters),
       api.getLocations(),
-      api.getDevices(),
-      api.getIncidents(),
       api.getAssignableUsers()
     ];
 
@@ -183,12 +187,10 @@ function TasksPage() {
       requests.push(api.getTasks());
     }
 
-    const [tasksData, locationsData, devicesData, incidentsData, usersData, allTasksData = []] = await Promise.all(requests);
+    const [tasksData, locationsData, usersData, allTasksData = []] = await Promise.all(requests);
 
     setTasks(tasksData);
     setLocations(locationsData);
-    setDevices(devicesData);
-    setIncidents(incidentsData);
     setUsers(usersData);
     setCalendarUndatedTasks(
       viewMode === 'calendar' ? allTasksData.filter((task) => !toDateFromTask(task)) : []
@@ -202,15 +204,18 @@ function TasksPage() {
     setSuccess('');
 
     const payload = {
-      ...form,
+      title: form.title,
+      description: form.description,
       location_id: form.location_id ? Number(form.location_id) : null,
-      device_id: form.device_id ? Number(form.device_id) : null,
-      incident_id: form.incident_id ? Number(form.incident_id) : null,
-      assigned_user_id: form.assigned_user_id ? Number(form.assigned_user_id) : null,
+      status: form.status,
+      priority: form.priority,
       due_date: form.due_date || null,
-      scheduled_for: form.scheduled_for || null,
-      assigned_to: form.assigned_to || null
+      scheduled_for: form.scheduled_for || null
     };
+
+    if (!editingTaskId || assignmentDirty) {
+      payload.assigned_user_id = form.assigned_user_id ? Number(form.assigned_user_id) : null;
+    }
 
     try {
       if (editingTaskId) {
@@ -223,6 +228,7 @@ function TasksPage() {
 
       setEditingTaskId(null);
       setForm(emptyForm());
+      setAssignmentDirty(false);
       setSelectedTaskId(null);
       await load();
     } catch (err) {
@@ -240,22 +246,20 @@ function TasksPage() {
       title: task.title || '',
       description: task.description || '',
       location_id: task.location_id ? String(task.location_id) : '',
-      device_id: task.device_id ? String(task.device_id) : '',
-      incident_id: task.incident_id ? String(task.incident_id) : '',
       status: task.status || 'pending',
       priority: task.priority || 'medium',
-      assigned_to: task.assigned_to || '',
-      assigned_user_id: task.assigned_user_id ? String(task.assigned_user_id) : '',
+      assigned_user_id: hasSelectableAssignedUser(task, users) ? String(task.assigned_user_id) : '',
       due_date: task.due_date || '',
-      scheduled_for: normalizeDatetimeInput(task.scheduled_for),
-      task_type: task.task_type || 'general'
+      scheduled_for: normalizeDatetimeInput(task.scheduled_for)
     });
+    setAssignmentDirty(false);
     setSelectedTaskId(task.id);
   };
 
   const onCancelEdit = () => {
     setEditingTaskId(null);
     setForm(emptyForm());
+    setAssignmentDirty(false);
   };
 
   const onDelete = async (task) => {
@@ -271,6 +275,7 @@ function TasksPage() {
       if (editingTaskId === task.id) {
         setEditingTaskId(null);
         setForm(emptyForm());
+        setAssignmentDirty(false);
       }
       if (selectedTaskId === task.id) {
         setSelectedTaskId(null);
@@ -538,56 +543,15 @@ function TasksPage() {
           </label>
 
           <label>
-            Tipo de tarea
-            <input
-              className="input"
-              value={form.task_type}
-              onChange={(event) => setForm({ ...form, task_type: event.target.value })}
-            />
-          </label>
-
-          <label>
             Local
             <select
               className="input"
               value={form.location_id}
-              onChange={(event) => setForm({ ...form, location_id: event.target.value, device_id: '' })}
+              onChange={(event) => setForm({ ...form, location_id: event.target.value })}
             >
               <option value="">Sin local</option>
               {locations.map((location) => (
                 <option key={location.id} value={location.id}>{location.name}</option>
-              ))}
-            </select>
-          </label>
-
-          <label>
-            Dispositivo
-            <select
-              className="input"
-              value={form.device_id}
-              onChange={(event) => setForm({ ...form, device_id: event.target.value })}
-            >
-              <option value="">Sin dispositivo</option>
-              {devices
-                .filter((device) => !form.location_id || device.location_id === Number(form.location_id))
-                .map((device) => (
-                  <option key={device.id} value={device.id}>{device.name}</option>
-                ))}
-            </select>
-          </label>
-
-          <label>
-            Incidente
-            <select
-              className="input"
-              value={form.incident_id}
-              onChange={(event) => setForm({ ...form, incident_id: event.target.value })}
-            >
-              <option value="">Sin incidente</option>
-              {incidents.map((incident) => (
-                <option key={incident.id} value={incident.id}>
-                  #{incident.id} - {incident.title}
-                </option>
               ))}
             </select>
           </label>
@@ -598,12 +562,11 @@ function TasksPage() {
               className="input"
               value={form.assigned_user_id}
               onChange={(event) => {
-                const selectedUser = users.find((item) => item.id === Number(event.target.value));
                 setForm({
                   ...form,
-                  assigned_user_id: event.target.value,
-                  assigned_to: selectedUser?.name || ''
+                  assigned_user_id: event.target.value
                 });
+                setAssignmentDirty(true);
               }}
             >
               <option value="">Sin usuario</option>
@@ -612,15 +575,13 @@ function TasksPage() {
               ))}
             </select>
           </label>
-
-          <label>
-            Asignado a (texto legacy)
-            <input
-              className="input"
-              value={form.assigned_to}
-              onChange={(event) => setForm({ ...form, assigned_to: event.target.value })}
-            />
-          </label>
+          {editingTaskHistoricalAssignee && !assignmentDirty && !form.assigned_user_id && (
+            <div className="full-row">
+              <small className="panel-caption">
+                Asignacion historica actual: {editingTaskHistoricalAssignee}. Se conserva mientras no reasignes la tarea.
+              </small>
+            </div>
+          )}
 
           <label>
             Vence
@@ -771,7 +732,7 @@ function TasksPage() {
                             <span>{location?.name || 'Sin local'}</span>
                           </div>
                           <div className="kanban-card-meta">
-                            <span>Asignado: {task.assigned_to || '-'}</span>
+                            <span>Asignado: {getTaskAssigneeLabel(task)}</span>
                             <span>Vence: {task.due_date || '-'}</span>
                           </div>
                           <div className="kanban-card-actions">
@@ -962,7 +923,7 @@ function TasksPage() {
                       <td>{location?.name || '-'}</td>
                       <td><span className={`badge ${task.status}`}>{formatOperationalStatus(task.status)}</span></td>
                       <td><span className={`badge ${task.priority}`}>{task.priority}</span></td>
-                      <td>{task.assigned_to || '-'}</td>
+                      <td>{getTaskAssigneeLabel(task)}</td>
                       <td>{task.due_date || '-'}</td>
                       <td>{normalizeDatetimeInput(task.scheduled_for) || '-'}</td>
                       <td>
