@@ -430,7 +430,9 @@ test("TeamViewer backend hardening covers preview, import, degradation, and rout
       teamviewerFetch.reset();
 
       const locationId = harness.db
-        .prepare(`INSERT INTO locations (name, status) VALUES ('Estado TV Local', 'active')`)
+        .prepare(
+          `INSERT INTO locations (name, status) VALUES ('Estado TV Local', 'active')`,
+        )
         .run().lastInsertRowid;
 
       harness.db
