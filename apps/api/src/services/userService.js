@@ -57,6 +57,10 @@ function listAssignableUsers() {
   return userRepository.findAssignable();
 }
 
+function listActiveTechnicians() {
+  return userRepository.findActiveTechnicians();
+}
+
 function getUserById(id) {
   const user = userRepository.findById(id);
   if (!user) throw httpError(404, 'User not found');
@@ -153,6 +157,7 @@ module.exports = {
   allowedRoles,
   createUser,
   getUserById,
+  listActiveTechnicians,
   listAssignableUsers,
   listUsers,
   updateUser,

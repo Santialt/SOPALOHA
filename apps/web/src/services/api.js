@@ -156,6 +156,8 @@ export const api = {
       body: JSON.stringify(payload),
       timeoutMs: 60000
     }),
+  getTeamviewerImportedCaseCatalogs: () =>
+    request('/teamviewer/imported-cases/catalogs', { timeoutMs: 20000 }),
   getTeamviewerImportedCases: (filters = {}) =>
     request(`/teamviewer/imported-cases${buildQuery(filters)}`, { timeoutMs: 30000 }),
   getTeamviewerImportedCaseById: (id) => request(`/teamviewer/imported-cases/${id}`),

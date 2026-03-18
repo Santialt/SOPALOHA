@@ -75,7 +75,7 @@ test("TeamViewer backend hardening covers preview, import, degradation, and rout
 
   await harness.start();
   harness.seedUser(adminUser);
-  harness.seedUser(techUser);
+  const techUserRecord = harness.seedUser(techUser);
 
   t.after(async () => {
     global.fetch = realFetch;
@@ -345,6 +345,23 @@ test("TeamViewer backend hardening covers preview, import, degradation, and rout
         .sort();
       assert.deepEqual(resolvedNames, ["Local Nuevo", "Local Reused"]);
 
+      const catalogs = await harness.authedRequest(
+        techUser,
+        "GET",
+        "/teamviewer/imported-cases/catalogs",
+      );
+      assert.equal(catalogs.status, 200);
+      assert.ok(
+        catalogs.body.technicians.some(
+          (row) => row.email === techUser.email && row.role === "tech",
+        ),
+      );
+      assert.ok(
+        catalogs.body.teamviewer_groups.some(
+          (row) => row.group_name === "Local Reused",
+        ),
+      );
+
       const manualCase = await harness.authedRequest(
         techUser,
         "POST",
@@ -353,6 +370,7 @@ test("TeamViewer backend hardening covers preview, import, degradation, and rout
           body: {
             started_at: "2026-03-11T09:00:00Z",
             ended_at: "2026-03-11T09:10:00Z",
+            technician_user_id: techUserRecord.id,
             teamviewer_group_name: "Local Reused",
             note_raw: "Impresora sin papel - Sofia",
           },
@@ -368,6 +386,7 @@ test("TeamViewer backend hardening covers preview, import, degradation, and rout
           body: {
             started_at: "2026-03-11T09:00:00Z",
             ended_at: "2026-03-11T09:10:00Z",
+            technician_user_id: techUserRecord.id,
             teamviewer_group_name: "Local Reused",
             note_raw: "Impresora sin papel - Sofia",
           },
@@ -375,6 +394,19 @@ test("TeamViewer backend hardening covers preview, import, degradation, and rout
       );
       assert.equal(adminManualCase.status, 201);
       assert.equal(adminManualCase.body.teamviewer_group_name, "Local Reused");
+      assert.equal(adminManualCase.body.technician_user_id, techUserRecord.id);
+      assert.equal(adminManualCase.body.technician_user_name, techUser.name);
+      assert.equal(adminManualCase.body.technician_display_name, techUser.name);
+      assert.equal(adminManualCase.body.technician_username, techUser.email);
+
+      const filteredByTechnician = await harness.authedRequest(
+        techUser,
+        "GET",
+        `/teamviewer/imported-cases?from_date=2026-03-01&to_date=2026-03-31&technician_user_id=${techUserRecord.id}`,
+      );
+      assert.equal(filteredByTechnician.status, 200);
+      assert.equal(filteredByTechnician.body.length, 1);
+      assert.equal(filteredByTechnician.body[0].id, adminManualCase.body.id);
 
       const deleteManualCase = await harness.authedRequest(
         techUser,

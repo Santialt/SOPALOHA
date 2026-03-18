@@ -13,6 +13,7 @@ router.get('/devices/:teamviewerId', explorerController.getDevice);
 router.get('/import-preview', controller.getImportPreview);
 router.post('/import', requireAdmin, controller.postImport);
 router.post('/import-cases', requireAdmin, importedCaseController.importCases);
+router.get('/imported-cases/catalogs', importedCaseController.listImportedCaseCatalogs);
 router.get('/imported-cases', importedCaseController.listImportedCases);
 router.post('/imported-cases', requireAdmin, importedCaseController.createManualImportedCase);
 router.get('/imported-cases/:id', importedCaseController.getImportedCaseById);

@@ -19,6 +19,15 @@ function listImportedCases(req, res, next) {
   }
 }
 
+async function listImportedCaseCatalogs(req, res, next) {
+  try {
+    const payload = await service.listImportedCaseCatalogs();
+    return res.json(payload);
+  } catch (error) {
+    return next(error);
+  }
+}
+
 function getImportedCaseById(req, res, next) {
   try {
     const id = Number(req.params.id);
@@ -57,6 +66,7 @@ function deleteImportedCase(req, res, next) {
 module.exports = {
   importCases,
   listImportedCases,
+  listImportedCaseCatalogs,
   getImportedCaseById,
   createManualImportedCase,
   deleteImportedCase
