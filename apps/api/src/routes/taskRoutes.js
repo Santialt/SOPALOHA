@@ -6,13 +6,10 @@ const { validateBody } = require('../middleware/validate');
 
 const router = express.Router();
 
-const taskRules = [
+const activeTaskRules = [
   { field: 'title', required: true },
   { field: 'description' },
   { field: 'location_id', type: 'integer' },
-  { field: 'device_id', type: 'integer' },
-  { field: 'incident_id', type: 'integer' },
-  { field: 'assigned_to' },
   { field: 'assigned_user_id', type: 'integer' },
   { field: 'status', allowedValues: ['pending', 'in_progress', 'blocked', 'done', 'cancelled'] },
   { field: 'priority', allowedValues: ['low', 'medium', 'high', 'critical'] },
@@ -21,9 +18,17 @@ const taskRules = [
     field: 'scheduled_for',
     pattern: /^\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2})?)?$/,
     patternDescription: 'YYYY-MM-DD o YYYY-MM-DDTHH:MM'
-  },
+  }
+];
+
+const legacyCompatibilityTaskRules = [
+  { field: 'device_id', type: 'integer' },
+  { field: 'incident_id', type: 'integer' },
+  { field: 'assigned_to' },
   { field: 'task_type' }
 ];
+
+const taskRules = [...activeTaskRules, ...legacyCompatibilityTaskRules];
 
 router.get('/', requireRole('tech'), controller.getTasks);
 router.get('/:id', requireRole('tech'), controller.getTaskById);

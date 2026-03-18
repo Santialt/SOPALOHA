@@ -4,11 +4,42 @@ import InlineError from '../components/InlineError';
 import InlineSuccess from '../components/InlineSuccess';
 import LoadingBlock from '../components/LoadingBlock';
 import { api } from '../services/api';
+import { openTeamviewerOnClient } from '../utils/teamviewer';
 
 function formatLocationStatus(status) {
   if (status === 'inactive' || status === 'cerrado') return 'cerrado';
   if (status === 'active' || status === 'abierto') return 'abierto';
   return status || 'sin datos';
+}
+
+function formatRemoteStatus(status) {
+  const normalized = String(status || '').trim().toLowerCase();
+  if (normalized === 'online') return 'En linea';
+  if (normalized === 'offline') return 'Sin conexion';
+  return status || 'Sin datos';
+}
+
+function formatMatchStatus(sourceStatus) {
+  if (sourceStatus === 'linked') return 'Vinculado en SOPALOHA';
+  if (sourceStatus === 'pending_import') return 'Local detectado, equipo pendiente de importar';
+  if (sourceStatus === 'teamviewer_only') return 'Solo en TeamViewer';
+  return sourceStatus || 'Sin datos';
+}
+
+function formatDeviceRole(role) {
+  if (role === 'server') return 'Servidor';
+  if (role === 'pos') return 'Caja / POS';
+  if (role === 'other') return 'Otro equipo';
+  return role || 'Sin datos';
+}
+
+function formatBusinessBoolean(value) {
+  return value ? 'Si' : 'No';
+}
+
+function formatValue(value) {
+  if (value === null || value === undefined || value === '') return 'Sin datos';
+  return value;
 }
 
 function TeamViewerExplorerPage() {
@@ -156,14 +187,16 @@ function TeamViewerExplorerPage() {
     setSuccess('');
 
     try {
-      const result = await api.openTeamviewer(device.teamviewer_id);
-      if (result.skipped) {
-        setSuccess('Apertura omitida para evitar doble ejecucion.');
-      } else {
-        setSuccess(`TeamViewer lanzado por backend (${result.method}).`);
+      const result = openTeamviewerOnClient(device.teamviewer_id);
+      if (!result.ok) {
+        setError(result.message);
+        return;
       }
+      setSuccess(
+        'Se intento abrir TeamViewer en esta PC usando el deep link local. Si no se abre, verifica TeamViewer instalado y usa el ID copiado.'
+      );
     } catch (err) {
-      setError(err.message);
+      setError('No se pudo solicitar la apertura local de TeamViewer.');
     } finally {
       setRunningActionKey('');
     }
@@ -213,6 +246,8 @@ function TeamViewerExplorerPage() {
           <div className="key-value-inline">
             <small>Grupos: {explorer.summary.groups_total}</small>
             <small>Equipos: {explorer.summary.devices_total}</small>
+            <small>Locales vinculados: {explorer.summary.groups_linked_to_locations}</small>
+            <small>Equipos vinculados: {explorer.summary.devices_linked_to_sopaloha}</small>
           </div>
         </div>
         <div className="filter-row">
@@ -249,7 +284,7 @@ function TeamViewerExplorerPage() {
                   >
                     <strong>{group.group_name}</strong>
                     <small>
-                      {group.device_count} equipos | {group.location_name || 'sin location'}
+                      {group.device_count} equipos | {group.location_name || 'sin local vinculado'}
                     </small>
                   </button>
                 </div>
@@ -298,28 +333,23 @@ function TeamViewerExplorerPage() {
             <div>
               <h3>{selectedGroup.group_name}</h3>
               <div className="key-value-grid">
-                <div><strong>Group ID:</strong> {selectedGroup.group_id}</div>
-                <div><strong>Cantidad equipos:</strong> {selectedGroup.device_count}</div>
-                <div><strong>Location asociado:</strong> {selectedGroup.location_name || 'sin match'}</div>
+                <div><strong>ID de grupo:</strong> {selectedGroup.group_id}</div>
+                <div><strong>Equipos en el grupo:</strong> {selectedGroup.device_count}</div>
+                <div><strong>Estado de vinculacion:</strong> {formatMatchStatus(selectedGroup.source_status)}</div>
+                <div><strong>Local vinculado:</strong> {selectedGroup.location_name || 'Sin match'}</div>
               </div>
 
-              <h3>Ficha del local</h3>
+              <h3>Resumen operativo del local</h3>
               <div className="key-value-grid">
-                <div><strong>name:</strong> {locationForDetails?.name || 'sin datos'}</div>
-                <div><strong>company_name:</strong> {locationForDetails?.company_name || 'sin datos'}</div>
-                <div><strong>razon_social:</strong> {locationForDetails?.razon_social || 'sin datos'}</div>
-                <div><strong>cuit:</strong> {locationForDetails?.cuit || 'sin datos'}</div>
-                <div><strong>llave_aloha:</strong> {locationForDetails?.llave_aloha || 'sin datos'}</div>
-                <div><strong>version_aloha:</strong> {locationForDetails?.version_aloha || 'sin datos'}</div>
-                <div>
-                  <strong>version_modulo_fiscal:</strong>{' '}
-                  {locationForDetails?.version_modulo_fiscal || 'sin datos'}
-                </div>
-                <div><strong>usa_nbo:</strong> {locationForDetails ? (locationForDetails.usa_nbo ? 'si' : 'no') : 'sin datos'}</div>
-                <div><strong>address:</strong> {locationForDetails?.address || 'sin datos'}</div>
-                <div><strong>city:</strong> {locationForDetails?.city || 'sin datos'}</div>
-                <div><strong>phone:</strong> {locationForDetails?.phone || 'sin datos'}</div>
-                <div><strong>status:</strong> {formatLocationStatus(locationForDetails?.status)}</div>
+                <div><strong>Local:</strong> {formatValue(locationForDetails?.name)}</div>
+                <div><strong>Empresa:</strong> {formatValue(locationForDetails?.company_name)}</div>
+                <div><strong>Razon social:</strong> {formatValue(locationForDetails?.razon_social)}</div>
+                <div><strong>CUIT:</strong> {formatValue(locationForDetails?.cuit)}</div>
+                <div><strong>Direccion:</strong> {formatValue(locationForDetails?.address)}</div>
+                <div><strong>Ciudad:</strong> {formatValue(locationForDetails?.city)}</div>
+                <div><strong>Telefono:</strong> {formatValue(locationForDetails?.phone)}</div>
+                <div><strong>Estado del local:</strong> {formatLocationStatus(locationForDetails?.status)}</div>
+                <div><strong>Usa NBO:</strong> {locationForDetails ? formatBusinessBoolean(locationForDetails.usa_nbo) : 'Sin datos'}</div>
               </div>
 
               <div className="form-actions">
@@ -346,24 +376,24 @@ function TeamViewerExplorerPage() {
             <div>
               <h3>{selectedDevice.alias}</h3>
               <div className="key-value-grid">
-                <div><strong>TeamViewer ID:</strong> {selectedDevice.teamviewer_id || 'sin datos'}</div>
-                <div><strong>Estado:</strong> {selectedDevice.status || 'sin datos'}</div>
+                <div><strong>TeamViewer ID:</strong> {formatValue(selectedDevice.teamviewer_id)}</div>
+                <div><strong>Estado remoto:</strong> {formatRemoteStatus(selectedDevice.status)}</div>
                 <div><strong>Grupo:</strong> {selectedDevice.group_name}</div>
-                <div><strong>Location asociado:</strong> {selectedDevice.location_name || 'sin match'}</div>
-                <div><strong>device_role detectado:</strong> {selectedDevice.role_detected || 'other'}</div>
-                <div><strong>Origen:</strong> {selectedDevice.source_status}</div>
+                <div><strong>Local vinculado:</strong> {selectedDevice.location_name || 'Sin match'}</div>
+                <div><strong>Tipo estimado:</strong> {formatDeviceRole(selectedDevice.role_detected)}</div>
+                <div><strong>Estado de importacion:</strong> {formatMatchStatus(selectedDevice.source_status)}</div>
               </div>
 
-              <h3>Ficha de device (SQLite)</h3>
+              <h3>Equipo vinculado en SOPALOHA</h3>
               <div className="key-value-grid">
-                <div><strong>name:</strong> {linkedDevice?.name || 'sin datos'}</div>
-                <div><strong>device_role:</strong> {linkedDevice?.device_role || 'sin datos'}</div>
-                <div><strong>ip_address:</strong> {linkedDevice?.ip_address || 'sin datos'}</div>
-                <div><strong>windows_version:</strong> {linkedDevice?.windows_version || 'sin datos'}</div>
-                <div><strong>ram_gb:</strong> {linkedDevice?.ram_gb ?? 'sin datos'}</div>
-                <div><strong>cpu:</strong> {linkedDevice?.cpu || 'sin datos'}</div>
-                <div><strong>disk_type:</strong> {linkedDevice?.disk_type || 'sin datos'}</div>
-                <div><strong>notes:</strong> {linkedDevice?.notes || 'sin datos'}</div>
+                <div><strong>Nombre interno:</strong> {formatValue(linkedDevice?.name)}</div>
+                <div><strong>Tipo de equipo:</strong> {formatValue(linkedDevice?.device_role)}</div>
+                <div><strong>IP:</strong> {formatValue(linkedDevice?.ip_address)}</div>
+                <div><strong>Windows:</strong> {formatValue(linkedDevice?.windows_version)}</div>
+                <div><strong>Memoria RAM:</strong> {linkedDevice?.ram_gb ?? 'Sin datos'}</div>
+                <div><strong>Procesador:</strong> {formatValue(linkedDevice?.cpu)}</div>
+                <div><strong>Almacenamiento:</strong> {formatValue(linkedDevice?.disk_type)}</div>
+                <div><strong>Notas:</strong> {formatValue(linkedDevice?.notes)}</div>
               </div>
 
               <div className="form-actions">
@@ -378,7 +408,7 @@ function TeamViewerExplorerPage() {
                 >
                   {runningActionKey === `tv-${selectedDevice.group_id}:${selectedDevice.teamviewer_id}`
                     ? 'Abriendo...'
-                    : 'Abrir TeamViewer'}
+                    : 'Abrir en esta PC'}
                 </button>
                 <button type="button" className="btn-small" onClick={() => onCopyTeamviewerId(selectedDevice)}>
                   Copiar TeamViewer ID

@@ -14,8 +14,10 @@ const dayFormatter = new Intl.DateTimeFormat('es-AR', { day: '2-digit', month: '
 function emptyShiftForm() {
   return {
     title: '',
-    assigned_to: '',
-    backup_assigned_to: '',
+    assigned_user_id: '',
+    backup_assigned_user_id: '',
+    assigned_to_legacy: '',
+    backup_assigned_to_legacy: '',
     start_at: '',
     end_at: '',
     notes: ''
@@ -28,14 +30,6 @@ function emptyTemplateForm() {
     start_time: '09:00',
     end_time: '18:00',
     crosses_to_next_day: false
-  };
-}
-
-function emptyTechnicianForm() {
-  return {
-    name: '',
-    is_active: true,
-    notes: ''
   };
 }
 
@@ -125,34 +119,60 @@ function toDateTimeParts(value) {
   };
 }
 
+function getShiftPrimaryLabel(shift) {
+  return shift?.assigned_user_name || shift?.assigned_to || '-';
+}
+
+function getShiftBackupLabel(shift) {
+  return shift?.backup_assigned_user_name || shift?.backup_assigned_to || '';
+}
+
+function hasSelectableUser(shift, users, fieldName) {
+  const userId = shift?.[fieldName];
+  return Boolean(userId && users.some((user) => user.id === userId));
+}
+
 function OnCallPage() {
   const [shifts, setShifts] = useState([]);
   const [templates, setTemplates] = useState([]);
-  const [technicians, setTechnicians] = useState([]);
+  const [users, setUsers] = useState([]);
   const [currentShift, setCurrentShift] = useState(null);
   const [currentShiftError, setCurrentShiftError] = useState('');
   const [savingShift, setSavingShift] = useState(false);
   const [savingTemplate, setSavingTemplate] = useState(false);
-  const [savingTechnician, setSavingTechnician] = useState(false);
-  const [quickAssigning, setQuickAssigning] = useState(false);
+  const [calendarAssigning, setCalendarAssigning] = useState(false);
   const [deletingShiftId, setDeletingShiftId] = useState(null);
   const [editingShiftId, setEditingShiftId] = useState(null);
   const [editingTemplateId, setEditingTemplateId] = useState(null);
-  const [editingTechnicianId, setEditingTechnicianId] = useState(null);
   const [success, setSuccess] = useState('');
   const [shiftForm, setShiftForm] = useState(emptyShiftForm());
   const [templateForm, setTemplateForm] = useState(emptyTemplateForm());
-  const [technicianForm, setTechnicianForm] = useState(emptyTechnicianForm());
-  const [quickAssignPrincipal, setQuickAssignPrincipal] = useState('');
-  const [quickAssignBackup, setQuickAssignBackup] = useState('');
+  const [shiftPrincipalDirty, setShiftPrincipalDirty] = useState(false);
+  const [shiftBackupDirty, setShiftBackupDirty] = useState(false);
+  const [draggingUserId, setDraggingUserId] = useState(null);
+  const [dragMode, setDragMode] = useState('primary');
+  const [calendarDropSlotKey, setCalendarDropSlotKey] = useState('');
   const [calendarCursor, setCalendarCursor] = useState(() => startOfDay(new Date()));
+
+  const editingShift = useMemo(
+    () => shifts.find((shift) => shift.id === editingShiftId) || null,
+    [shifts, editingShiftId]
+  );
+  const editingShiftHistoricalPrimary =
+    editingShift && !hasSelectableUser(editingShift, users, 'assigned_user_id')
+      ? getShiftPrimaryLabel(editingShift)
+      : '';
+  const editingShiftHistoricalBackup =
+    editingShift && !hasSelectableUser(editingShift, users, 'backup_assigned_user_id')
+      ? getShiftBackupLabel(editingShift)
+      : '';
 
   const { load, loading, error, setError } = useDataLoader(async () => {
     setCurrentShiftError('');
-    const [shiftsData, templatesData, techniciansData, currentData] = await Promise.all([
+    const [shiftsData, templatesData, usersData, currentData] = await Promise.all([
       api.getOnCallShifts(),
       api.getOnCallTemplates(),
-      api.getOnCallTechnicians(),
+      api.getAssignableUsers({ role: 'tech' }),
       api.getCurrentOnCallShift().catch((err) => {
         setCurrentShiftError(err.message || 'No se pudo cargar la guardia actual');
         return null;
@@ -160,23 +180,41 @@ function OnCallPage() {
     ]);
     setShifts(shiftsData);
     setTemplates(templatesData);
-    setTechnicians(techniciansData);
+    setUsers(usersData);
     setCurrentShift(currentData);
   }, []);
 
-  const activeTechnicians = useMemo(
-    () => technicians.filter((tech) => tech.is_active).map((tech) => tech.name),
-    [technicians]
-  );
-
   useEffect(() => {
-    if (!quickAssignPrincipal && activeTechnicians.length > 0) {
-      setQuickAssignPrincipal(activeTechnicians[0]);
+    if (draggingUserId && !users.some((user) => user.id === draggingUserId)) {
+      setDraggingUserId(null);
     }
-    if (quickAssignBackup && !activeTechnicians.includes(quickAssignBackup)) {
-      setQuickAssignBackup('');
+  }, [draggingUserId, users]);
+
+  const buildShiftPayload = (formState = shiftForm) => {
+    const payload = {
+      title: formState.title,
+      start_at: formState.start_at,
+      end_at: formState.end_at,
+      notes: formState.notes || null
+    };
+
+    if (formState.assigned_user_id) {
+      payload.assigned_user_id = Number(formState.assigned_user_id);
+    } else if (editingShiftId && !shiftPrincipalDirty && formState.assigned_to_legacy) {
+      payload.assigned_to = formState.assigned_to_legacy;
     }
-  }, [activeTechnicians, quickAssignPrincipal, quickAssignBackup]);
+
+    if (formState.backup_assigned_user_id) {
+      payload.backup_assigned_user_id = Number(formState.backup_assigned_user_id);
+    } else if (editingShiftId && !shiftBackupDirty && formState.backup_assigned_to_legacy) {
+      payload.backup_assigned_to = formState.backup_assigned_to_legacy;
+    } else {
+      payload.backup_assigned_user_id = null;
+      payload.backup_assigned_to = null;
+    }
+
+    return payload;
+  };
 
   const onSubmitShift = async (event) => {
     event.preventDefault();
@@ -184,14 +222,7 @@ function OnCallPage() {
     setError('');
     setSuccess('');
 
-    const payload = {
-      title: shiftForm.title,
-      assigned_to: shiftForm.assigned_to,
-      backup_assigned_to: shiftForm.backup_assigned_to || null,
-      start_at: shiftForm.start_at,
-      end_at: shiftForm.end_at,
-      notes: shiftForm.notes || null
-    };
+    const payload = buildShiftPayload();
 
     try {
       if (editingShiftId) {
@@ -204,6 +235,8 @@ function OnCallPage() {
 
       setEditingShiftId(null);
       setShiftForm(emptyShiftForm());
+      setShiftPrincipalDirty(false);
+      setShiftBackupDirty(false);
       await load();
     } catch (err) {
       setError(err.message);
@@ -218,17 +251,25 @@ function OnCallPage() {
     setSuccess('');
     setShiftForm({
       title: shift.title || '',
-      assigned_to: shift.assigned_to || '',
-      backup_assigned_to: shift.backup_assigned_to || '',
+      assigned_user_id: hasSelectableUser(shift, users, 'assigned_user_id') ? String(shift.assigned_user_id) : '',
+      backup_assigned_user_id: hasSelectableUser(shift, users, 'backup_assigned_user_id')
+        ? String(shift.backup_assigned_user_id)
+        : '',
+      assigned_to_legacy: getShiftPrimaryLabel(shift) === '-' ? '' : getShiftPrimaryLabel(shift),
+      backup_assigned_to_legacy: getShiftBackupLabel(shift),
       start_at: normalizeDatetimeInput(shift.start_at),
       end_at: normalizeDatetimeInput(shift.end_at),
       notes: shift.notes || ''
     });
+    setShiftPrincipalDirty(false);
+    setShiftBackupDirty(false);
   };
 
   const onCancelShiftEdit = () => {
     setEditingShiftId(null);
     setShiftForm(emptyShiftForm());
+    setShiftPrincipalDirty(false);
+    setShiftBackupDirty(false);
   };
 
   const onSubmitTemplate = async (event) => {
@@ -280,41 +321,6 @@ function OnCallPage() {
     setTemplateForm(emptyTemplateForm());
   };
 
-  const onQuickAssignTemplate = async (day, template) => {
-    if (!quickAssignPrincipal) {
-      setError('Debes indicar tecnico principal para crear la guardia.');
-      return;
-    }
-    const notes = window.prompt('Notas (opcional)', '');
-
-    const dateKey = buildDayKey(day);
-    const endDate = template.crosses_to_next_day ? shiftDateByDays(dateKey, 1) : dateKey;
-
-    const payload = {
-      title: template.title,
-      assigned_to: quickAssignPrincipal,
-      backup_assigned_to:
-        quickAssignBackup && quickAssignBackup !== quickAssignPrincipal ? quickAssignBackup : null,
-      start_at: `${dateKey}T${template.start_time}`,
-      end_at: `${endDate}T${template.end_time}`,
-      notes: notes && notes.trim() ? notes.trim() : null
-    };
-
-    setQuickAssigning(true);
-    setError('');
-    setSuccess('');
-
-    try {
-      await api.createOnCallShift(payload);
-      setSuccess(`Guardia creada para ${template.title} el ${dateKey}.`);
-      await load();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setQuickAssigning(false);
-    }
-  };
-
   const findShiftForDayTemplate = (day, template) => {
     const dayKey = buildDayKey(day);
     const expectedEndDate = template.crosses_to_next_day ? shiftDateByDays(dayKey, 1) : dayKey;
@@ -336,6 +342,101 @@ function OnCallPage() {
     return matches.sort((a, b) => b.id - a.id)[0];
   };
 
+  const buildTemplateShiftPayload = (day, template, user) => {
+    const dateKey = buildDayKey(day);
+    const endDate = template.crosses_to_next_day ? shiftDateByDays(dateKey, 1) : dateKey;
+
+    return {
+      title: template.title,
+      assigned_user_id: user.id,
+      start_at: `${dateKey}T${template.start_time}`,
+      end_at: `${endDate}T${template.end_time}`,
+      notes: null
+    };
+  };
+
+  const buildExistingShiftPayload = (shift, overrides = {}) => {
+    const payload = {
+      title: overrides.title ?? shift.title ?? '',
+      start_at: overrides.start_at ?? normalizeDatetimeInput(shift.start_at),
+      end_at: overrides.end_at ?? normalizeDatetimeInput(shift.end_at),
+      notes: overrides.notes ?? shift.notes ?? null
+    };
+
+    if (Object.prototype.hasOwnProperty.call(overrides, 'assigned_user_id')) {
+      payload.assigned_user_id = overrides.assigned_user_id;
+    } else if (shift.assigned_user_id) {
+      payload.assigned_user_id = shift.assigned_user_id;
+    } else if (shift.assigned_to) {
+      payload.assigned_to = shift.assigned_to;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(overrides, 'backup_assigned_user_id')) {
+      payload.backup_assigned_user_id = overrides.backup_assigned_user_id;
+    } else if (shift.backup_assigned_user_id) {
+      payload.backup_assigned_user_id = shift.backup_assigned_user_id;
+    } else if (shift.backup_assigned_to) {
+      payload.backup_assigned_to = shift.backup_assigned_to;
+    } else {
+      payload.backup_assigned_user_id = null;
+      payload.backup_assigned_to = null;
+    }
+
+    return payload;
+  };
+
+  const applyCalendarDrop = async (day, template, draggedUserId) => {
+    const droppedUser = users.find((user) => user.id === draggedUserId);
+    if (!droppedUser) {
+      setError('El usuario seleccionado ya no esta disponible para guardias.');
+      return;
+    }
+
+    const shift = findShiftForDayTemplate(day, template);
+
+    if (dragMode === 'backup' && !shift) {
+      setError('Primero asigna un tecnico principal para ese turno.');
+      return;
+    }
+
+    if (
+      shift &&
+      ((dragMode === 'primary' && shift.backup_assigned_user_id === droppedUser.id) ||
+        (dragMode === 'backup' && shift.assigned_user_id === droppedUser.id))
+    ) {
+      setError('El backup debe ser distinto del tecnico principal.');
+      return;
+    }
+
+    setCalendarAssigning(true);
+    setCalendarDropSlotKey('');
+    setError('');
+    setSuccess('');
+
+    try {
+      if (shift) {
+        const payload =
+          dragMode === 'primary'
+            ? buildExistingShiftPayload(shift, { assigned_user_id: droppedUser.id })
+            : buildExistingShiftPayload(shift, { backup_assigned_user_id: droppedUser.id });
+        await api.updateOnCallShift(shift.id, payload);
+        setSuccess(
+          `Guardia #${shift.id} actualizada: ${dragMode === 'primary' ? 'principal' : 'backup'} ${droppedUser.name}.`
+        );
+      } else {
+        await api.createOnCallShift(buildTemplateShiftPayload(day, template, droppedUser));
+        setSuccess(`Guardia creada para ${template.title} el ${buildDayKey(day)}.`);
+      }
+
+      await load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setCalendarAssigning(false);
+      setDraggingUserId(null);
+    }
+  };
+
   const onDeleteShift = async (shift) => {
     const ok = window.confirm(`Eliminar la guardia "${shift.title}" (#${shift.id})?`);
     if (!ok) return;
@@ -349,6 +450,8 @@ function OnCallPage() {
       if (editingShiftId === shift.id) {
         setEditingShiftId(null);
         setShiftForm(emptyShiftForm());
+        setShiftPrincipalDirty(false);
+        setShiftBackupDirty(false);
       }
       setSuccess(`Guardia #${shift.id} eliminada.`);
       await load();
@@ -357,53 +460,6 @@ function OnCallPage() {
     } finally {
       setDeletingShiftId(null);
     }
-  };
-
-  const onSubmitTechnician = async (event) => {
-    event.preventDefault();
-    setSavingTechnician(true);
-    setError('');
-    setSuccess('');
-
-    const payload = {
-      name: technicianForm.name,
-      is_active: technicianForm.is_active,
-      notes: technicianForm.notes || null
-    };
-
-    try {
-      if (editingTechnicianId) {
-        await api.updateOnCallTechnician(editingTechnicianId, payload);
-        setSuccess(`Tecnico #${editingTechnicianId} actualizado.`);
-      } else {
-        await api.createOnCallTechnician(payload);
-        setSuccess('Tecnico creado.');
-      }
-
-      setEditingTechnicianId(null);
-      setTechnicianForm(emptyTechnicianForm());
-      await load();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSavingTechnician(false);
-    }
-  };
-
-  const onEditTechnician = (tech) => {
-    setEditingTechnicianId(tech.id);
-    setError('');
-    setSuccess('');
-    setTechnicianForm({
-      name: tech.name || '',
-      is_active: Boolean(tech.is_active),
-      notes: tech.notes || ''
-    });
-  };
-
-  const onCancelTechnicianEdit = () => {
-    setEditingTechnicianId(null);
-    setTechnicianForm(emptyTechnicianForm());
   };
 
   const calendarDays = useMemo(() => {
@@ -432,6 +488,33 @@ function OnCallPage() {
     setCalendarCursor(new Date(parsed.getFullYear(), parsed.getMonth(), 1));
   };
 
+  const onDragStartUser = (event, user) => {
+    setDraggingUserId(user.id);
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', String(user.id));
+  };
+
+  const onDragEndUser = () => {
+    setDraggingUserId(null);
+    setCalendarDropSlotKey('');
+  };
+
+  const onDragOverSlot = (event, slotKey) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    if (calendarDropSlotKey !== slotKey) {
+      setCalendarDropSlotKey(slotKey);
+    }
+  };
+
+  const onDropUserInSlot = async (event, day, template) => {
+    event.preventDefault();
+    const draggedUserId = Number(event.dataTransfer.getData('text/plain'));
+    setCalendarDropSlotKey('');
+    if (!Number.isInteger(draggedUserId)) return;
+    await applyCalendarDrop(day, template, draggedUserId);
+  };
+
   if (loading) return <LoadingBlock label="Cargando guardias..." />;
 
   return (
@@ -440,83 +523,9 @@ function OnCallPage() {
         <CurrentOnCallBlock shift={currentShift} error={currentShiftError} />
 
         <section className="section-card">
-          <h2>{editingTechnicianId ? `Editar tecnico #${editingTechnicianId}` : 'Tecnicos predefinidos'}</h2>
+          <h2>{editingTemplateId ? `Editar plantilla #${editingTemplateId}` : 'Plantillas de turno'}</h2>
           <InlineError message={error} />
           <InlineSuccess message={success} />
-
-          <form onSubmit={onSubmitTechnician} className="form-grid form-grid-3">
-            <label>
-              Nombre *
-              <input
-                className="input"
-                value={technicianForm.name}
-                onChange={(event) => setTechnicianForm({ ...technicianForm, name: event.target.value })}
-                required
-              />
-            </label>
-            <label className="on-call-checkbox">
-              <input
-                type="checkbox"
-                checked={technicianForm.is_active}
-                onChange={(event) =>
-                  setTechnicianForm({ ...technicianForm, is_active: event.target.checked })
-                }
-              />
-              Activo para asignacion
-            </label>
-            <label className="full-row">
-              Notas
-              <input
-                className="input"
-                value={technicianForm.notes}
-                onChange={(event) => setTechnicianForm({ ...technicianForm, notes: event.target.value })}
-              />
-            </label>
-            <div className="form-actions full-row">
-              <button type="submit" className="btn-primary" disabled={savingTechnician}>
-                {savingTechnician ? 'Guardando...' : editingTechnicianId ? 'Guardar tecnico' : 'Crear tecnico'}
-              </button>
-              {editingTechnicianId && (
-                <button type="button" className="btn-secondary" onClick={onCancelTechnicianEdit}>
-                  Cancelar
-                </button>
-              )}
-            </div>
-          </form>
-
-          <div className="table-wrap">
-            <table className="table compact">
-              <thead>
-                <tr>
-                  <th>Nombre</th>
-                  <th>Activo</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {technicians.map((tech) => (
-                  <tr key={tech.id}>
-                    <td>{tech.name}</td>
-                    <td>{tech.is_active ? 'Si' : 'No'}</td>
-                    <td>
-                      <button type="button" className="btn-secondary" onClick={() => onEditTechnician(tech)}>
-                        Editar
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {technicians.length === 0 && (
-                  <tr>
-                    <td colSpan="3" className="empty-row">Sin tecnicos</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <section className="section-card">
-          <h2>{editingTemplateId ? `Editar plantilla #${editingTemplateId}` : 'Plantillas de turno'}</h2>
 
           <form onSubmit={onSubmitTemplate} className="form-grid form-grid-3">
             <label>
@@ -623,17 +632,17 @@ function OnCallPage() {
               Responsable principal *
               <select
                 className="input"
-                value={shiftForm.assigned_to}
-                onChange={(event) => setShiftForm({ ...shiftForm, assigned_to: event.target.value })}
-                required
+                value={shiftForm.assigned_user_id}
+                onChange={(event) => {
+                  setShiftForm({ ...shiftForm, assigned_user_id: event.target.value });
+                  setShiftPrincipalDirty(true);
+                }}
+                required={!editingShiftHistoricalPrimary}
               >
-                <option value="">Seleccionar tecnico</option>
-                {activeTechnicians.map((name) => (
-                  <option key={name} value={name}>{name}</option>
+                <option value="">Seleccionar usuario tecnico</option>
+                {users.map((user) => (
+                  <option key={user.id} value={user.id}>{user.name}</option>
                 ))}
-                {shiftForm.assigned_to && !activeTechnicians.includes(shiftForm.assigned_to) && (
-                  <option value={shiftForm.assigned_to}>{shiftForm.assigned_to}</option>
-                )}
               </select>
             </label>
 
@@ -641,17 +650,16 @@ function OnCallPage() {
               Backup
               <select
                 className="input"
-                value={shiftForm.backup_assigned_to}
-                onChange={(event) => setShiftForm({ ...shiftForm, backup_assigned_to: event.target.value })}
+                value={shiftForm.backup_assigned_user_id}
+                onChange={(event) => {
+                  setShiftForm({ ...shiftForm, backup_assigned_user_id: event.target.value });
+                  setShiftBackupDirty(true);
+                }}
               >
                 <option value="">Sin backup</option>
-                {activeTechnicians.map((name) => (
-                  <option key={name} value={name}>{name}</option>
+                {users.map((user) => (
+                  <option key={user.id} value={user.id}>{user.name}</option>
                 ))}
-                {shiftForm.backup_assigned_to &&
-                  !activeTechnicians.includes(shiftForm.backup_assigned_to) && (
-                    <option value={shiftForm.backup_assigned_to}>{shiftForm.backup_assigned_to}</option>
-                  )}
               </select>
             </label>
 
@@ -676,6 +684,21 @@ function OnCallPage() {
                 required
               />
             </label>
+
+            {editingShiftHistoricalPrimary && !shiftPrincipalDirty && !shiftForm.assigned_user_id && (
+              <div className="full-row">
+                <small className="panel-caption">
+                  Asignacion historica actual: {editingShiftHistoricalPrimary}. Se conserva mientras no reasignes el principal.
+                </small>
+              </div>
+            )}
+            {editingShiftHistoricalBackup && !shiftBackupDirty && !shiftForm.backup_assigned_user_id && (
+              <div className="full-row">
+                <small className="panel-caption">
+                  Backup historico actual: {editingShiftHistoricalBackup}. Se conserva mientras no reasignes el backup.
+                </small>
+              </div>
+            )}
 
             <label className="full-row">
               Notas
@@ -722,8 +745,8 @@ function OnCallPage() {
                   <tr key={shift.id}>
                     <td>{shift.id}</td>
                     <td>{shift.title}</td>
-                    <td>{shift.assigned_to}</td>
-                    <td>{shift.backup_assigned_to || '-'}</td>
+                    <td>{getShiftPrimaryLabel(shift)}</td>
+                    <td>{getShiftBackupLabel(shift) || '-'}</td>
                     <td>{normalizeDatetimeInput(shift.start_at) || '-'}</td>
                     <td>{normalizeDatetimeInput(shift.end_at) || '-'}</td>
                     <td>
@@ -757,35 +780,46 @@ function OnCallPage() {
       <section className="section-card">
         <div className="section-head wrap">
           <h2>Calendario de guardias</h2>
-          <small>Cada dia muestra plantillas de turno para asignacion rapida.</small>
+          <small>Arrastra usuarios tecnicos activos sobre el calendario existente. El modo define si reasignas principal o backup.</small>
           <div className="task-calendar-toolbar">
-            <div className="on-call-toolbar-assignees">
-              <label>
-                Principal
-                <select
-                  className="input"
-                  value={quickAssignPrincipal}
-                  onChange={(event) => setQuickAssignPrincipal(event.target.value)}
+            <div className="on-call-dnd-toolbar">
+              <div className="form-actions">
+                <button
+                  type="button"
+                  className={dragMode === 'primary' ? 'btn-primary' : 'btn-secondary'}
+                  onClick={() => setDragMode('primary')}
                 >
-                  <option value="">Seleccionar tecnico</option>
-                  {activeTechnicians.map((name) => (
-                    <option key={name} value={name}>{name}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Backup
-                <select
-                  className="input"
-                  value={quickAssignBackup}
-                  onChange={(event) => setQuickAssignBackup(event.target.value)}
+                  Arrastrar principal
+                </button>
+                <button
+                  type="button"
+                  className={dragMode === 'backup' ? 'btn-primary' : 'btn-secondary'}
+                  onClick={() => setDragMode('backup')}
                 >
-                  <option value="">Sin backup</option>
-                  {activeTechnicians.map((name) => (
-                    <option key={name} value={name}>{name}</option>
-                  ))}
-                </select>
-              </label>
+                  Arrastrar backup
+                </button>
+              </div>
+              <div className="on-call-dnd-user-list" aria-label="Usuarios tecnicos activos">
+                {users.map((user) => (
+                  <button
+                    key={user.id}
+                    type="button"
+                    className={`on-call-dnd-user ${draggingUserId === user.id ? 'is-dragging' : ''}`}
+                    draggable
+                    onDragStart={(event) => onDragStartUser(event, user)}
+                    onDragEnd={onDragEndUser}
+                    title={`Arrastrar ${user.name}`}
+                  >
+                    <strong>{user.name}</strong>
+                    <small>{dragMode === 'primary' ? 'Principal' : 'Backup'}</small>
+                  </button>
+                ))}
+                {users.length === 0 && (
+                  <div className="dashboard-empty-state">
+                    No hay usuarios tecnicos activos disponibles para guardias.
+                  </div>
+                )}
+              </div>
             </div>
             <div className="task-calendar-jump">
               <input
@@ -840,21 +874,27 @@ function OnCallPage() {
                       const shift = findShiftForDayTemplate(day, template);
                       if (shift) matchedShiftIds.add(shift.id);
                       const isAssigned = Boolean(shift);
+                      const slotKey = `${buildDayKey(day)}-${template.id}`;
 
                       return (
                         <article
-                          key={`${buildDayKey(day)}-${template.id}`}
-                          className={`on-call-slot-card ${isAssigned ? 'assigned' : 'empty'}`}
+                          key={slotKey}
+                          className={`on-call-slot-card ${isAssigned ? 'assigned' : 'empty'} ${calendarDropSlotKey === slotKey ? 'is-drop-target' : ''}`}
                           title={shift?.notes || template.title}
+                          onDragOver={(event) => onDragOverSlot(event, slotKey)}
+                          onDragLeave={() => {
+                            if (calendarDropSlotKey === slotKey) setCalendarDropSlotKey('');
+                          }}
+                          onDrop={(event) => onDropUserInSlot(event, day, template)}
                         >
                           <div className="on-call-slot-title">{template.title}</div>
                           <div className="on-call-slot-main">
-                            {isAssigned ? shift.assigned_to : 'Sin asignar'}
+                            {isAssigned ? getShiftPrimaryLabel(shift) : 'Sin asignar'}
                           </div>
                           <div className="on-call-slot-sub">
                             {isAssigned
-                              ? shift.backup_assigned_to
-                                ? `Backup: ${shift.backup_assigned_to}`
+                              ? getShiftBackupLabel(shift)
+                                ? `Backup: ${getShiftBackupLabel(shift)}`
                                 : 'Sin backup'
                               : `${template.start_time} - ${template.end_time}`}
                           </div>
@@ -868,14 +908,13 @@ function OnCallPage() {
                                 Editar
                               </button>
                             ) : (
-                              <button
-                                type="button"
-                                className="btn-small"
-                                onClick={() => onQuickAssignTemplate(day, template)}
-                                disabled={quickAssigning}
-                              >
-                                Asignar
-                              </button>
+                              <span className="on-call-slot-hint">
+                                {calendarAssigning && draggingUserId
+                                  ? 'Asignando...'
+                                  : dragMode === 'primary'
+                                    ? 'Solta principal'
+                                    : 'Requiere principal'}
+                              </span>
                             )}
                           </div>
                         </article>

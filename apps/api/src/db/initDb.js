@@ -221,6 +221,21 @@ function runMigrations() {
     END;
   `);
 
+  ensureColumn(
+    "on_call_shifts",
+    "assigned_user_id",
+    "INTEGER REFERENCES users(id) ON UPDATE CASCADE ON DELETE SET NULL",
+  );
+  ensureColumn(
+    "on_call_shifts",
+    "backup_assigned_user_id",
+    "INTEGER REFERENCES users(id) ON UPDATE CASCADE ON DELETE SET NULL",
+  );
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_on_call_shifts_assigned_user_id ON on_call_shifts(assigned_user_id);
+    CREATE INDEX IF NOT EXISTS idx_on_call_shifts_backup_assigned_user_id ON on_call_shifts(backup_assigned_user_id);
+  `);
+
   const templateCount = db
     .prepare("SELECT COUNT(*) AS total FROM on_call_templates")
     .get().total;

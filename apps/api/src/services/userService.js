@@ -53,8 +53,13 @@ function listUsers(filters = {}) {
   return userRepository.findAll(normalized);
 }
 
-function listAssignableUsers() {
-  return userRepository.findAssignable();
+function listAssignableUsers(filters = {}) {
+  const normalized = {};
+  if (!isBlank(filters.role)) {
+    validateRole(filters.role);
+    normalized.role = filters.role;
+  }
+  return userRepository.findAssignable(normalized);
 }
 
 function listActiveTechnicians() {

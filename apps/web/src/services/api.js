@@ -83,7 +83,7 @@ export const api = {
   getCurrentUser: () => request('/auth/me'),
 
   getUsers: (filters = {}) => request(`/users${buildQuery(filters)}`),
-  getAssignableUsers: () => request('/users/assignable'),
+  getAssignableUsers: (filters = {}) => request(`/users/assignable${buildQuery(filters)}`),
   getUserById: (id) => request(`/users/${id}`),
   createUser: (payload) => request('/users', { method: 'POST', body: JSON.stringify(payload) }),
   updateUser: (id, payload) => request(`/users/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
@@ -138,11 +138,6 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ ip })
     }),
-  openTeamviewer: (teamviewerId) =>
-    request('/support-actions/teamviewer/open', {
-      method: 'POST',
-      body: JSON.stringify({ teamviewer_id: teamviewerId })
-    }),
 
   getTeamviewerImportPreview: () => request('/teamviewer/import-preview', { timeoutMs: 45000 }),
   runTeamviewerImport: () =>
@@ -170,6 +165,8 @@ export const api = {
   getTeamviewerExplorer: () => request('/teamviewer/explorer', { timeoutMs: 30000 }),
   getTeamviewerGroup: (groupId) => request(`/teamviewer/groups/${groupId}`),
   getTeamviewerDevice: (teamviewerId) => request(`/teamviewer/devices/${teamviewerId}`),
+  getLocationTeamviewerDeviceStatuses: (locationId) =>
+    request(`/teamviewer/locations/${locationId}/device-statuses`, { timeoutMs: 20000 }),
 
   getOnCallShifts: () => request('/on-call-shifts'),
   getOnCallShiftById: (id) => request(`/on-call-shifts/${id}`),

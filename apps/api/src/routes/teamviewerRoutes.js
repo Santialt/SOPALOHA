@@ -10,6 +10,7 @@ const requireAdmin = requireRole('admin');
 router.get('/explorer', explorerController.getExplorer);
 router.get('/groups/:groupId', explorerController.getGroup);
 router.get('/devices/:teamviewerId', explorerController.getDevice);
+router.get('/locations/:locationId/device-statuses', explorerController.getLocationDeviceStatuses);
 router.get('/import-preview', controller.getImportPreview);
 router.post('/import', requireAdmin, controller.postImport);
 router.post('/import-cases', requireAdmin, importedCaseController.importCases);

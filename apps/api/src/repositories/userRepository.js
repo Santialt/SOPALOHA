@@ -39,17 +39,25 @@ function findAll(filters = {}) {
     .all(params);
 }
 
-function findAssignable() {
+function findAssignable(filters = {}) {
+  const where = ['active = 1'];
+  const params = {};
+
+  if (filters.role) {
+    where.push('role = @role');
+    params.role = filters.role;
+  }
+
   return db
     .prepare(
       `
       SELECT id, name, email, role
       FROM users
-      WHERE active = 1
+      WHERE ${where.join(' AND ')}
       ORDER BY lower(name) ASC, id ASC
     `
     )
-    .all();
+    .all(params);
 }
 
 function findActiveTechnicians() {

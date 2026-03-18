@@ -35,7 +35,8 @@ function findAll(filters = {}) {
       tasks.*,
       creator.name AS created_by_name,
       updater.name AS updated_by_name,
-      assigned_user.name AS assigned_user_name
+      assigned_user.name AS assigned_user_name,
+      coalesce(assigned_user.name, nullif(trim(tasks.assigned_to), '')) AS assignment_display_name
     FROM tasks
     LEFT JOIN users creator ON creator.id = tasks.created_by
     LEFT JOIN users updater ON updater.id = tasks.updated_by
@@ -84,7 +85,8 @@ function findById(id) {
         tasks.*,
         creator.name AS created_by_name,
         updater.name AS updated_by_name,
-        assigned_user.name AS assigned_user_name
+        assigned_user.name AS assigned_user_name,
+        coalesce(assigned_user.name, nullif(trim(tasks.assigned_to), '')) AS assignment_display_name
       FROM tasks
       LEFT JOIN users creator ON creator.id = tasks.created_by
       LEFT JOIN users updater ON updater.id = tasks.updated_by

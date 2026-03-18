@@ -19,7 +19,7 @@ function listUsers(req, res, next) {
 
 function listAssignableUsers(req, res, next) {
   try {
-    res.json(userService.listAssignableUsers());
+    res.json(userService.listAssignableUsers(req.query || {}));
   } catch (error) {
     next(error);
   }
