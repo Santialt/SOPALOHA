@@ -1,6 +1,26 @@
 const repository = require('../repositories/teamviewerImportedCaseRepository');
-const { fetchConnectionReports } = require('./teamviewerApiClient');
+const userRepository = require('../repositories/userRepository');
+const { fetchConnectionReports, fetchGroups } = require('./teamviewerApiClient');
 const { httpError } = require('../utils/httpError');
+const { hashPassword } = require('../utils/passwords');
+
+const IMPORTED_TEAMVIEWER_TECHNICIANS = [
+  {
+    aliases: ['jpascuini'],
+    name: 'Jpascuini',
+    email: 'jpascuini@teamviewer.local'
+  },
+  {
+    aliases: ['santiago altamirano', 'santiago.altamirano'],
+    name: 'Santiago Altamirano',
+    email: 'santiago.altamirano@teamviewer.local'
+  },
+  {
+    aliases: ['uriel granero', 'uriel.granero'],
+    name: 'Uriel Granero',
+    email: 'uriel.granero@teamviewer.local'
+  }
+];
 
 function isBlank(value) {
   return value === undefined || value === null || String(value).trim() === '';
@@ -15,6 +35,10 @@ function sanitizeText(value) {
     .join('')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function normalizeLookupKey(value) {
+  return sanitizeText(value).toLowerCase();
 }
 
 function pickFirst(source, candidateKeys) {
@@ -125,7 +149,7 @@ function normalizeListFilters(filters = {}) {
     to_date: null,
     location_id: null,
     group: isBlank(filters.group) ? null : sanitizeText(filters.group),
-    technician: isBlank(filters.technician) ? null : sanitizeText(filters.technician),
+    technician_user_id: null,
     keyword: isBlank(filters.keyword) ? null : sanitizeText(filters.keyword)
   };
 
@@ -151,6 +175,22 @@ function normalizeListFilters(filters = {}) {
       throw httpError(400, 'location_id filter must be an integer');
     }
     normalized.location_id = locationId;
+  }
+
+  if (!isBlank(filters.technician_user_id)) {
+    const technicianUserId = Number(filters.technician_user_id);
+    if (!Number.isInteger(technicianUserId)) {
+      throw httpError(400, 'technician_user_id filter must be an integer');
+    }
+
+    const technician = userRepository.findById(technicianUserId);
+    if (!technician || !technician.active || technician.role !== 'tech') {
+      throw httpError(400, 'technician_user_id filter must reference an active tech user');
+    }
+
+    normalized.technician_user_id = technicianUserId;
+    normalized.technician_name = technician.name;
+    normalized.technician_email = technician.email;
   }
 
   if (!isBlank(filters.limit)) {
@@ -180,6 +220,72 @@ function parseDateRangeEdge(value, endOfDay) {
     return new Date(`${raw}${suffix}`);
   }
   return new Date(raw);
+}
+
+function slugifyEmailLocalPart(value) {
+  const normalized = normalizeLookupKey(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '.')
+    .replace(/^\.+|\.+$/g, '');
+
+  return normalized || 'teamviewer.tech';
+}
+
+function findImportedTechnicianProfile(technicianDisplayName, technicianUsername) {
+  const candidateKeys = [technicianDisplayName, technicianUsername]
+    .map((value) => normalizeLookupKey(value))
+    .filter(Boolean);
+
+  for (const profile of IMPORTED_TEAMVIEWER_TECHNICIANS) {
+    const profileAliases = profile.aliases.map((alias) => normalizeLookupKey(alias));
+    if (candidateKeys.some((key) => profileAliases.includes(key))) {
+      return profile;
+    }
+  }
+
+  if (!candidateKeys.length) {
+    return null;
+  }
+
+  const preferredName = sanitizeText(technicianDisplayName) || sanitizeText(technicianUsername);
+  if (!preferredName) {
+    return null;
+  }
+
+  return {
+    aliases: candidateKeys,
+    name: preferredName,
+    email: `${slugifyEmailLocalPart(preferredName)}@teamviewer.local`
+  };
+}
+
+function findOrCreateImportedTechnician(normalizedCase) {
+  const profile = findImportedTechnicianProfile(
+    normalizedCase.technician_display_name,
+    normalizedCase.technician_username
+  );
+  if (!profile) {
+    return null;
+  }
+
+  const byEmail = userRepository.findByEmail(profile.email);
+  if (byEmail) {
+    return byEmail;
+  }
+
+  const byName = userRepository.findByName(profile.name);
+  if (byName) {
+    return byName;
+  }
+
+  return userRepository.create({
+    name: profile.name,
+    email: profile.email,
+    password_hash: hashPassword(`tv-import-${profile.email}`),
+    role: 'tech',
+    active: true
+  });
 }
 
 function normalizeRawConnection(rawConnection) {
@@ -271,6 +377,7 @@ function normalizeRawConnection(rawConnection) {
     technician_display_name: isBlank(technicianDisplayNameCandidate)
       ? null
       : sanitizeText(technicianDisplayNameCandidate),
+    technician_user_id: null,
     teamviewer_group_name: teamviewerGroupName,
     note_raw: noteRaw,
     location_id: null,
@@ -351,8 +458,12 @@ async function importCases(payload = {}) {
     seenExternalIds.add(normalized.external_connection_id);
 
     stats.total_valid_format += 1;
+    const technicianUser = findOrCreateImportedTechnician(normalized);
     rowsToInsert.push({
       ...normalized,
+      technician_user_id: technicianUser?.id || null,
+      technician_display_name: technicianUser?.name || normalized.technician_display_name,
+      technician_username: technicianUser?.email || normalized.technician_username,
       problem_description: parsed.problem_description,
       requested_by: parsed.requested_by
     });
@@ -407,6 +518,16 @@ function createManualImportedCase(payload = {}) {
     throw httpError(400, 'teamviewer_group_name is required');
   }
 
+  const technicianUserId = Number(payload.technician_user_id);
+  if (!Number.isInteger(technicianUserId)) {
+    throw httpError(400, 'technician_user_id is required and must be an integer');
+  }
+
+  const technician = userRepository.findById(technicianUserId);
+  if (!technician || !technician.active || technician.role !== 'tech') {
+    throw httpError(400, 'technician_user_id must reference an active tech user');
+  }
+
   const noteRaw = sanitizeText(payload.note_raw);
   const parsed = parseNoteStrict(noteRaw);
   if (!parsed.valid) {
@@ -419,10 +540,9 @@ function createManualImportedCase(payload = {}) {
     started_at: startedAt,
     ended_at: endedAt,
     duration_seconds: normalizeDurationSeconds(payload.duration_seconds, startedAt, endedAt),
-    technician_username: isBlank(payload.technician_username) ? null : sanitizeText(payload.technician_username),
-    technician_display_name: isBlank(payload.technician_display_name)
-      ? null
-      : sanitizeText(payload.technician_display_name),
+    technician_username: sanitizeText(technician.email),
+    technician_display_name: sanitizeText(technician.name),
+    technician_user_id: technician.id,
     teamviewer_group_name: teamviewerGroupName,
     note_raw: noteRaw,
     problem_description: parsed.problem_description,
@@ -431,6 +551,89 @@ function createManualImportedCase(payload = {}) {
     linked_incident_id: null,
     raw_payload_json: isBlank(payload.raw_payload_json) ? null : String(payload.raw_payload_json)
   });
+}
+
+let teamviewerGroupsCache = {
+  loaded_at: null,
+  groups: []
+};
+
+const TEAMVIEWER_GROUPS_CACHE_TTL_MS = 5 * 60 * 1000;
+
+function buildPersistedGroupIndex() {
+  const index = new Map();
+  for (const row of repository.findDistinctGroups()) {
+    index.set(String(row.teamviewer_group_name || '').trim().toLowerCase(), row);
+  }
+  return index;
+}
+
+function normalizeCatalogGroup(rawGroup, persistedGroupIndex) {
+  const groupName = sanitizeText(rawGroup?.name ?? rawGroup?.group_name ?? rawGroup?.alias);
+  if (!groupName) return null;
+
+  const persisted = persistedGroupIndex.get(groupName.toLowerCase());
+  return {
+    group_name: groupName,
+    location_id: persisted?.location_id || null,
+    location_name: persisted?.location_name || null,
+    source: 'teamviewer'
+  };
+}
+
+async function listImportedCaseCatalogs() {
+  const technicians = userRepository.findActiveTechnicians();
+  const persistedGroups = repository.findDistinctGroups().map((row) => ({
+    group_name: row.teamviewer_group_name,
+    location_id: row.location_id || null,
+    location_name: row.location_name || null,
+    source: 'persisted'
+  }));
+  const persistedGroupIndex = buildPersistedGroupIndex();
+
+  let groups = [...persistedGroups];
+  let source = persistedGroups.length > 0 ? 'persisted' : 'empty';
+  const now = Date.now();
+  const cacheFresh =
+    teamviewerGroupsCache.loaded_at && now - teamviewerGroupsCache.loaded_at < TEAMVIEWER_GROUPS_CACHE_TTL_MS;
+
+  try {
+    if (cacheFresh) {
+      groups = teamviewerGroupsCache.groups;
+      source = 'teamviewer_cache';
+    } else {
+      const fetchedGroups = (await fetchGroups())
+        .map((group) => normalizeCatalogGroup(group, persistedGroupIndex))
+        .filter(Boolean);
+
+      if (fetchedGroups.length > 0) {
+        const deduped = new Map();
+        for (const group of [...fetchedGroups, ...persistedGroups]) {
+          const key = group.group_name.toLowerCase();
+          if (!deduped.has(key)) {
+            deduped.set(key, group);
+          }
+        }
+
+        groups = [...deduped.values()].sort((a, b) => a.group_name.localeCompare(b.group_name, 'es', { sensitivity: 'base' }));
+        source = 'teamviewer';
+        teamviewerGroupsCache = {
+          loaded_at: now,
+          groups
+        };
+      }
+    }
+  } catch (error) {
+    if (groups.length === 0) {
+      throw error;
+    }
+  }
+
+  return {
+    technicians,
+    teamviewer_groups: groups,
+    teamviewer_groups_source: source
+  };
 }
 
 function deleteImportedCase(id) {
@@ -443,6 +646,7 @@ function deleteImportedCase(id) {
 module.exports = {
   importCases,
   listImportedCases,
+  listImportedCaseCatalogs,
   getImportedCaseById,
   createManualImportedCase,
   deleteImportedCase,

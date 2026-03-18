@@ -29,15 +29,26 @@ function findAll(filters = {}) {
   }
 
   if (filters.group) {
-    where.push('lower(teamviewer_group_name) LIKE lower(@group_like)');
-    params.group_like = `%${filters.group}%`;
+    where.push('lower(trim(teamviewer_group_name)) = lower(trim(@group_name))');
+    params.group_name = filters.group;
   }
 
-  if (filters.technician) {
+  if (filters.technician_user_id) {
     where.push(
-      '(lower(coalesce(technician_username, \'\')) LIKE lower(@technician_like) OR lower(coalesce(technician_display_name, \'\')) LIKE lower(@technician_like))'
+      `(
+        teamviewer_imported_cases.technician_user_id = @technician_user_id
+        OR (
+          teamviewer_imported_cases.technician_user_id IS NULL
+          AND (
+            lower(trim(coalesce(teamviewer_imported_cases.technician_display_name, ''))) = lower(trim(@technician_name))
+            OR lower(trim(coalesce(teamviewer_imported_cases.technician_username, ''))) = lower(trim(@technician_email))
+          )
+        )
+      )`
     );
-    params.technician_like = `%${filters.technician}%`;
+    params.technician_user_id = filters.technician_user_id;
+    params.technician_name = filters.technician_name || '';
+    params.technician_email = filters.technician_email || '';
   }
 
   if (filters.keyword) {
@@ -59,9 +70,13 @@ function findAll(filters = {}) {
       `
       SELECT
         teamviewer_imported_cases.*,
+        technician_user.name AS technician_user_name,
+        technician_user.email AS technician_user_email,
+        technician_user.role AS technician_user_role,
         ${resolvedLocationIdExpr} AS resolved_location_id,
         ${resolvedLocationNameExpr} AS resolved_location_name
       FROM teamviewer_imported_cases
+      LEFT JOIN users technician_user ON technician_user.id = teamviewer_imported_cases.technician_user_id
       ${resolvedLocationJoin}
       ${whereSql}
       ORDER BY started_at DESC, id DESC
@@ -72,7 +87,20 @@ function findAll(filters = {}) {
 }
 
 function findById(id) {
-  return db.prepare('SELECT * FROM teamviewer_imported_cases WHERE id = ?').get(id);
+  return db
+    .prepare(
+      `
+      SELECT
+        teamviewer_imported_cases.*,
+        technician_user.name AS technician_user_name,
+        technician_user.email AS technician_user_email,
+        technician_user.role AS technician_user_role
+      FROM teamviewer_imported_cases
+      LEFT JOIN users technician_user ON technician_user.id = teamviewer_imported_cases.technician_user_id
+      WHERE teamviewer_imported_cases.id = ?
+    `
+    )
+    .get(id);
 }
 
 function create(payload) {
@@ -86,6 +114,7 @@ function create(payload) {
         duration_seconds,
         technician_username,
         technician_display_name,
+        technician_user_id,
         teamviewer_group_name,
         note_raw,
         problem_description,
@@ -100,6 +129,7 @@ function create(payload) {
         @duration_seconds,
         @technician_username,
         @technician_display_name,
+        @technician_user_id,
         @teamviewer_group_name,
         @note_raw,
         @problem_description,
@@ -130,6 +160,7 @@ function insertMany(rows) {
         duration_seconds,
         technician_username,
         technician_display_name,
+        technician_user_id,
         teamviewer_group_name,
         note_raw,
         problem_description,
@@ -144,6 +175,7 @@ function insertMany(rows) {
         @duration_seconds,
         @technician_username,
         @technician_display_name,
+        @technician_user_id,
         @teamviewer_group_name,
         @note_raw,
         @problem_description,
@@ -174,10 +206,32 @@ function insertMany(rows) {
   return run(rows);
 }
 
+function findDistinctGroups() {
+  return db
+    .prepare(
+      `
+      SELECT
+        teamviewer_group_name,
+        coalesce(explicit_location.id, matched_location.id, teamviewer_imported_cases.location_id) AS location_id,
+        coalesce(explicit_location.name, matched_location.name, teamviewer_group_name) AS location_name
+      FROM teamviewer_imported_cases
+      LEFT JOIN locations explicit_location ON explicit_location.id = teamviewer_imported_cases.location_id
+      LEFT JOIN locations matched_location
+        ON teamviewer_imported_cases.location_id IS NULL
+        AND lower(trim(coalesce(matched_location.name, ''))) = lower(trim(coalesce(teamviewer_imported_cases.teamviewer_group_name, '')))
+      WHERE trim(coalesce(teamviewer_group_name, '')) <> ''
+      GROUP BY lower(trim(teamviewer_group_name))
+      ORDER BY lower(trim(teamviewer_group_name)) ASC
+    `
+    )
+    .all();
+}
+
 module.exports = {
   findAll,
   findById,
   create,
+  findDistinctGroups,
   remove,
   insertMany
 };

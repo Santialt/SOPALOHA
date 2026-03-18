@@ -204,6 +204,7 @@ CREATE TABLE IF NOT EXISTS teamviewer_imported_cases (
   duration_seconds INTEGER CHECK (duration_seconds IS NULL OR duration_seconds >= 0),
   technician_username TEXT,
   technician_display_name TEXT,
+  technician_user_id INTEGER,
   teamviewer_group_name TEXT NOT NULL,
   note_raw TEXT NOT NULL,
   problem_description TEXT NOT NULL,
@@ -214,6 +215,9 @@ CREATE TABLE IF NOT EXISTS teamviewer_imported_cases (
   imported_at TEXT NOT NULL DEFAULT (datetime('now')),
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (technician_user_id) REFERENCES users(id)
+    ON UPDATE CASCADE
+    ON DELETE SET NULL,
   FOREIGN KEY (location_id) REFERENCES locations(id)
     ON UPDATE CASCADE
     ON DELETE SET NULL,
@@ -502,7 +506,6 @@ CREATE INDEX IF NOT EXISTS idx_tv_imported_cases_group
   ON teamviewer_imported_cases(teamviewer_group_name);
 CREATE INDEX IF NOT EXISTS idx_tv_imported_cases_technician
   ON teamviewer_imported_cases(technician_username, technician_display_name);
-
 CREATE INDEX IF NOT EXISTS idx_weekly_tasks_status_due ON weekly_tasks(status, due_date);
 CREATE INDEX IF NOT EXISTS idx_weekly_tasks_location ON weekly_tasks(location_id);
 CREATE INDEX IF NOT EXISTS idx_weekly_tasks_priority ON weekly_tasks(priority);

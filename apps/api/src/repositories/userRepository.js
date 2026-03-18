@@ -52,12 +52,30 @@ function findAssignable() {
     .all();
 }
 
+function findActiveTechnicians() {
+  return db
+    .prepare(
+      `
+      SELECT id, name, email, role
+      FROM users
+      WHERE active = 1
+        AND role = 'tech'
+      ORDER BY lower(name) ASC, id ASC
+    `
+    )
+    .all();
+}
+
 function findById(id) {
   return db.prepare('SELECT * FROM users WHERE id = ?').get(id);
 }
 
 function findByEmail(email) {
   return db.prepare('SELECT * FROM users WHERE lower(email) = lower(?)').get(email);
+}
+
+function findByName(name) {
+  return db.prepare('SELECT * FROM users WHERE lower(trim(name)) = lower(trim(?))').get(name);
 }
 
 function countAdmins() {
@@ -117,7 +135,9 @@ module.exports = {
   create,
   findAll,
   findAssignable,
+  findActiveTechnicians,
   findByEmail,
+  findByName,
   findById,
   update,
   updateActive

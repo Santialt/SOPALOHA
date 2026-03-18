@@ -22,44 +22,47 @@ function formatDateTime(value) {
   return date.toLocaleString('es-AR');
 }
 
-function buildActiveFiltersSummary(filters, defaults) {
+function buildActiveFiltersSummary(filters) {
   const parts = [];
-
-  if (String(filters.location_id || '') !== String(defaults.location_id || '')) parts.push('local');
-  if (filters.from_date !== defaults.from_date || filters.to_date !== defaults.to_date) parts.push('rango de fechas');
-  if (filters.technician.trim() !== defaults.technician.trim()) parts.push('tecnico');
-  if (filters.group.trim() !== defaults.group.trim()) parts.push('grupo');
-  if (filters.keyword.trim() !== defaults.keyword.trim()) parts.push('texto');
+  if (filters.location_id) parts.push('local');
+  if (filters.from_date || filters.to_date) parts.push('rango de fechas');
+  if (filters.technician_user_id) parts.push('tecnico');
+  if (filters.group) parts.push('grupo');
+  if (filters.keyword.trim()) parts.push('texto');
 
   if (parts.length === 0) {
-    return 'Filtros en valores operativos por defecto.';
+    return 'Selecciona un rango y buscá para consultar casos.';
   }
 
   return `Filtros activos: ${parts.join(', ')}.`;
 }
 
 function resolveTechnicianFromCase(row) {
+  if (row.technician_user_name) return row.technician_user_name;
   if (row.technician_display_name) return row.technician_display_name;
-  if (row.raw_payload_json) {
-    try {
-      const parsed = JSON.parse(row.raw_payload_json);
-      const name = String(parsed?.username || parsed?.USER || '').trim();
-      if (name) return name;
-    } catch (error) {
-      // ignore payload parsing errors in UI fallback
-    }
-  }
   if (row.technician_username && !/^u\d+$/i.test(String(row.technician_username))) {
     return row.technician_username;
   }
   return row.technician_username || '-';
 }
 
+function createInitialListFilters(prefillLocationId) {
+  return {
+    location_id: prefillLocationId,
+    from_date: '',
+    to_date: '',
+    technician_user_id: '',
+    group: '',
+    keyword: ''
+  };
+}
+
 function TeamViewerImportedCasesPage() {
   const [searchParams] = useSearchParams();
   const prefillLocationId = Number(searchParams.get('location_id')) || '';
-  const prefillGroupId = searchParams.get('teamviewer_group_id') || '';
-  const [loading, setLoading] = useState(true);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
   const [importing, setImporting] = useState(false);
   const [savingManual, setSavingManual] = useState(false);
   const [runningActionCaseId, setRunningActionCaseId] = useState(null);
@@ -69,8 +72,10 @@ function TeamViewerImportedCasesPage() {
   const [discarded, setDiscarded] = useState([]);
   const [rows, setRows] = useState([]);
   const [locations, setLocations] = useState([]);
+  const [technicians, setTechnicians] = useState([]);
   const [teamviewerGroups, setTeamviewerGroups] = useState([]);
   const [pageOffset, setPageOffset] = useState(0);
+  const [lastSubmittedFilters, setLastSubmittedFilters] = useState(null);
 
   const [importRange, setImportRange] = useState(() => {
     const now = new Date();
@@ -82,89 +87,95 @@ function TeamViewerImportedCasesPage() {
     };
   });
 
-  const [listFilters, setListFilters] = useState(() => {
-    const now = new Date();
-    const from = new Date(now);
-    from.setDate(now.getDate() - 30);
-    return {
-      location_id: prefillLocationId,
-      from_date: toDateInputValue(from),
-      to_date: toDateInputValue(now),
-      technician: '',
-      group: '',
-      keyword: ''
-    };
-  });
-  const defaultListFilters = useMemo(() => {
-    const now = new Date();
-    const from = new Date(now);
-    from.setDate(now.getDate() - 30);
-    return {
-      location_id: prefillLocationId,
-      from_date: toDateInputValue(from),
-      to_date: toDateInputValue(now),
-      technician: '',
-      group: '',
-      keyword: ''
-    };
-  }, [prefillLocationId]);
+  const [listFilters, setListFilters] = useState(() => createInitialListFilters(prefillLocationId));
 
   const [manualForm, setManualForm] = useState(() => {
     const now = new Date();
     return {
       started_at: toDatetimeLocalValue(now),
       ended_at: toDatetimeLocalValue(now),
-      technician_display_name: '',
-      teamviewer_group_id: prefillGroupId,
+      technician_user_id: '',
+      teamviewer_group_name: '',
       note_raw: ''
     };
   });
 
-  const loadRows = async (offset = pageOffset, filters = listFilters) => {
-    setLoading(true);
-    setError('');
-
-    try {
-      const [casesData, locationsData, explorerData] = await Promise.all([
-        api.getTeamviewerImportedCases({
-          ...filters,
-          limit: PAGE_SIZE,
-          offset
-        }),
-        api.getLocations(),
-        api.getTeamviewerExplorer()
-      ]);
-      setRows(casesData);
-      setLocations(locationsData);
-      setTeamviewerGroups(Array.isArray(explorerData.groups) ? explorerData.groups : []);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    loadRows(pageOffset);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageOffset]);
+    let cancelled = false;
+
+    async function loadCatalogs() {
+      setCatalogLoading(true);
+      setError('');
+
+      try {
+        const [locationsData, catalogsData] = await Promise.all([
+          api.getLocations(),
+          api.getTeamviewerImportedCaseCatalogs()
+        ]);
+
+        if (cancelled) return;
+
+        setLocations(Array.isArray(locationsData) ? locationsData : []);
+        setTechnicians(Array.isArray(catalogsData?.technicians) ? catalogsData.technicians : []);
+        setTeamviewerGroups(Array.isArray(catalogsData?.teamviewer_groups) ? catalogsData.teamviewer_groups : []);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err.message);
+        }
+      } finally {
+        if (!cancelled) {
+          setCatalogLoading(false);
+        }
+      }
+    }
+
+    loadCatalogs();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const locationOptions = useMemo(
     () => [...locations].sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' })),
     [locations]
+  );
+  const technicianOptions = useMemo(
+    () => [...technicians].sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' })),
+    [technicians]
   );
   const groupOptions = useMemo(
     () => [...teamviewerGroups].sort((a, b) => a.group_name.localeCompare(b.group_name, 'es', { sensitivity: 'base' })),
     [teamviewerGroups]
   );
   const selectedManualGroup = useMemo(
-    () => teamviewerGroups.find((group) => group.group_id === manualForm.teamviewer_group_id) || null,
-    [teamviewerGroups, manualForm.teamviewer_group_id]
+    () => groupOptions.find((group) => group.group_name === manualForm.teamviewer_group_name) || null,
+    [groupOptions, manualForm.teamviewer_group_name]
   );
 
+  const hasDateRangeSelected = Boolean(listFilters.from_date || listFilters.to_date);
   const hasMore = rows.length === PAGE_SIZE;
   const listSummaryLabel = rows.length === 1 ? '1 caso' : `${rows.length} casos`;
-  const activeFiltersSummary = buildActiveFiltersSummary(listFilters, defaultListFilters);
+  const activeFiltersSummary = buildActiveFiltersSummary(listFilters);
+
+  const loadRows = async (filters, offset = 0) => {
+    setLoading(true);
+    setError('');
+
+    try {
+      const casesData = await api.getTeamviewerImportedCases({
+        ...filters,
+        limit: PAGE_SIZE,
+        offset
+      });
+      setRows(Array.isArray(casesData) ? casesData : []);
+      setHasSearched(true);
+      setLastSubmittedFilters(filters);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const onImport = async () => {
     setImporting(true);
@@ -175,9 +186,16 @@ function TeamViewerImportedCasesPage() {
       const result = await api.importTeamviewerCases(importRange);
       setSummary(result.summary);
       setDiscarded(Array.isArray(result.discarded) ? result.discarded : []);
-      setPageOffset(0);
-      await loadRows(0);
       setSuccess('Importacion de casos finalizada.');
+
+      const catalogsData = await api.getTeamviewerImportedCaseCatalogs();
+      setTechnicians(Array.isArray(catalogsData?.technicians) ? catalogsData.technicians : []);
+      setTeamviewerGroups(Array.isArray(catalogsData?.teamviewer_groups) ? catalogsData.teamviewer_groups : []);
+
+      if (lastSubmittedFilters) {
+        setPageOffset(0);
+        await loadRows(lastSubmittedFilters, 0);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -195,20 +213,28 @@ function TeamViewerImportedCasesPage() {
       await api.createTeamviewerImportedCase({
         started_at: manualForm.started_at,
         ended_at: manualForm.ended_at || null,
-        technician_display_name: manualForm.technician_display_name,
-        teamviewer_group_name: selectedManualGroup?.group_name || '',
+        technician_user_id: manualForm.technician_user_id,
+        teamviewer_group_name: manualForm.teamviewer_group_name,
         location_id: selectedManualGroup?.location_id || null,
         note_raw: manualForm.note_raw
       });
+
       setSuccess('Caso manual creado.');
       setManualForm((prev) => ({
         ...prev,
-        teamviewer_group_id: prefillGroupId,
-        note_raw: '',
-        technician_display_name: ''
+        technician_user_id: '',
+        teamviewer_group_name: '',
+        note_raw: ''
       }));
-      setPageOffset(0);
-      await loadRows(0);
+
+      const catalogsData = await api.getTeamviewerImportedCaseCatalogs();
+      setTechnicians(Array.isArray(catalogsData?.technicians) ? catalogsData.technicians : []);
+      setTeamviewerGroups(Array.isArray(catalogsData?.teamviewer_groups) ? catalogsData.teamviewer_groups : []);
+
+      if (lastSubmittedFilters) {
+        setPageOffset(0);
+        await loadRows(lastSubmittedFilters, 0);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -219,6 +245,7 @@ function TeamViewerImportedCasesPage() {
   const onDeleteCase = async (row) => {
     const ok = window.confirm(`Eliminar caso importado #${row.id}?`);
     if (!ok) return;
+
     setRunningActionCaseId(row.id);
     setError('');
     setSuccess('');
@@ -226,7 +253,10 @@ function TeamViewerImportedCasesPage() {
     try {
       await api.deleteTeamviewerImportedCase(row.id);
       setSuccess(`Caso #${row.id} eliminado.`);
-      await loadRows(pageOffset);
+
+      if (lastSubmittedFilters) {
+        await loadRows(lastSubmittedFilters, pageOffset);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -235,19 +265,41 @@ function TeamViewerImportedCasesPage() {
   };
 
   const onApplyFilters = async () => {
+    if (!hasDateRangeSelected) {
+      setError('Selecciona fecha desde, fecha hasta o ambas antes de buscar.');
+      return;
+    }
+
+    const nextFilters = { ...listFilters };
     setPageOffset(0);
-    await loadRows(0);
+    await loadRows(nextFilters, 0);
   };
 
-  if (loading && rows.length === 0) {
-    return <LoadingBlock label="Cargando casos TeamViewer..." />;
+  const onResetFilters = () => {
+    setListFilters(createInitialListFilters(prefillLocationId));
+    setRows([]);
+    setPageOffset(0);
+    setHasSearched(false);
+    setLastSubmittedFilters(null);
+    setError('');
+    setSuccess('');
+  };
+
+  useEffect(() => {
+    if (!lastSubmittedFilters || pageOffset === 0) return;
+    loadRows(lastSubmittedFilters, pageOffset);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageOffset]);
+
+  if (catalogLoading) {
+    return <LoadingBlock label="Cargando catalogos de casos TeamViewer..." />;
   }
 
   return (
     <div className="page-stack">
       <section className="section-card">
         <h2>Casos TeamViewer</h2>
-        <small>Importacion automatica, alta manual y visualizacion centralizada de casos TeamViewer.</small>
+        <small>Alta manual, importacion y consulta centralizada de casos TeamViewer.</small>
       </section>
 
       <section className="section-card">
@@ -302,24 +354,32 @@ function TeamViewerImportedCasesPage() {
             />
           </label>
           <label>
-            Tecnico (nombre visible)
-            <input
+            Tecnico *
+            <select
               className="input"
-              value={manualForm.technician_display_name}
-              onChange={(event) => setManualForm((prev) => ({ ...prev, technician_display_name: event.target.value }))}
-            />
+              value={manualForm.technician_user_id}
+              onChange={(event) => setManualForm((prev) => ({ ...prev, technician_user_id: event.target.value }))}
+              required
+            >
+              <option value="">Seleccionar tecnico</option>
+              {technicianOptions.map((technician) => (
+                <option key={technician.id} value={technician.id}>
+                  {technician.name}
+                </option>
+              ))}
+            </select>
           </label>
           <label>
             Grupo TeamViewer *
             <select
               className="input"
-              value={manualForm.teamviewer_group_id}
-              onChange={(event) => setManualForm((prev) => ({ ...prev, teamviewer_group_id: event.target.value }))}
+              value={manualForm.teamviewer_group_name}
+              onChange={(event) => setManualForm((prev) => ({ ...prev, teamviewer_group_name: event.target.value }))}
               required
             >
               <option value="">Seleccionar grupo</option>
               {groupOptions.map((group) => (
-                <option key={group.group_id} value={group.group_id}>
+                <option key={group.group_name} value={group.group_name}>
                   {group.group_name}
                 </option>
               ))}
@@ -335,7 +395,11 @@ function TeamViewerImportedCasesPage() {
             />
           </label>
           <div className="form-actions">
-            <button type="submit" className="btn-primary" disabled={savingManual || !selectedManualGroup}>
+            <button
+              type="submit"
+              className="btn-primary"
+              disabled={savingManual || !manualForm.technician_user_id || !manualForm.teamviewer_group_name}
+            >
               {savingManual ? 'Guardando...' : 'Agregar caso manual'}
             </button>
           </div>
@@ -391,14 +455,12 @@ function TeamViewerImportedCasesPage() {
 
       <section className="section-card">
         <div className="section-head">
-          <h2>Casos TeamViewer</h2>
-          <small>
-            Mostrando {listSummaryLabel} en esta pagina.
-          </small>
+          <h2>Consulta de casos</h2>
+          <small>{hasSearched ? `Mostrando ${listSummaryLabel} en esta pagina.` : 'Sin consulta ejecutada.'}</small>
         </div>
 
         <div className="incident-summary-total">
-          <strong>{rows.length}</strong>
+          <strong>{hasSearched ? rows.length : 0}</strong>
           <span>{activeFiltersSummary}</span>
         </div>
 
@@ -438,21 +500,33 @@ function TeamViewerImportedCasesPage() {
           </label>
           <label>
             Tecnico
-            <input
+            <select
               className="input"
-              value={listFilters.technician}
-              onChange={(event) => setListFilters((prev) => ({ ...prev, technician: event.target.value }))}
-              placeholder="Nombre o username"
-            />
+              value={listFilters.technician_user_id}
+              onChange={(event) => setListFilters((prev) => ({ ...prev, technician_user_id: event.target.value }))}
+            >
+              <option value="">Todos</option>
+              {technicianOptions.map((technician) => (
+                <option key={technician.id} value={technician.id}>
+                  {technician.name}
+                </option>
+              ))}
+            </select>
           </label>
           <label>
             Grupo TeamViewer
-            <input
+            <select
               className="input"
               value={listFilters.group}
               onChange={(event) => setListFilters((prev) => ({ ...prev, group: event.target.value }))}
-              placeholder="Grupo"
-            />
+            >
+              <option value="">Todos</option>
+              {groupOptions.map((group) => (
+                <option key={group.group_name} value={group.group_name}>
+                  {group.group_name}
+                </option>
+              ))}
+            </select>
           </label>
           <label>
             Texto
@@ -467,23 +541,16 @@ function TeamViewerImportedCasesPage() {
 
         <div className="form-actions">
           <button type="button" className="btn-primary" onClick={onApplyFilters} disabled={loading}>
-            Aplicar filtros
+            Buscar casos
           </button>
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={async () => {
-              setListFilters(defaultListFilters);
-              setPageOffset(0);
-              await loadRows(0, defaultListFilters);
-            }}
-            disabled={loading}
-          >
+          <button type="button" className="btn-secondary" onClick={onResetFilters} disabled={loading}>
             Restablecer filtros
           </button>
         </div>
 
-        {loading ? (
+        {!hasSearched ? (
+          <div className="kanban-empty">Selecciona fecha desde, fecha hasta o un rango y luego hace clic en "Buscar casos".</div>
+        ) : loading ? (
           <LoadingBlock label="Actualizando casos..." />
         ) : (
           <>
@@ -507,6 +574,7 @@ function TeamViewerImportedCasesPage() {
                     const location = resolvedLocationId
                       ? locations.find((item) => item.id === resolvedLocationId)
                       : null;
+
                     return (
                       <tr key={row.id}>
                         <td>{formatDateTime(row.started_at)}</td>
