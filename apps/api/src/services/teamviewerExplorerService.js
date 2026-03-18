@@ -1,6 +1,7 @@
 const {
   detectDeviceRole,
   normalizeKey,
+  normalizeString,
   resolveTeamviewerId,
   normalizeDeviceAlias,
   normalizeDeviceGroupId,
@@ -8,9 +9,81 @@ const {
   buildExistingLocationsMap,
   buildExistingDeviceMaps
 } = require('./teamviewerImportService');
+const { fetchDevices } = require('./teamviewerApiClient');
+const db = require('../db/connection');
+
+const REMOTE_DEVICE_STATUS_CACHE_TTL_MS = 15000;
+
+let remoteDeviceStatusCache = null;
+let remoteDeviceStatusPromise = null;
 
 function normalizeState(rawDevice) {
   return String(rawDevice?.online_state || rawDevice?.status || rawDevice?.state || '').trim() || null;
+}
+
+function normalizePresence(rawState) {
+  const normalized = String(rawState || '').trim().toLowerCase();
+  if (normalized === 'online') return 'online';
+  if (normalized === 'offline') return 'offline';
+  return 'unknown';
+}
+
+function buildRemoteDeviceStatusMap(rawDevices) {
+  const statusesById = new Map();
+
+  for (const rawDevice of rawDevices) {
+    const resolvedId = resolveTeamviewerId(rawDevice);
+    if (!resolvedId.value) continue;
+
+    const rawState = normalizeState(rawDevice);
+    const nextStatus = {
+      teamviewer_id: normalizeString(resolvedId.value),
+      raw_state: rawState,
+      presence: normalizePresence(rawState)
+    };
+    const currentStatus = statusesById.get(nextStatus.teamviewer_id);
+
+    if (!currentStatus || (!currentStatus.raw_state && nextStatus.raw_state)) {
+      statusesById.set(nextStatus.teamviewer_id, nextStatus);
+    }
+  }
+
+  return statusesById;
+}
+
+async function loadRemoteDeviceStatuses() {
+  const now = Date.now();
+  if (remoteDeviceStatusCache && remoteDeviceStatusCache.expires_at > now) {
+    return remoteDeviceStatusCache;
+  }
+
+  if (!remoteDeviceStatusPromise) {
+    remoteDeviceStatusPromise = (async () => {
+      const rawDevices = await fetchDevices();
+      const nextCache = {
+        generated_at: new Date().toISOString(),
+        expires_at: Date.now() + REMOTE_DEVICE_STATUS_CACHE_TTL_MS,
+        stale: false,
+        statuses_by_id: buildRemoteDeviceStatusMap(rawDevices)
+      };
+      remoteDeviceStatusCache = nextCache;
+      return nextCache;
+    })().finally(() => {
+      remoteDeviceStatusPromise = null;
+    });
+  }
+
+  try {
+    return await remoteDeviceStatusPromise;
+  } catch (error) {
+    if (remoteDeviceStatusCache) {
+      return {
+        ...remoteDeviceStatusCache,
+        stale: true
+      };
+    }
+    throw error;
+  }
 }
 
 function buildExplorerSnapshot() {
@@ -148,8 +221,45 @@ async function getDeviceDetail(teamviewerId) {
   };
 }
 
+async function getLocationDeviceStatuses(locationId) {
+  const devices = db
+    .prepare(
+      `SELECT id, location_id, name, teamviewer_id
+       FROM devices
+       WHERE location_id = ?
+       ORDER BY id DESC`
+    )
+    .all(locationId);
+
+  const remoteStatuses = await loadRemoteDeviceStatuses();
+
+  return {
+    generated_at: remoteStatuses.generated_at,
+    stale: remoteStatuses.stale,
+    location_id: locationId,
+    devices: devices.map((device) => {
+      const normalizedTeamviewerId = normalizeString(device.teamviewer_id);
+      const remoteStatus = normalizedTeamviewerId
+        ? remoteStatuses.statuses_by_id.get(normalizedTeamviewerId) || null
+        : null;
+
+      return {
+        device_id: device.id,
+        location_id: device.location_id,
+        device_name: device.name,
+        teamviewer_id: device.teamviewer_id || null,
+        presence: remoteStatus?.presence || 'unknown',
+        raw_state: remoteStatus?.raw_state || null,
+        status_available: Boolean(remoteStatus),
+        status_source: remoteStatus ? 'teamviewer_remote' : 'unavailable'
+      };
+    })
+  };
+}
+
 module.exports = {
   buildExplorerData,
   getGroupDetail,
-  getDeviceDetail
+  getDeviceDetail,
+  getLocationDeviceStatuses
 };

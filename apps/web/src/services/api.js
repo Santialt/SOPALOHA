@@ -138,11 +138,6 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ ip })
     }),
-  openTeamviewer: (teamviewerId) =>
-    request('/support-actions/teamviewer/open', {
-      method: 'POST',
-      body: JSON.stringify({ teamviewer_id: teamviewerId })
-    }),
 
   getTeamviewerImportPreview: () => request('/teamviewer/import-preview', { timeoutMs: 45000 }),
   runTeamviewerImport: () =>
@@ -170,6 +165,8 @@ export const api = {
   getTeamviewerExplorer: () => request('/teamviewer/explorer', { timeoutMs: 30000 }),
   getTeamviewerGroup: (groupId) => request(`/teamviewer/groups/${groupId}`),
   getTeamviewerDevice: (teamviewerId) => request(`/teamviewer/devices/${teamviewerId}`),
+  getLocationTeamviewerDeviceStatuses: (locationId) =>
+    request(`/teamviewer/locations/${locationId}/device-statuses`, { timeoutMs: 20000 }),
 
   getOnCallShifts: () => request('/on-call-shifts'),
   getOnCallShiftById: (id) => request(`/on-call-shifts/${id}`),

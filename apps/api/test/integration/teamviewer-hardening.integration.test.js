@@ -425,6 +425,123 @@ test("TeamViewer backend hardening covers preview, import, degradation, and rout
   );
 
   await t.test(
+    "TeamViewer location device statuses expose online, offline, and unknown without rebuilding explorer payloads in the client",
+    async () => {
+      teamviewerFetch.reset();
+
+      const locationId = harness.db
+        .prepare(`INSERT INTO locations (name, status) VALUES ('Estado TV Local', 'active')`)
+        .run().lastInsertRowid;
+
+      harness.db
+        .prepare(
+          `
+          INSERT INTO devices (location_id, name, type, device_role, teamviewer_id)
+          VALUES
+            (?, 'Server Estado', 'server', 'server', '111111111'),
+            (?, 'POS Estado', 'pos_terminal', 'pos', '222222222'),
+            (?, 'Equipo Sin Match', 'other', 'other', '333333333'),
+            (?, 'Equipo Sin TV', 'other', 'other', NULL)
+        `,
+        )
+        .run(locationId, locationId, locationId, locationId);
+
+      teamviewerFetch.setHandler(async (url) => {
+        const parsedUrl = new URL(url);
+        if (parsedUrl.pathname !== "/api/v1/devices") {
+          throw new Error(`Unexpected TeamViewer request: ${url}`);
+        }
+
+        return jsonResponse({
+          devices: [
+            {
+              alias: "Server Estado",
+              remotecontrol_id: "111 111 111",
+              online_state: "online",
+            },
+            {
+              alias: "POS Estado",
+              remotecontrol_id: "222222222",
+              status: "offline",
+            },
+            {
+              alias: "Equipo Estado Raro",
+              remotecontrol_id: "444444444",
+              state: "busy",
+            },
+          ],
+        });
+      });
+
+      const result = await harness.authedRequest(
+        techUser,
+        "GET",
+        `/teamviewer/locations/${locationId}/device-statuses`,
+      );
+
+      assert.equal(result.status, 200);
+      assert.equal(result.body.location_id, locationId);
+      assert.equal(result.body.devices.length, 4);
+
+      const byName = new Map(
+        result.body.devices.map((row) => [row.device_name, row]),
+      );
+
+      assert.deepEqual(
+        {
+          presence: byName.get("Server Estado").presence,
+          raw_state: byName.get("Server Estado").raw_state,
+          status_available: byName.get("Server Estado").status_available,
+        },
+        {
+          presence: "online",
+          raw_state: "online",
+          status_available: true,
+        },
+      );
+
+      assert.deepEqual(
+        {
+          presence: byName.get("POS Estado").presence,
+          raw_state: byName.get("POS Estado").raw_state,
+          status_available: byName.get("POS Estado").status_available,
+        },
+        {
+          presence: "offline",
+          raw_state: "offline",
+          status_available: true,
+        },
+      );
+
+      assert.deepEqual(
+        {
+          presence: byName.get("Equipo Sin Match").presence,
+          raw_state: byName.get("Equipo Sin Match").raw_state,
+          status_available: byName.get("Equipo Sin Match").status_available,
+        },
+        {
+          presence: "unknown",
+          raw_state: null,
+          status_available: false,
+        },
+      );
+
+      assert.deepEqual(
+        {
+          presence: byName.get("Equipo Sin TV").presence,
+          raw_state: byName.get("Equipo Sin TV").raw_state,
+          status_available: byName.get("Equipo Sin TV").status_available,
+        },
+        {
+          presence: "unknown",
+          raw_state: null,
+          status_available: false,
+        },
+      );
+    },
+  );
+
+  await t.test(
     "TeamViewer upstream failures degrade to stable 502 API responses instead of generic crashes",
     async () => {
       teamviewerFetch.reset();

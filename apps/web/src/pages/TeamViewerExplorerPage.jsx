@@ -4,6 +4,7 @@ import InlineError from '../components/InlineError';
 import InlineSuccess from '../components/InlineSuccess';
 import LoadingBlock from '../components/LoadingBlock';
 import { api } from '../services/api';
+import { openTeamviewerOnClient } from '../utils/teamviewer';
 
 function formatLocationStatus(status) {
   if (status === 'inactive' || status === 'cerrado') return 'cerrado';
@@ -156,14 +157,16 @@ function TeamViewerExplorerPage() {
     setSuccess('');
 
     try {
-      const result = await api.openTeamviewer(device.teamviewer_id);
-      if (result.skipped) {
-        setSuccess('Apertura omitida para evitar doble ejecucion.');
-      } else {
-        setSuccess(`TeamViewer lanzado por backend (${result.method}).`);
+      const result = openTeamviewerOnClient(device.teamviewer_id);
+      if (!result.ok) {
+        setError(result.message);
+        return;
       }
+      setSuccess(
+        'Se intento abrir TeamViewer en esta PC usando el deep link local. Si no se abre, verifica TeamViewer instalado y usa el ID copiado.'
+      );
     } catch (err) {
-      setError(err.message);
+      setError('No se pudo solicitar la apertura local de TeamViewer.');
     } finally {
       setRunningActionKey('');
     }
@@ -378,7 +381,7 @@ function TeamViewerExplorerPage() {
                 >
                   {runningActionKey === `tv-${selectedDevice.group_id}:${selectedDevice.teamviewer_id}`
                     ? 'Abriendo...'
-                    : 'Abrir TeamViewer'}
+                    : 'Abrir en esta PC'}
                 </button>
                 <button type="button" className="btn-small" onClick={() => onCopyTeamviewerId(selectedDevice)}>
                   Copiar TeamViewer ID

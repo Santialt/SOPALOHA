@@ -1,10 +1,11 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import InlineError from '../components/InlineError';
 import InlineSuccess from '../components/InlineSuccess';
 import LoadingBlock from '../components/LoadingBlock';
 import { useDataLoader } from '../hooks/useDataLoader';
 import { api, enums } from '../services/api';
+import { describeTeamviewerPresence, openTeamviewerOnClient } from '../utils/teamviewer';
 
 const defaultLocationForm = {
   name: '',
@@ -30,7 +31,7 @@ const defaultLocationForm = {
 
 const defaultDeviceForm = {
   name: '',
-  device_role: 'pos',
+  device_role: 'other',
   ip_address: '',
   teamviewer_id: '',
   windows_version: '',
@@ -153,6 +154,9 @@ function LocationDetailPage() {
   const [savingDevice, setSavingDevice] = useState(false);
   const [deletingDeviceId, setDeletingDeviceId] = useState(null);
   const [runningActionKey, setRunningActionKey] = useState('');
+  const [teamviewerStatusesByDeviceId, setTeamviewerStatusesByDeviceId] = useState({});
+  const [loadingTeamviewerStatuses, setLoadingTeamviewerStatuses] = useState(false);
+  const [teamviewerStatusError, setTeamviewerStatusError] = useState('');
   const [success, setSuccess] = useState('');
   const teamviewerOpenLockRef = useRef(new Map());
 
@@ -178,7 +182,58 @@ function LocationDetailPage() {
     setTeamviewerCases(locationTeamviewerCases);
     setTasks(locationTasks);
     setIntegrations(locationIntegrations.map((item) => item.integration_name));
+    setTeamviewerStatusError('');
   }, [id, numericLocationId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!Number.isInteger(numericLocationId) || numericLocationId <= 0) {
+      setTeamviewerStatusesByDeviceId({});
+      setLoadingTeamviewerStatuses(false);
+      setTeamviewerStatusError('');
+      return undefined;
+    }
+
+    if (devices.length === 0) {
+      setTeamviewerStatusesByDeviceId({});
+      setLoadingTeamviewerStatuses(false);
+      setTeamviewerStatusError('');
+      return undefined;
+    }
+
+    const loadTeamviewerStatuses = async () => {
+      setLoadingTeamviewerStatuses(true);
+      setTeamviewerStatusError('');
+
+      try {
+        const payload = await api.getLocationTeamviewerDeviceStatuses(numericLocationId);
+        if (cancelled) return;
+
+        const nextStatuses = Object.fromEntries(
+          payload.devices.map((device) => [device.device_id, device])
+        );
+        setTeamviewerStatusesByDeviceId(nextStatuses);
+        if (payload.stale) {
+          setTeamviewerStatusError('Estado TeamViewer mostrado desde cache reciente.');
+        }
+      } catch (err) {
+        if (cancelled) return;
+        setTeamviewerStatusesByDeviceId({});
+        setTeamviewerStatusError('No se pudo actualizar el estado TeamViewer de los equipos.');
+      } finally {
+        if (!cancelled) {
+          setLoadingTeamviewerStatuses(false);
+        }
+      }
+    };
+
+    loadTeamviewerStatuses();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [numericLocationId, devices]);
 
   const onSaveLocation = async (event) => {
     event.preventDefault();
@@ -345,18 +400,29 @@ function LocationDetailPage() {
     setSuccess('');
 
     try {
-      const result = await api.openTeamviewer(device.teamviewer_id);
-      if (result.skipped) {
-        setSuccess('Apertura omitida para evitar doble ejecucion.');
-      } else {
-        setSuccess(`TeamViewer lanzado por backend (${result.method}).`);
+      const result = openTeamviewerOnClient(device.teamviewer_id);
+      if (!result.ok) {
+        setError(result.message);
+        return;
       }
+
+      setSuccess(
+        'Se intento abrir TeamViewer en esta PC usando el deep link local. Si no se abre, verifica TeamViewer instalado y usa "Copiar TV ID".'
+      );
     } catch (err) {
-      setError(err.message);
+      setError('No se pudo solicitar la apertura local de TeamViewer.');
     } finally {
       setRunningActionKey('');
     }
   };
+
+  const getTeamviewerStatusForDevice = (device) =>
+    describeTeamviewerPresence({
+      presence: teamviewerStatusesByDeviceId[device.id]?.presence || 'unknown',
+      rawState: teamviewerStatusesByDeviceId[device.id]?.raw_state || null,
+      hasTeamviewerId: Boolean(device.teamviewer_id),
+      statusAvailable: Boolean(teamviewerStatusesByDeviceId[device.id]?.status_available)
+    });
 
   if (loading) return <LoadingBlock label="Cargando detalle de local..." />;
 
@@ -608,18 +674,22 @@ function LocationDetailPage() {
       <section className="section-card">
         <div className="section-head wrap">
           <h3>Dispositivos ({devices.length})</h3>
+          <small>
+            El estado TeamViewer se consulta aparte para no bloquear la carga principal del local.
+          </small>
           <Link to={`/incidents?location_id=${numericLocationId}`} className="btn-link">
             Registrar caso TeamViewer
           </Link>
         </div>
+        {teamviewerStatusError && <InlineError message={teamviewerStatusError} />}
         <div className="table-wrap table-wrap-xl">
           <table className="table compact">
             <thead>
               <tr>
                 <th>ID</th>
                 <th>Nombre</th>
-                <th>Rol</th>
                 <th>IP</th>
+                <th>Estado TV</th>
                 <th>TeamViewer</th>
                 <th>Windows</th>
                 <th>Acciones</th>
@@ -630,8 +700,21 @@ function LocationDetailPage() {
                 <tr key={device.id}>
                   <td>{device.id}</td>
                   <td>{device.name}</td>
-                  <td>{device.device_role || '-'}</td>
                   <td>{device.ip_address || '-'}</td>
+                  <td>
+                    {(() => {
+                      const status = getTeamviewerStatusForDevice(device);
+                      return (
+                        <div className="teamviewer-status">
+                          <span className={`teamviewer-status-dot ${status.tone}`} aria-hidden="true" />
+                          <div>
+                            <strong>{status.label}</strong>
+                            <small>{status.detail}</small>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </td>
                   <td>{device.teamviewer_id || '-'}</td>
                   <td>{device.windows_version || '-'}</td>
                   <td>
@@ -643,9 +726,9 @@ function LocationDetailPage() {
                         type="button"
                         className="btn-small"
                         onClick={() => onOpenTeamviewer(device)}
-                        disabled={runningActionKey === `tv-${device.id}`}
+                        disabled={runningActionKey === `tv-${device.id}` || !device.teamviewer_id}
                       >
-                        {runningActionKey === `tv-${device.id}` ? 'Abriendo...' : 'Abrir TeamViewer'}
+                        {runningActionKey === `tv-${device.id}` ? 'Abriendo...' : 'Abrir en esta PC'}
                       </button>
                       <button type="button" className="btn-small" onClick={() => onEditDevice(device)}>
                         Editar
@@ -682,20 +765,6 @@ function LocationDetailPage() {
               onChange={(event) => setDeviceForm({ ...deviceForm, name: event.target.value })}
               required
             />
-          </label>
-          <label>
-            Rol
-            <select
-              className="input"
-              value={deviceForm.device_role}
-              onChange={(event) => setDeviceForm({ ...deviceForm, device_role: event.target.value })}
-            >
-              {enums.deviceRoles.map((role) => (
-                <option key={role} value={role}>
-                  {role}
-                </option>
-              ))}
-            </select>
           </label>
           <label>
             IP
@@ -761,6 +830,7 @@ function LocationDetailPage() {
             <button className="btn-primary" type="submit" disabled={savingDevice}>
               {savingDevice ? 'Guardando...' : editingDeviceId ? 'Actualizar' : 'Agregar'}
             </button>
+            {loadingTeamviewerStatuses && <small>Actualizando estado TeamViewer...</small>}
             {editingDeviceId && (
               <button
                 className="btn-secondary"

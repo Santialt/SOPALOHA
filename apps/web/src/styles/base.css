@@ -808,6 +808,50 @@ button:disabled {
   color: #fff;
 }
 
+.teamviewer-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.teamviewer-status > div {
+  display: grid;
+  gap: 2px;
+}
+
+.teamviewer-status strong {
+  font-size: 12px;
+  line-height: 1.1;
+}
+
+.teamviewer-status small {
+  line-height: 1.2;
+}
+
+.teamviewer-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+  border: 1px solid color-mix(in srgb, var(--color-text-muted) 30%, var(--color-border));
+  background: color-mix(in srgb, var(--color-text-muted) 38%, var(--color-surface));
+}
+
+.teamviewer-status-dot.online {
+  border-color: color-mix(in srgb, var(--color-success) 50%, var(--color-border));
+  background: var(--color-success);
+}
+
+.teamviewer-status-dot.offline {
+  border-color: color-mix(in srgb, var(--color-danger) 50%, var(--color-border));
+  background: var(--color-danger);
+}
+
+.teamviewer-status-dot.unknown {
+  border-color: color-mix(in srgb, var(--color-text-muted) 40%, var(--color-border));
+  background: color-mix(in srgb, var(--color-text-muted) 46%, var(--color-surface));
+}
+
 .status-select {
   min-width: 118px;
 }

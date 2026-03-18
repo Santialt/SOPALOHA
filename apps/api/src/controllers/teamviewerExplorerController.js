@@ -48,8 +48,30 @@ async function getDevice(req, res, next) {
   }
 }
 
+async function getLocationDeviceStatuses(req, res, next) {
+  const locationId = Number(req.params.locationId);
+
+  if (!Number.isInteger(locationId) || locationId <= 0) {
+    return next(httpError(400, 'locationId must be a positive integer'));
+  }
+
+  try {
+    const payload = await service.getLocationDeviceStatuses(locationId);
+    logger.info('TeamViewer device statuses requested for location', {
+      request_id: req.requestId,
+      location_id: locationId,
+      devices_total: payload.devices.length,
+      stale: payload.stale
+    });
+    return res.json(payload);
+  } catch (error) {
+    return next(error);
+  }
+}
+
 module.exports = {
   getExplorer,
   getGroup,
-  getDevice
+  getDevice,
+  getLocationDeviceStatuses
 };
