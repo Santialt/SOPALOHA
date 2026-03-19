@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import Button from '../components/Button';
 import CurrentOnCallBlock from '../components/CurrentOnCallBlock';
 import InlineError from '../components/InlineError';
 import InlineSuccess from '../components/InlineSuccess';
@@ -123,10 +124,6 @@ function getShiftPrimaryLabel(shift) {
   return shift?.assigned_user_name || shift?.assigned_to || '-';
 }
 
-function getShiftBackupLabel(shift) {
-  return shift?.backup_assigned_user_name || shift?.backup_assigned_to || '';
-}
-
 function hasSelectableUser(shift, users, fieldName) {
   const userId = shift?.[fieldName];
   return Boolean(userId && users.some((user) => user.id === userId));
@@ -148,11 +145,10 @@ function OnCallPage() {
   const [shiftForm, setShiftForm] = useState(emptyShiftForm());
   const [templateForm, setTemplateForm] = useState(emptyTemplateForm());
   const [shiftPrincipalDirty, setShiftPrincipalDirty] = useState(false);
-  const [shiftBackupDirty, setShiftBackupDirty] = useState(false);
-  const [draggingUserId, setDraggingUserId] = useState(null);
-  const [dragMode, setDragMode] = useState('primary');
-  const [calendarDropSlotKey, setCalendarDropSlotKey] = useState('');
   const [calendarCursor, setCalendarCursor] = useState(() => startOfDay(new Date()));
+  const [assigningSlot, setAssigningSlot] = useState(null);
+  const [draggingUserId, setDraggingUserId] = useState(null);
+  const [calendarDropSlotKey, setCalendarDropSlotKey] = useState('');
 
   const editingShift = useMemo(
     () => shifts.find((shift) => shift.id === editingShiftId) || null,
@@ -162,11 +158,6 @@ function OnCallPage() {
     editingShift && !hasSelectableUser(editingShift, users, 'assigned_user_id')
       ? getShiftPrimaryLabel(editingShift)
       : '';
-  const editingShiftHistoricalBackup =
-    editingShift && !hasSelectableUser(editingShift, users, 'backup_assigned_user_id')
-      ? getShiftBackupLabel(editingShift)
-      : '';
-
   const { load, loading, error, setError } = useDataLoader(async () => {
     setCurrentShiftError('');
     const [shiftsData, templatesData, usersData, currentData] = await Promise.all([
@@ -184,12 +175,6 @@ function OnCallPage() {
     setCurrentShift(currentData);
   }, []);
 
-  useEffect(() => {
-    if (draggingUserId && !users.some((user) => user.id === draggingUserId)) {
-      setDraggingUserId(null);
-    }
-  }, [draggingUserId, users]);
-
   const buildShiftPayload = (formState = shiftForm) => {
     const payload = {
       title: formState.title,
@@ -204,14 +189,8 @@ function OnCallPage() {
       payload.assigned_to = formState.assigned_to_legacy;
     }
 
-    if (formState.backup_assigned_user_id) {
-      payload.backup_assigned_user_id = Number(formState.backup_assigned_user_id);
-    } else if (editingShiftId && !shiftBackupDirty && formState.backup_assigned_to_legacy) {
-      payload.backup_assigned_to = formState.backup_assigned_to_legacy;
-    } else {
-      payload.backup_assigned_user_id = null;
-      payload.backup_assigned_to = null;
-    }
+    payload.backup_assigned_user_id = null;
+    payload.backup_assigned_to = null;
 
     return payload;
   };
@@ -236,7 +215,6 @@ function OnCallPage() {
       setEditingShiftId(null);
       setShiftForm(emptyShiftForm());
       setShiftPrincipalDirty(false);
-      setShiftBackupDirty(false);
       await load();
     } catch (err) {
       setError(err.message);
@@ -252,24 +230,18 @@ function OnCallPage() {
     setShiftForm({
       title: shift.title || '',
       assigned_user_id: hasSelectableUser(shift, users, 'assigned_user_id') ? String(shift.assigned_user_id) : '',
-      backup_assigned_user_id: hasSelectableUser(shift, users, 'backup_assigned_user_id')
-        ? String(shift.backup_assigned_user_id)
-        : '',
       assigned_to_legacy: getShiftPrimaryLabel(shift) === '-' ? '' : getShiftPrimaryLabel(shift),
-      backup_assigned_to_legacy: getShiftBackupLabel(shift),
       start_at: normalizeDatetimeInput(shift.start_at),
       end_at: normalizeDatetimeInput(shift.end_at),
       notes: shift.notes || ''
     });
     setShiftPrincipalDirty(false);
-    setShiftBackupDirty(false);
   };
 
   const onCancelShiftEdit = () => {
     setEditingShiftId(null);
     setShiftForm(emptyShiftForm());
     setShiftPrincipalDirty(false);
-    setShiftBackupDirty(false);
   };
 
   const onSubmitTemplate = async (event) => {
@@ -385,8 +357,9 @@ function OnCallPage() {
     return payload;
   };
 
-  const applyCalendarDrop = async (day, template, draggedUserId) => {
-    const droppedUser = users.find((user) => user.id === draggedUserId);
+  const applyCalendarAssignment = async (day, template, userId) => {
+    const currentScrollY = window.scrollY;
+    const droppedUser = users.find((user) => user.id === Number(userId));
     if (!droppedUser) {
       setError('El usuario seleccionado ya no esta disponible para guardias.');
       return;
@@ -394,46 +367,61 @@ function OnCallPage() {
 
     const shift = findShiftForDayTemplate(day, template);
 
-    if (dragMode === 'backup' && !shift) {
-      setError('Primero asigna un tecnico principal para ese turno.');
-      return;
-    }
-
-    if (
-      shift &&
-      ((dragMode === 'primary' && shift.backup_assigned_user_id === droppedUser.id) ||
-        (dragMode === 'backup' && shift.assigned_user_id === droppedUser.id))
-    ) {
-      setError('El backup debe ser distinto del tecnico principal.');
-      return;
-    }
-
     setCalendarAssigning(true);
+    setAssigningSlot(null);
     setCalendarDropSlotKey('');
     setError('');
     setSuccess('');
 
     try {
       if (shift) {
-        const payload =
-          dragMode === 'primary'
-            ? buildExistingShiftPayload(shift, { assigned_user_id: droppedUser.id })
-            : buildExistingShiftPayload(shift, { backup_assigned_user_id: droppedUser.id });
+        const payload = buildExistingShiftPayload(shift, { assigned_user_id: droppedUser.id });
         await api.updateOnCallShift(shift.id, payload);
-        setSuccess(
-          `Guardia #${shift.id} actualizada: ${dragMode === 'primary' ? 'principal' : 'backup'} ${droppedUser.name}.`
-        );
+        setSuccess(`Guardia #${shift.id} actualizada: principal ${droppedUser.name}.`);
       } else {
         await api.createOnCallShift(buildTemplateShiftPayload(day, template, droppedUser));
         setSuccess(`Guardia creada para ${template.title} el ${buildDayKey(day)}.`);
       }
 
       await load();
+      window.requestAnimationFrame(() => {
+        window.scrollTo({ top: currentScrollY, behavior: 'auto' });
+      });
     } catch (err) {
       setError(err.message);
     } finally {
       setCalendarAssigning(false);
       setDraggingUserId(null);
+    }
+  };
+
+  const onDragStartUser = (event, user) => {
+    setDraggingUserId(user.id);
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', String(user.id));
+  };
+
+  const onDragEndUser = () => {
+    setDraggingUserId(null);
+    setCalendarDropSlotKey('');
+  };
+
+  const onDragOverSlot = (event, slotKey) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    if (calendarDropSlotKey !== slotKey) {
+      setCalendarDropSlotKey(slotKey);
+    }
+  };
+
+  const onDropUserInSlot = async (event, day, template, slotKey) => {
+    event.preventDefault();
+    setCalendarDropSlotKey('');
+    const draggedUserId = Number(event.dataTransfer.getData('text/plain'));
+    if (!Number.isInteger(draggedUserId)) return;
+    await applyCalendarAssignment(day, template, draggedUserId);
+    if (assigningSlot?.slotKey === slotKey) {
+      setAssigningSlot(null);
     }
   };
 
@@ -451,7 +439,6 @@ function OnCallPage() {
         setEditingShiftId(null);
         setShiftForm(emptyShiftForm());
         setShiftPrincipalDirty(false);
-        setShiftBackupDirty(false);
       }
       setSuccess(`Guardia #${shift.id} eliminada.`);
       await load();
@@ -486,33 +473,6 @@ function OnCallPage() {
     const parsed = new Date(`${raw}-01T00:00:00`);
     if (Number.isNaN(parsed.getTime())) return;
     setCalendarCursor(new Date(parsed.getFullYear(), parsed.getMonth(), 1));
-  };
-
-  const onDragStartUser = (event, user) => {
-    setDraggingUserId(user.id);
-    event.dataTransfer.effectAllowed = 'move';
-    event.dataTransfer.setData('text/plain', String(user.id));
-  };
-
-  const onDragEndUser = () => {
-    setDraggingUserId(null);
-    setCalendarDropSlotKey('');
-  };
-
-  const onDragOverSlot = (event, slotKey) => {
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
-    if (calendarDropSlotKey !== slotKey) {
-      setCalendarDropSlotKey(slotKey);
-    }
-  };
-
-  const onDropUserInSlot = async (event, day, template) => {
-    event.preventDefault();
-    const draggedUserId = Number(event.dataTransfer.getData('text/plain'));
-    setCalendarDropSlotKey('');
-    if (!Number.isInteger(draggedUserId)) return;
-    await applyCalendarDrop(day, template, draggedUserId);
   };
 
   if (loading) return <LoadingBlock label="Cargando guardias..." />;
@@ -568,13 +528,13 @@ function OnCallPage() {
               Cruza al dia siguiente
             </label>
             <div className="form-actions full-row">
-              <button type="submit" className="btn-primary" disabled={savingTemplate}>
+              <Button type="submit" variant="primary" disabled={savingTemplate}>
                 {savingTemplate ? 'Guardando...' : editingTemplateId ? 'Guardar plantilla' : 'Crear plantilla'}
-              </button>
+              </Button>
               {editingTemplateId && (
-                <button type="button" className="btn-secondary" onClick={onCancelTemplateEdit}>
+                <Button type="button" variant="secondary" onClick={onCancelTemplateEdit}>
                   Cancelar
-                </button>
+                </Button>
               )}
             </div>
           </form>
@@ -598,9 +558,9 @@ function OnCallPage() {
                     <td>{template.end_time}</td>
                     <td>{template.crosses_to_next_day ? 'Si' : 'No'}</td>
                     <td>
-                      <button type="button" className="btn-secondary" onClick={() => onEditTemplate(template)}>
+                      <Button type="button" variant="secondary" onClick={() => onEditTemplate(template)}>
                         Editar
-                      </button>
+                      </Button>
                     </td>
                   </tr>
                 ))}
@@ -647,23 +607,6 @@ function OnCallPage() {
             </label>
 
             <label>
-              Backup
-              <select
-                className="input"
-                value={shiftForm.backup_assigned_user_id}
-                onChange={(event) => {
-                  setShiftForm({ ...shiftForm, backup_assigned_user_id: event.target.value });
-                  setShiftBackupDirty(true);
-                }}
-              >
-                <option value="">Sin backup</option>
-                {users.map((user) => (
-                  <option key={user.id} value={user.id}>{user.name}</option>
-                ))}
-              </select>
-            </label>
-
-            <label>
               Inicio *
               <input
                 type="datetime-local"
@@ -692,13 +635,6 @@ function OnCallPage() {
                 </small>
               </div>
             )}
-            {editingShiftHistoricalBackup && !shiftBackupDirty && !shiftForm.backup_assigned_user_id && (
-              <div className="full-row">
-                <small className="panel-caption">
-                  Backup historico actual: {editingShiftHistoricalBackup}. Se conserva mientras no reasignes el backup.
-                </small>
-              </div>
-            )}
 
             <label className="full-row">
               Notas
@@ -711,13 +647,13 @@ function OnCallPage() {
             </label>
 
             <div className="form-actions full-row">
-              <button type="submit" className="btn-primary" disabled={savingShift}>
+              <Button type="submit" variant="primary" disabled={savingShift}>
                 {savingShift ? 'Guardando...' : editingShiftId ? 'Guardar cambios' : 'Crear guardia'}
-              </button>
+              </Button>
               {editingShiftId && (
-                <button type="button" className="btn-secondary" onClick={onCancelShiftEdit}>
+                <Button type="button" variant="secondary" onClick={onCancelShiftEdit}>
                   Cancelar edicion
-                </button>
+                </Button>
               )}
             </div>
           </form>
@@ -734,7 +670,6 @@ function OnCallPage() {
                   <th>ID</th>
                   <th>Titulo</th>
                   <th>Principal</th>
-                  <th>Backup</th>
                   <th>Inicio</th>
                   <th>Fin</th>
                   <th>Acciones</th>
@@ -746,29 +681,28 @@ function OnCallPage() {
                     <td>{shift.id}</td>
                     <td>{shift.title}</td>
                     <td>{getShiftPrimaryLabel(shift)}</td>
-                    <td>{getShiftBackupLabel(shift) || '-'}</td>
                     <td>{normalizeDatetimeInput(shift.start_at) || '-'}</td>
                     <td>{normalizeDatetimeInput(shift.end_at) || '-'}</td>
                     <td>
                       <div className="form-actions">
-                        <button className="btn-secondary" onClick={() => onEditShift(shift)}>
+                        <Button variant="secondary" onClick={() => onEditShift(shift)}>
                           Editar
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
-                          className="btn-danger"
+                          variant="danger"
                           onClick={() => onDeleteShift(shift)}
                           disabled={deletingShiftId === shift.id}
                         >
                           {deletingShiftId === shift.id ? 'Eliminando...' : 'Eliminar'}
-                        </button>
+                        </Button>
                       </div>
                     </td>
                   </tr>
                 ))}
                 {shifts.length === 0 && (
                   <tr>
-                    <td colSpan="7" className="empty-row">Sin guardias</td>
+                    <td colSpan="6" className="empty-row">Sin guardias</td>
                   </tr>
                 )}
               </tbody>
@@ -780,47 +714,8 @@ function OnCallPage() {
       <section className="section-card">
         <div className="section-head wrap">
           <h2>Calendario de guardias</h2>
-          <small>Arrastra usuarios tecnicos activos sobre el calendario existente. El modo define si reasignas principal o backup.</small>
+          <small>Asignacion directa desde cada tarjeta. El flujo evita arrastrar y desplazarse para cargar guardias.</small>
           <div className="task-calendar-toolbar">
-            <div className="on-call-dnd-toolbar">
-              <div className="form-actions">
-                <button
-                  type="button"
-                  className={dragMode === 'primary' ? 'btn-primary' : 'btn-secondary'}
-                  onClick={() => setDragMode('primary')}
-                >
-                  Arrastrar principal
-                </button>
-                <button
-                  type="button"
-                  className={dragMode === 'backup' ? 'btn-primary' : 'btn-secondary'}
-                  onClick={() => setDragMode('backup')}
-                >
-                  Arrastrar backup
-                </button>
-              </div>
-              <div className="on-call-dnd-user-list" aria-label="Usuarios tecnicos activos">
-                {users.map((user) => (
-                  <button
-                    key={user.id}
-                    type="button"
-                    className={`on-call-dnd-user ${draggingUserId === user.id ? 'is-dragging' : ''}`}
-                    draggable
-                    onDragStart={(event) => onDragStartUser(event, user)}
-                    onDragEnd={onDragEndUser}
-                    title={`Arrastrar ${user.name}`}
-                  >
-                    <strong>{user.name}</strong>
-                    <small>{dragMode === 'primary' ? 'Principal' : 'Backup'}</small>
-                  </button>
-                ))}
-                {users.length === 0 && (
-                  <div className="dashboard-empty-state">
-                    No hay usuarios tecnicos activos disponibles para guardias.
-                  </div>
-                )}
-              </div>
-            </div>
             <div className="task-calendar-jump">
               <input
                 type="month"
@@ -830,18 +725,79 @@ function OnCallPage() {
               />
             </div>
             <div className="form-actions">
-              <button type="button" className="btn-secondary" onClick={() => onMoveCalendar(-1)}>
+              <Button type="button" variant="secondary" onClick={() => onMoveCalendar(-1)}>
                 Anterior
-              </button>
-              <button type="button" className="btn-secondary" onClick={onGoToday}>
+              </Button>
+              <Button type="button" variant="secondary" onClick={onGoToday}>
                 Hoy
-              </button>
-              <button type="button" className="btn-secondary" onClick={() => onMoveCalendar(1)}>
+              </Button>
+              <Button type="button" variant="secondary" onClick={() => onMoveCalendar(1)}>
                 Siguiente
-              </button>
+              </Button>
             </div>
             <strong>{monthFormatter.format(calendarCursor)}</strong>
           </div>
+        </div>
+
+        <div className="on-call-sticky-assignment-bar">
+          {assigningSlot ? (
+            <div className="on-call-sticky-assignment-content">
+              <div className="on-call-sticky-assignment-head">
+                <div>
+                  <strong>Asignar principal</strong>
+                  <small>
+                    {assigningSlot.template.title} · {buildDayKey(assigningSlot.day)}
+                  </small>
+                </div>
+                <Button type="button" variant="secondary" onClick={() => setAssigningSlot(null)}>
+                  Cerrar
+                </Button>
+              </div>
+              <div className="on-call-sticky-user-list" aria-label="Tecnicos asignables">
+                {users.map((user) => (
+                  <Button
+                    key={user.id}
+                    type="button"
+                    variant="secondary"
+                    className={draggingUserId === user.id ? 'is-dragging' : ''}
+                    draggable
+                    onDragStart={(event) => onDragStartUser(event, user)}
+                    onDragEnd={onDragEndUser}
+                    disabled={calendarAssigning}
+                    onClick={() =>
+                      applyCalendarAssignment(
+                        assigningSlot.day,
+                        assigningSlot.template,
+                        user.id
+                      )
+                    }
+                  >
+                    {user.name}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="on-call-sticky-assignment-content is-idle">
+              <strong>Tecnicos asignables</strong>
+              <small>Toca `+` o arrastra un tecnico sobre el turno para asignar principal.</small>
+              <div className="on-call-sticky-user-list" aria-label="Tecnicos asignables">
+                {users.map((user) => (
+                  <Button
+                    key={user.id}
+                    type="button"
+                    variant="secondary"
+                    className={draggingUserId === user.id ? 'is-dragging' : ''}
+                    draggable
+                    onDragStart={(event) => onDragStartUser(event, user)}
+                    onDragEnd={onDragEndUser}
+                  >
+                    {user.name}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="task-calendar-scroll">
@@ -879,43 +835,43 @@ function OnCallPage() {
                       return (
                         <article
                           key={slotKey}
-                          className={`on-call-slot-card ${isAssigned ? 'assigned' : 'empty'} ${calendarDropSlotKey === slotKey ? 'is-drop-target' : ''}`}
+                          className={`on-call-slot-card ${isAssigned ? 'assigned' : 'empty'} ${assigningSlot?.slotKey === slotKey ? 'is-active' : ''} ${calendarDropSlotKey === slotKey ? 'is-drop-target' : ''}`}
                           title={shift?.notes || template.title}
                           onDragOver={(event) => onDragOverSlot(event, slotKey)}
                           onDragLeave={() => {
                             if (calendarDropSlotKey === slotKey) setCalendarDropSlotKey('');
                           }}
-                          onDrop={(event) => onDropUserInSlot(event, day, template)}
+                          onDrop={(event) => onDropUserInSlot(event, day, template, slotKey)}
                         >
                           <div className="on-call-slot-title">{template.title}</div>
                           <div className="on-call-slot-main">
                             {isAssigned ? getShiftPrimaryLabel(shift) : 'Sin asignar'}
                           </div>
                           <div className="on-call-slot-sub">
-                            {isAssigned
-                              ? getShiftBackupLabel(shift)
-                                ? `Backup: ${getShiftBackupLabel(shift)}`
-                                : 'Sin backup'
-                              : `${template.start_time} - ${template.end_time}`}
+                            {`${template.start_time} - ${template.end_time}`}
                           </div>
                           <div className="on-call-slot-actions">
                             {isAssigned ? (
-                              <button
-                                type="button"
-                                className="btn-small"
-                                onClick={() => onEditShift(shift)}
-                              >
+                              <Button type="button" variant="ghost" onClick={() => onEditShift(shift)}>
                                 Editar
-                              </button>
+                              </Button>
                             ) : (
-                              <span className="on-call-slot-hint">
-                                {calendarAssigning && draggingUserId
-                                  ? 'Asignando...'
-                                  : dragMode === 'primary'
-                                    ? 'Solta principal'
-                                    : 'Requiere principal'}
-                              </span>
+                              <span className="on-call-slot-hint">Sin cobertura</span>
                             )}
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              onClick={() =>
+                                setAssigningSlot({
+                                  slotKey,
+                                  day,
+                                  template
+                                })
+                              }
+                              aria-label={`Asignar principal para ${template.title}`}
+                            >
+                              +
+                            </Button>
                           </div>
                         </article>
                       );

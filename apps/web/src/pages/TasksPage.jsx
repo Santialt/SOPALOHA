@@ -1,4 +1,8 @@
 import { useMemo, useState } from 'react';
+import Badge from '../components/Badge';
+import Button from '../components/Button';
+import Card from '../components/Card';
+import DataTable from '../components/DataTable';
 import EntityCommentsPanel from '../components/EntityCommentsPanel';
 import InlineError from '../components/InlineError';
 import InlineSuccess from '../components/InlineSuccess';
@@ -395,6 +399,11 @@ function TasksPage() {
     acc[status] = tasks.filter((task) => task.status === status);
     return acc;
   }, {});
+  const groupedTaskCounts = {
+    open: (tasksByStatus.pending || []).length + (tasksByStatus.blocked || []).length,
+    inProgress: (tasksByStatus.in_progress || []).length,
+    closed: (tasksByStatus.done || []).length + (tasksByStatus.cancelled || []).length
+  };
 
   const calendarData = useMemo(() => {
     const taskEvents = tasks
@@ -478,6 +487,49 @@ function TasksPage() {
       ? monthFormatter.format(calendarCursor)
       : `${dayFormatter.format(calendarRange.start)} - ${dayFormatter.format(calendarRange.end)}`;
 
+  const tableColumns = [
+    { key: 'id', header: 'ID' },
+    { key: 'title', header: 'Titulo' },
+    { key: 'location', header: 'Local' },
+    { key: 'status', header: 'Estado' },
+    { key: 'priority', header: 'Prioridad' },
+    { key: 'assigned', header: 'Asignado' },
+    { key: 'due', header: 'Vence' },
+    { key: 'scheduled', header: 'Programada' },
+    { key: 'actions', header: 'Acciones' }
+  ];
+  const tableRows = tasks.map((task) => {
+    const location = locations.find((item) => item.id === task.location_id);
+    return {
+      key: task.id,
+      cells: [
+        task.id,
+        task.title,
+        location?.name || '-',
+        <Badge key={`status-${task.id}`} tone={task.status === 'blocked' ? 'danger' : task.status === 'done' || task.status === 'cancelled' ? 'neutral' : task.status === 'in_progress' ? 'warning' : 'primary'}>
+          {formatOperationalStatus(task.status)}
+        </Badge>,
+        <Badge key={`priority-${task.id}`} tone={task.priority === 'critical' ? 'danger' : task.priority === 'high' ? 'warning' : task.priority === 'low' ? 'success' : 'neutral'}>
+          {task.priority}
+        </Badge>,
+        getTaskAssigneeLabel(task),
+        task.due_date || '-',
+        normalizeDatetimeInput(task.scheduled_for) || '-',
+        <div key={`actions-${task.id}`} className="form-actions">
+          <Button variant="secondary" onClick={() => onEdit(task)}>
+            Editar
+          </Button>
+          <Button variant="ghost" onClick={() => setSelectedTaskId(task.id)}>
+            Comentarios
+          </Button>
+          <Button variant="danger" onClick={() => onDelete(task)} disabled={deletingTaskId === task.id}>
+            {deletingTaskId === task.id ? 'Eliminando...' : 'Eliminar'}
+          </Button>
+        </div>
+      ]
+    };
+  });
+
   const onMoveCalendar = (direction) => {
     setCalendarCursor((prev) =>
       calendarScope === 'month' ? addMonths(prev, direction) : addDays(prev, 7 * direction)
@@ -502,6 +554,34 @@ function TasksPage() {
 
   return (
     <div className="page-stack tasks-page">
+      <Card
+        title="Tareas operativas"
+        subtitle="La pantalla prioriza trabajo abierto, luego herramientas de gestion. Usa kanban para mover estados y calendario para planificacion."
+        actions={
+          <Button variant="secondary" onClick={() => setIsFormExpanded((prev) => !prev)}>
+            {isFormExpanded ? 'Ocultar formulario' : editingTaskId ? `Editar #${editingTaskId}` : 'Nueva tarea'}
+          </Button>
+        }
+      >
+        <div className="card-grid">
+          <div className="stat-card tone-warning">
+            <div className="stat-label">Abiertas</div>
+            <div className="stat-value">{groupedTaskCounts.open}</div>
+            <div className="stat-helper">Pendientes y bloqueadas.</div>
+          </div>
+          <div className="stat-card tone-primary">
+            <div className="stat-label">En progreso</div>
+            <div className="stat-value">{groupedTaskCounts.inProgress}</div>
+            <div className="stat-helper">Trabajo activo del equipo.</div>
+          </div>
+          <div className="stat-card tone-success">
+            <div className="stat-label">Cerradas</div>
+            <div className="stat-value">{groupedTaskCounts.closed}</div>
+            <div className="stat-helper">Resueltas o canceladas.</div>
+          </div>
+        </div>
+      </Card>
+
       <section className="section-card collapsible-section">
         <button
           type="button"
@@ -512,7 +592,9 @@ function TasksPage() {
           <span>
             <strong>{editingTaskId ? `Editar tarea #${editingTaskId}` : 'Alta de tarea'}</strong>
           </span>
-          <small>{isFormExpanded ? 'Ocultar formulario' : 'Desplegar formulario'}</small>
+          <span className={`collapsible-indicator ${isFormExpanded ? 'expanded' : ''}`} aria-hidden="true">
+            +
+          </span>
         </button>
 
         {isFormExpanded && (
@@ -629,13 +711,13 @@ function TasksPage() {
               </label>
 
               <div className="form-actions full-row">
-                <button type="submit" className="btn-primary" disabled={saving}>
+                <Button type="submit" variant="primary" disabled={saving}>
                   {saving ? 'Guardando...' : editingTaskId ? 'Guardar cambios' : 'Crear tarea'}
-                </button>
+                </Button>
                 {editingTaskId && (
-                  <button type="button" className="btn-secondary" onClick={onCancelEdit}>
+                  <Button variant="secondary" onClick={onCancelEdit}>
                     Cancelar edicion
-                  </button>
+                  </Button>
                 )}
               </div>
             </form>
@@ -652,39 +734,29 @@ function TasksPage() {
 
       <section className="section-card">
         <div className="section-head wrap">
-          <h2>
-            {viewMode === 'kanban'
-              ? 'Tablero de tareas'
-              : viewMode === 'calendar'
-                ? 'Calendario de tareas'
-                : 'Listado de tareas'}
-          </h2>
-          {viewMode === 'kanban' && <small>Arrastra y suelta tarjetas entre columnas para cambiar estado.</small>}
-          {viewMode === 'calendar' && (
-            <small>Eventos por scheduled_for y fallback a due_date. Click para editar la tarea.</small>
-          )}
+          <div>
+            <h2>
+              {viewMode === 'kanban'
+                ? 'Trabajo en curso'
+                : viewMode === 'calendar'
+                  ? 'Planificacion'
+                  : 'Listado de tareas'}
+            </h2>
+            {viewMode === 'kanban' && <small>Arrastra tarjetas entre columnas para cambiar estado.</small>}
+            {viewMode === 'calendar' && (
+              <small>Eventos por scheduled_for y fallback a due_date. Click para editar.</small>
+            )}
+          </div>
           <div className="form-actions">
-            <button
-              type="button"
-              className={viewMode === 'kanban' ? 'btn-primary' : 'btn-secondary'}
-              onClick={() => setViewMode('kanban')}
-            >
+            <Button variant={viewMode === 'kanban' ? 'primary' : 'secondary'} onClick={() => setViewMode('kanban')}>
               Kanban
-            </button>
-            <button
-              type="button"
-              className={viewMode === 'list' ? 'btn-primary' : 'btn-secondary'}
-              onClick={() => setViewMode('list')}
-            >
+            </Button>
+            <Button variant={viewMode === 'list' ? 'primary' : 'secondary'} onClick={() => setViewMode('list')}>
               Tabla
-            </button>
-            <button
-              type="button"
-              className={viewMode === 'calendar' ? 'btn-primary' : 'btn-secondary'}
-              onClick={() => setViewMode('calendar')}
-            >
+            </Button>
+            <Button variant={viewMode === 'calendar' ? 'primary' : 'secondary'} onClick={() => setViewMode('calendar')}>
               Calendario
-            </button>
+            </Button>
           </div>
           <div className="filter-row">
             {viewMode !== 'kanban' && (
@@ -730,7 +802,9 @@ function TasksPage() {
                 <article key={status} className={`kanban-column ${dragOverStatus === status ? 'is-drop-target' : ''}`}>
                   <header className="kanban-column-head">
                     <h3>{statusLabels[status] || status}</h3>
-                    <span className={`badge ${status}`}>{columnTasks.length}</span>
+                    <Badge tone={status === 'blocked' ? 'danger' : status === 'done' || status === 'cancelled' ? 'neutral' : status === 'in_progress' ? 'warning' : 'primary'}>
+                      {columnTasks.length}
+                    </Badge>
                   </header>
 
                   <div
@@ -752,7 +826,9 @@ function TasksPage() {
                             #{task.id} - {task.title}
                           </div>
                           <div className="kanban-card-meta">
-                            <span className={`badge ${task.priority}`}>{task.priority}</span>
+                            <Badge tone={task.priority === 'critical' ? 'danger' : task.priority === 'high' ? 'warning' : task.priority === 'low' ? 'success' : 'neutral'}>
+                              {task.priority}
+                            </Badge>
                             <span>{location?.name || 'Sin local'}</span>
                           </div>
                           <div className="kanban-card-meta">
@@ -760,20 +836,22 @@ function TasksPage() {
                             <span>Vence: {task.due_date || '-'}</span>
                           </div>
                           <div className="kanban-card-actions">
-                            <span className={`badge ${task.status}`}>{formatOperationalStatus(task.status)}</span>
-                            <button className="btn-secondary" onClick={() => onEdit(task)}>
+                            <Badge tone={task.status === 'blocked' ? 'danger' : task.status === 'done' || task.status === 'cancelled' ? 'neutral' : task.status === 'in_progress' ? 'warning' : 'primary'}>
+                              {formatOperationalStatus(task.status)}
+                            </Badge>
+                            <Button variant="secondary" onClick={() => onEdit(task)}>
                               Editar
-                            </button>
-                            <button className="btn-secondary" onClick={() => setSelectedTaskId(task.id)}>
+                            </Button>
+                            <Button variant="ghost" onClick={() => setSelectedTaskId(task.id)}>
                               Comentarios
-                            </button>
-                            <button
-                              className="btn-danger"
+                            </Button>
+                            <Button
+                              variant="danger"
                               onClick={() => onDelete(task)}
                               disabled={deletingTaskId === task.id || statusUpdatingTaskId === task.id}
                             >
                               {deletingTaskId === task.id ? 'Eliminando...' : 'Eliminar'}
-                            </button>
+                            </Button>
                           </div>
                         </div>
                       );
@@ -791,15 +869,15 @@ function TasksPage() {
           <div className="task-calendar-wrap">
             <div className="task-calendar-toolbar">
               <div className="form-actions">
-                <button type="button" className="btn-secondary" onClick={() => onMoveCalendar(-1)}>
+                <Button variant="secondary" onClick={() => onMoveCalendar(-1)}>
                   Anterior
-                </button>
-                <button type="button" className="btn-secondary" onClick={onGoToday}>
+                </Button>
+                <Button variant="secondary" onClick={onGoToday}>
                   Hoy
-                </button>
-                <button type="button" className="btn-secondary" onClick={() => onMoveCalendar(1)}>
+                </Button>
+                <Button variant="secondary" onClick={() => onMoveCalendar(1)}>
                   Siguiente
-                </button>
+                </Button>
               </div>
               <strong>{calendarTitle}</strong>
               {calendarScope === 'month' && (
@@ -825,20 +903,12 @@ function TasksPage() {
                 </div>
               )}
               <div className="form-actions">
-                <button
-                  type="button"
-                  className={calendarScope === 'month' ? 'btn-primary' : 'btn-secondary'}
-                  onClick={() => setCalendarScope('month')}
-                >
+                <Button variant={calendarScope === 'month' ? 'primary' : 'secondary'} onClick={() => setCalendarScope('month')}>
                   Mes
-                </button>
-                <button
-                  type="button"
-                  className={calendarScope === 'week' ? 'btn-primary' : 'btn-secondary'}
-                  onClick={() => setCalendarScope('week')}
-                >
+                </Button>
+                <Button variant={calendarScope === 'week' ? 'primary' : 'secondary'} onClick={() => setCalendarScope('week')}>
                   Semana
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -914,7 +984,9 @@ function TasksPage() {
                       <strong>#{task.id}</strong>
                       <span>{task.title}</span>
                       <small>{movingTaskToCalendarId === task.id ? 'Asignando fecha...' : draggingUndatedTaskId === task.id ? 'Solta en un dia del calendario' : 'Arrastrar al calendario'}</small>
-                      <span className={`badge ${task.status}`}>{formatOperationalStatus(task.status)}</span>
+                      <Badge tone={task.status === 'blocked' ? 'danger' : task.status === 'done' || task.status === 'cancelled' ? 'neutral' : task.status === 'in_progress' ? 'warning' : 'primary'}>
+                        {formatOperationalStatus(task.status)}
+                      </Badge>
                     </button>
                   ))}
                 </div>
@@ -922,62 +994,7 @@ function TasksPage() {
             </div>
           </div>
         ) : (
-          <div className="table-wrap table-wrap-xl">
-            <table className="table compact">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Titulo</th>
-                  <th>Local</th>
-                  <th>Estado</th>
-                  <th>Prioridad</th>
-                  <th>Asignado</th>
-                  <th>Vence</th>
-                  <th>Programada</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tasks.map((task) => {
-                  const location = locations.find((item) => item.id === task.location_id);
-                  return (
-                    <tr key={task.id}>
-                      <td>{task.id}</td>
-                      <td>{task.title}</td>
-                      <td>{location?.name || '-'}</td>
-                      <td><span className={`badge ${task.status}`}>{formatOperationalStatus(task.status)}</span></td>
-                      <td><span className={`badge ${task.priority}`}>{task.priority}</span></td>
-                      <td>{getTaskAssigneeLabel(task)}</td>
-                      <td>{task.due_date || '-'}</td>
-                      <td>{normalizeDatetimeInput(task.scheduled_for) || '-'}</td>
-                      <td>
-                        <div className="form-actions">
-                          <button className="btn-secondary" onClick={() => onEdit(task)}>
-                            Editar
-                          </button>
-                          <button className="btn-secondary" onClick={() => setSelectedTaskId(task.id)}>
-                            Comentarios
-                          </button>
-                          <button
-                            className="btn-danger"
-                            onClick={() => onDelete(task)}
-                            disabled={deletingTaskId === task.id}
-                          >
-                            {deletingTaskId === task.id ? 'Eliminando...' : 'Eliminar'}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-                {tasks.length === 0 && (
-                  <tr>
-                    <td colSpan="9" className="empty-row">Sin tareas</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          <DataTable columns={tableColumns} rows={tableRows} emptyMessage="Sin tareas" tableClassName="compact" extraWide />
         )}
       </section>
 
