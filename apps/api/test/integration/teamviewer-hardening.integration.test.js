@@ -226,12 +226,20 @@ test("TeamViewer backend hardening covers preview, import, degradation, and rout
     "TeamViewer imported-case flows require admin mutations while preserving read-only access",
     async () => {
       teamviewerFetch.reset();
+      const reportQueries = [];
 
       teamviewerFetch.setHandler(async (url) => {
         const parsedUrl = new URL(url);
         if (parsedUrl.pathname !== "/api/v1/reports/connections") {
           throw new Error(`Unexpected TeamViewer request: ${url}`);
         }
+
+        reportQueries.push({
+          from_date: parsedUrl.searchParams.get("from_date"),
+          to_date: parsedUrl.searchParams.get("to_date"),
+          start_date: parsedUrl.searchParams.get("start_date"),
+          end_date: parsedUrl.searchParams.get("end_date"),
+        });
 
         const offset = Number(parsedUrl.searchParams.get("offset"));
         if (offset === 0) {
@@ -319,18 +327,24 @@ test("TeamViewer backend hardening covers preview, import, degradation, and rout
 
       assert.equal(adminImportCasesResult.status, 200);
       assert.deepEqual(adminImportCasesResult.body.summary, {
-        total_received: 5,
-        total_with_note: 5,
+        total_received: 3,
+        total_with_note: 3,
         total_valid_format: 2,
         total_inserted: 2,
-        total_duplicated: 1,
-        total_discarded_invalid_format: 2,
-        total_out_of_range_from_api: 1,
+        total_duplicated: 0,
+        total_discarded_invalid_format: 1,
+        total_out_of_range_from_api: 0,
       });
       assert.deepEqual(
         adminImportCasesResult.body.discarded.map((row) => row.reason).sort(),
-        ["missing_required_fields", "missing_separator"],
+        ["missing_separator"],
       );
+      assert.deepEqual(reportQueries[0], {
+        from_date: "2026-03-01",
+        to_date: "2026-03-31",
+        start_date: null,
+        end_date: null,
+      });
 
       const listImportedCases = await harness.authedRequest(
         techUser,

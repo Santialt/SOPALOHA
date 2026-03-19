@@ -134,13 +134,16 @@ function normalizeImportRange(payload = {}) {
     throw httpError(400, 'Invalid date range. Use ISO date or datetime values');
   }
 
-  const fromIso = fromDate.toISOString();
-  const toIso = toDate.toISOString();
   if (fromDate > toDate) {
     throw httpError(400, 'from_date must be less than or equal to to_date');
   }
 
-  return { from_date: fromIso, to_date: toIso };
+  return {
+    from_date: fromDate.toISOString(),
+    to_date: toDate.toISOString(),
+    api_from_date: fromDate.toISOString().slice(0, 10),
+    api_to_date: toDate.toISOString().slice(0, 10)
+  };
 }
 
 function normalizeListFilters(filters = {}) {
@@ -390,7 +393,10 @@ async function importCases(payload = {}) {
   const range = normalizeImportRange(payload);
   const rangeStartMs = new Date(range.from_date).getTime();
   const rangeEndMs = new Date(range.to_date).getTime();
-  const rawConnections = await fetchConnectionReports(range);
+  const rawConnections = await fetchConnectionReports({
+    from_date: range.api_from_date,
+    to_date: range.api_to_date
+  });
   const connectionsInRange = rawConnections.filter((rawConnection) => {
     const startedAt = normalizeDateTime(
       pickFirst(rawConnection, [
@@ -479,7 +485,10 @@ async function importCases(payload = {}) {
 
   return {
     imported_at: new Date().toISOString(),
-    range,
+    range: {
+      from_date: range.from_date,
+      to_date: range.to_date
+    },
     summary: stats,
     discarded
   };

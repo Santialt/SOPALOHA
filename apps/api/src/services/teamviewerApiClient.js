@@ -6,7 +6,7 @@ const TEAMVIEWER_TIMEOUT_MS = Number(process.env.TEAMVIEWER_TIMEOUT_MS || 15000)
 const TEAMVIEWER_MAX_RETRIES = Number(process.env.TEAMVIEWER_MAX_RETRIES || 1);
 const TEAMVIEWER_BASE_BACKOFF_MS = 300;
 const TEAMVIEWER_MAX_BACKOFF_MS = 5000;
-const TEAMVIEWER_MAX_PAGES = 100;
+const TEAMVIEWER_REPORTS_PAGE_LIMIT = 1000;
 
 function getTeamviewerToken() {
   const token = String(process.env.TEAMVIEWER_API_TOKEN || '').trim();
@@ -247,122 +247,159 @@ async function fetchGroups() {
   return [];
 }
 
-function getPaginationOffset(payload) {
+function normalizeDateOnly(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return raw;
+  }
+
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+  return parsed.toISOString().slice(0, 10);
+}
+
+function parseDateOnly(value) {
+  return new Date(`${value}T00:00:00.000Z`);
+}
+
+function formatDateOnly(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function addUtcDays(date, amount) {
+  const next = new Date(date);
+  next.setUTCDate(next.getUTCDate() + amount);
+  return next;
+}
+
+function splitDateRange(fromDate, toDate) {
+  const fromMs = fromDate.getTime();
+  const toMs = toDate.getTime();
+  const totalDays = Math.floor((toMs - fromMs) / 86400000);
+  const leftDays = Math.floor(totalDays / 2);
+  const leftEnd = addUtcDays(fromDate, leftDays);
+  const rightStart = addUtcDays(leftEnd, 1);
+
+  return [
+    {
+      from_date: formatDateOnly(fromDate),
+      to_date: formatDateOnly(leftEnd)
+    },
+    {
+      from_date: formatDateOnly(rightStart),
+      to_date: formatDateOnly(toDate)
+    }
+  ];
+}
+
+function getRecordsRemaining(payload) {
   const candidates = [
-    payload?.next_offset,
-    payload?.nextOffset,
-    payload?.pagination?.next_offset,
-    payload?.pagination?.nextOffset,
-    payload?.paging?.next_offset,
-    payload?.paging?.nextOffset
+    payload?.records_remaining,
+    payload?.recordsRemaining,
+    payload?.pagination?.records_remaining,
+    payload?.pagination?.recordsRemaining
   ];
 
   for (const value of candidates) {
-    if (value === undefined || value === null || String(value).trim() === '') continue;
     const parsed = Number(value);
-    if (Number.isFinite(parsed) && parsed >= 0) return parsed;
+    if (Number.isFinite(parsed) && parsed >= 0) {
+      return parsed;
+    }
   }
 
-  return null;
+  return 0;
 }
 
-async function fetchConnectionReportsByQueryStrategy(range, queryMapping) {
-  const pageSize = 1000;
-  const rows = [];
-  let offset = 0;
-  const seenPageSignatures = new Set();
-  let reachedPageLimit = true;
+function dedupeConnectionRows(rows) {
+  const deduped = new Map();
 
-  for (let page = 0; page < TEAMVIEWER_MAX_PAGES; page += 1) {
-    const query = {
-      [queryMapping.fromKey]: range.from_date,
-      [queryMapping.toKey]: range.to_date,
-      offset,
-      limit: pageSize
-    };
-
-    const payload = await fetchJson('/reports/connections', query, {
-      useReportsToken: true,
-      timeoutMs: Math.max(TEAMVIEWER_TIMEOUT_MS, 20000)
-    });
-    const pageRows = extractArray(payload, ['records', 'connections', 'items', 'data']);
-
-    const firstId = String(pageRows[0]?.id || pageRows[0]?.connection_id || '').trim();
-    const lastId = String(pageRows[pageRows.length - 1]?.id || pageRows[pageRows.length - 1]?.connection_id || '').trim();
-    const signature = `${firstId}::${lastId}::${pageRows.length}`;
-    if (pageRows.length > 0 && seenPageSignatures.has(signature)) {
-      logger.warn('TeamViewer pagination loop detected, stopping report fetch', {
-        offset,
-        page,
-        signature
-      });
-      reachedPageLimit = false;
-      break;
-    }
-    seenPageSignatures.add(signature);
-
-    rows.push(...pageRows);
-
-    if (pageRows.length === 0) {
-      reachedPageLimit = false;
-      break;
-    }
-
-    const nextOffset = getPaginationOffset(payload);
-    if (nextOffset === null) {
-      if (pageRows.length < pageSize) {
-        reachedPageLimit = false;
-        break;
+  for (const row of rows) {
+    const key = String(row?.id || row?.connection_id || '').trim();
+    if (key) {
+      if (!deduped.has(key)) {
+        deduped.set(key, row);
       }
-      offset += pageSize;
       continue;
     }
 
-    if (nextOffset <= offset) {
-      logger.warn('TeamViewer returned non-increasing pagination offset', {
-        current_offset: offset,
-        next_offset: nextOffset
+    deduped.set(`row-${deduped.size}`, row);
+  }
+
+  return [...deduped.values()];
+}
+
+async function fetchConnectionReportsPage(range) {
+  const payload = await fetchJson('/reports/connections', {
+    from_date: range.from_date,
+    to_date: range.to_date,
+    limit: TEAMVIEWER_REPORTS_PAGE_LIMIT
+  }, {
+    useReportsToken: true,
+    timeoutMs: Math.max(TEAMVIEWER_TIMEOUT_MS, 20000)
+  });
+
+  return {
+    rows: extractArray(payload, ['records', 'connections', 'items', 'data']),
+    recordsRemaining: getRecordsRemaining(payload)
+  };
+}
+
+async function fetchConnectionReportsByDateRange(range, depth = 0) {
+  const page = await fetchConnectionReportsPage(range);
+  const fromDate = parseDateOnly(range.from_date);
+  const toDate = parseDateOnly(range.to_date);
+  const canSplit = fromDate.getTime() < toDate.getTime();
+  const isLikelyCapped =
+    page.rows.length >= TEAMVIEWER_REPORTS_PAGE_LIMIT || page.recordsRemaining > 0;
+
+  if (!isLikelyCapped || !canSplit) {
+    if (isLikelyCapped && !canSplit) {
+      logger.warn('TeamViewer reports range appears capped at one day granularity', {
+        from_date: range.from_date,
+        to_date: range.to_date,
+        rows: page.rows.length,
+        records_remaining: page.recordsRemaining
       });
-      reachedPageLimit = false;
-      break;
     }
-    offset = nextOffset;
+
+    return page.rows;
   }
 
-  if (reachedPageLimit) {
-    logger.warn('TeamViewer pagination page limit reached, stopping report fetch', {
-      max_pages: TEAMVIEWER_MAX_PAGES,
-      last_offset: offset
-    });
-  }
+  const [leftRange, rightRange] = splitDateRange(fromDate, toDate);
+  logger.warn('TeamViewer reports range exceeded upstream page cap, splitting request window', {
+    from_date: range.from_date,
+    to_date: range.to_date,
+    rows: page.rows.length,
+    records_remaining: page.recordsRemaining,
+    depth
+  });
 
-  return rows;
+  const [leftRows, rightRows] = await Promise.all([
+    fetchConnectionReportsByDateRange(leftRange, depth + 1),
+    fetchConnectionReportsByDateRange(rightRange, depth + 1)
+  ]);
+
+  return dedupeConnectionRows([...leftRows, ...rightRows]);
 }
 
 async function fetchConnectionReports(range) {
-  const strategies = [
-    { fromKey: 'from_date', toKey: 'to_date' },
-    { fromKey: 'start_date', toKey: 'end_date' },
-    { fromKey: 'from', toKey: 'to' }
-  ];
+  const normalizedRange = {
+    from_date: normalizeDateOnly(range?.from_date),
+    to_date: normalizeDateOnly(range?.to_date)
+  };
 
-  let lastError = null;
-  for (const strategy of strategies) {
-    try {
-      return await fetchConnectionReportsByQueryStrategy(range, strategy);
-    } catch (error) {
-      lastError = error;
-      if (error?.code !== 'TEAMVIEWER_BAD_RESPONSE') {
-        throw error;
-      }
-    }
+  if (!normalizedRange.from_date || !normalizedRange.to_date) {
+    throw createExternalServiceError({
+      message: 'TeamViewer reports require valid from_date and to_date values',
+      code: 'TEAMVIEWER_BAD_RESPONSE',
+      retryable: false
+    });
   }
 
-  if (lastError) {
-    throw lastError;
-  }
-
-  return [];
+  return fetchConnectionReportsByDateRange(normalizedRange);
 }
 
 module.exports = { fetchDevices, fetchGroups, fetchConnectionReports };
