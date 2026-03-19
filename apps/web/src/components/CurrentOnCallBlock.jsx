@@ -1,5 +1,7 @@
 import InlineError from './InlineError';
 import LoadingBlock from './LoadingBlock';
+import Badge from './Badge';
+import Card from './Card';
 
 const dateTimeFormatter = new Intl.DateTimeFormat('es-AR', {
   dateStyle: 'short',
@@ -18,10 +20,12 @@ function CurrentOnCallBlock({ shift, loading = false, error = '', title = 'Guard
   if (loading) return <LoadingBlock label="Cargando guardia actual..." />;
 
   return (
-    <section className="section-card current-on-call-card">
-      <div className="section-head">
-        <h2>{title}</h2>
-      </div>
+    <Card
+      className="current-on-call-card"
+      title={title}
+      subtitle="Cobertura vigente para escalamiento y soporte fuera de horario."
+      actions={<Badge tone={shift ? 'primary' : 'neutral'}>{shift ? 'Activa' : 'Sin cobertura'}</Badge>}
+    >
       <InlineError message={error} />
       {shift ? (
         <div className="current-on-call-content">
@@ -51,7 +55,7 @@ function CurrentOnCallBlock({ shift, loading = false, error = '', title = 'Guard
       ) : (
         <div className="kanban-empty">No hay una guardia activa en este momento.</div>
       )}
-    </section>
+    </Card>
   );
 }
 

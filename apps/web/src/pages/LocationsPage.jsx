@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import Button from '../components/Button';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import InlineError from '../components/InlineError';
 import InlineSuccess from '../components/InlineSuccess';
@@ -85,6 +86,7 @@ function LocationsPage() {
   const [success, setSuccess] = useState('');
   const [form, setForm] = useState(initialForm);
   const [editingId, setEditingId] = useState(null);
+  const [isFormExpanded, setIsFormExpanded] = useState(false);
   const rowRefs = useRef(new Map());
   const selectedId = Number(searchParams.get('selected'));
   const validSelectedId = Number.isInteger(selectedId) ? selectedId : null;
@@ -176,6 +178,7 @@ function LocationsPage() {
 
       setForm(initialForm);
       setEditingId(null);
+      setIsFormExpanded(false);
       await loadLocations();
     } catch (err) {
       setError(err.message);
@@ -189,6 +192,7 @@ function LocationsPage() {
     setSuccess('');
     setEditingId(location.id);
     setForm(mapLocationToForm(location));
+    setIsFormExpanded(true);
   };
 
   const onDelete = async (location, event) => {
@@ -219,16 +223,27 @@ function LocationsPage() {
 
   return (
     <div className="page-stack">
-      <section className="section-card">
-        <div className="section-head wrap">
-          <div>
-            <h2>{editingId ? `Editar local #${editingId}` : 'Crear local'}</h2>
+      <section className="section-card collapsible-section">
+        <button
+          type="button"
+          className="collapsible-toggle"
+          onClick={() => setIsFormExpanded((prev) => !prev)}
+          aria-expanded={isFormExpanded}
+          aria-label={isFormExpanded ? 'Contraer formulario de local' : 'Expandir formulario de local'}
+        >
+          <span>
+            <strong>{editingId ? `Editar local #${editingId}` : 'Crear local'}</strong>
             <small className="panel-caption">
               Carga primero identificacion y estado. Completa el resto solo si aporta soporte operativo.
             </small>
-          </div>
-        </div>
+          </span>
+          <span className={`collapsible-indicator ${isFormExpanded ? 'expanded' : ''}`} aria-hidden="true">
+            +
+          </span>
+        </button>
 
+        {isFormExpanded && (
+        <div className="collapsible-content">
         <form onSubmit={onSubmit} className="form-grid">
           <label>
             Nombre *
@@ -437,24 +452,27 @@ function LocationsPage() {
           </label>
 
           <div className="form-actions">
-            <button className="btn-primary" disabled={saving} type="submit">
+            <Button variant="primary" disabled={saving} type="submit">
               {saving ? 'Guardando...' : editingId ? 'Guardar cambios del local' : 'Crear local'}
-            </button>
+            </Button>
             {editingId && (
-              <button
+              <Button
                 type="button"
-                className="btn-secondary"
+                variant="secondary"
                 onClick={() => {
                   setEditingId(null);
                   setForm(initialForm);
                   setSuccess('');
+                  setIsFormExpanded(false);
                 }}
               >
                 Cancelar
-              </button>
+              </Button>
             )}
           </div>
         </form>
+        </div>
+        )}
       </section>
 
       <section className="section-card">
@@ -487,13 +505,9 @@ function LocationsPage() {
         <InlineSuccess message={success} />
         {validSelectedId && (
           <div className="form-actions">
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => setSearchParams({}, { replace: true })}
-            >
+            <Button type="button" variant="secondary" onClick={() => setSearchParams({}, { replace: true })}>
               Limpiar foco rapido
-            </button>
+            </Button>
           </div>
         )}
 
@@ -545,16 +559,16 @@ function LocationsPage() {
                   <td><span className={`badge ${location.status}`}>{location.status}</span></td>
                   <td>
                     <div className="form-actions">
-                      <button className="btn-small" onClick={(event) => onEdit(location, event)}>
+                      <Button variant="ghost" onClick={(event) => onEdit(location, event)}>
                         Editar
-                      </button>
-                      <button
-                        className="btn-danger"
+                      </Button>
+                      <Button
+                        variant="danger"
                         onClick={(event) => onDelete(location, event)}
                         disabled={deletingId === location.id}
                       >
                         {deletingId === location.id ? 'Eliminando...' : 'Eliminar'}
-                      </button>
+                      </Button>
                     </div>
                   </td>
                 </tr>

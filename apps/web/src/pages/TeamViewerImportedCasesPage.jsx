@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import Badge from '../components/Badge';
+import Button from '../components/Button';
+import Card from '../components/Card';
+import DataTable from '../components/DataTable';
 import InlineError from '../components/InlineError';
 import InlineSuccess from '../components/InlineSuccess';
 import LoadingBlock from '../components/LoadingBlock';
@@ -25,13 +29,13 @@ function formatDateTime(value) {
 function buildActiveFiltersSummary(filters) {
   const parts = [];
   if (filters.location_id) parts.push('local');
-  if (filters.from_date || filters.to_date) parts.push('rango de fechas');
+  if (filters.from_date || filters.to_date) parts.push('rango');
   if (filters.technician_user_id) parts.push('tecnico');
   if (filters.group) parts.push('grupo');
   if (filters.keyword.trim()) parts.push('texto');
 
   if (parts.length === 0) {
-    return 'Selecciona un rango y buscá para consultar casos.';
+    return 'Sin filtros activos.';
   }
 
   return `Filtros activos: ${parts.join(', ')}.`;
@@ -86,8 +90,6 @@ function TeamViewerImportedCasesPage() {
   const [teamviewerGroups, setTeamviewerGroups] = useState([]);
   const [pageOffset, setPageOffset] = useState(0);
   const [lastSubmittedFilters, setLastSubmittedFilters] = useState(null);
-  const [isImportSectionOpen, setIsImportSectionOpen] = useState(false);
-  const [isManualSectionOpen, setIsManualSectionOpen] = useState(false);
 
   const [importRange, setImportRange] = useState(() => {
     const now = new Date();
@@ -100,7 +102,6 @@ function TeamViewerImportedCasesPage() {
   });
 
   const [listFilters, setListFilters] = useState(() => createInitialListFilters(prefillLocationId));
-
   const [manualForm, setManualForm] = useState(() => {
     const now = new Date();
     return {
@@ -131,13 +132,9 @@ function TeamViewerImportedCasesPage() {
         setTechnicians(Array.isArray(catalogsData?.technicians) ? catalogsData.technicians : []);
         setTeamviewerGroups(Array.isArray(catalogsData?.teamviewer_groups) ? catalogsData.teamviewer_groups : []);
       } catch (err) {
-        if (!cancelled) {
-          setError(err.message);
-        }
+        if (!cancelled) setError(err.message);
       } finally {
-        if (!cancelled) {
-          setCatalogLoading(false);
-        }
+        if (!cancelled) setCatalogLoading(false);
       }
     }
 
@@ -156,17 +153,18 @@ function TeamViewerImportedCasesPage() {
     [technicians]
   );
   const groupOptions = useMemo(
-    () => [...teamviewerGroups].sort((a, b) => a.group_name.localeCompare(b.group_name, 'es', { sensitivity: 'base' })),
+    () =>
+      [...teamviewerGroups].sort((a, b) =>
+        a.group_name.localeCompare(b.group_name, 'es', { sensitivity: 'base' })
+      ),
     [teamviewerGroups]
   );
   const selectedManualGroup = useMemo(
     () => groupOptions.find((group) => group.group_name === manualForm.teamviewer_group_name) || null,
     [groupOptions, manualForm.teamviewer_group_name]
   );
-
   const hasDateRangeSelected = Boolean(listFilters.from_date || listFilters.to_date);
   const hasMore = rows.length === PAGE_SIZE;
-  const listSummaryLabel = rows.length === 1 ? '1 caso' : `${rows.length} casos`;
   const activeFiltersSummary = buildActiveFiltersSummary(listFilters);
 
   const loadRows = async (filters, offset = 0) => {
@@ -301,7 +299,6 @@ function TeamViewerImportedCasesPage() {
     setListFilters(initialFilters);
     setPageOffset(0);
     loadRows(initialFilters, 0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefillLocationId]);
 
   useEffect(() => {
@@ -314,199 +311,216 @@ function TeamViewerImportedCasesPage() {
     return <LoadingBlock label="Cargando catalogos de casos TeamViewer..." />;
   }
 
+  const tableColumns = [
+    { key: 'started_at', header: 'Inicio' },
+    { key: 'ended_at', header: 'Fin' },
+    { key: 'technician', header: 'Tecnico' },
+    { key: 'group', header: 'Grupo' },
+    { key: 'location', header: 'Local' },
+    { key: 'requester', header: 'Solicitante' },
+    { key: 'problem', header: 'Problema' },
+    { key: 'actions', header: 'Acciones' }
+  ];
+
+  const tableRows = rows.map((row) => {
+    const resolvedLocationId = row.resolved_location_id || row.location_id || null;
+    const location = resolvedLocationId ? locations.find((item) => item.id === resolvedLocationId) : null;
+
+    return {
+      key: row.id,
+      cells: [
+        formatDateTime(row.started_at),
+        formatDateTime(row.ended_at),
+        resolveTechnicianFromCase(row),
+        row.teamviewer_group_name || '-',
+        location?.name || row.resolved_location_name || row.teamviewer_group_name || '-',
+        row.requested_by || '-',
+        row.problem_description || '-',
+        <Button
+          key={`delete-${row.id}`}
+          variant="danger"
+          onClick={() => onDeleteCase(row)}
+          disabled={runningActionCaseId === row.id}
+        >
+          Eliminar
+        </Button>
+      ]
+    };
+  });
+
   return (
-    <div className="page-stack">
-      <section className="section-card">
-        <h2>Casos TeamViewer</h2>
-        <small>Alta manual, importacion y consulta centralizada de casos TeamViewer.</small>
-      </section>
-
-      <section className="section-card collapsible-section">
-        <button
-          type="button"
-          className="collapsible-toggle"
-          onClick={() => setIsImportSectionOpen((prev) => !prev)}
-          aria-expanded={isImportSectionOpen}
-        >
-          <span>Importar casos</span>
-          <small>{isImportSectionOpen ? 'Ocultar' : 'Desplegar'}</small>
-        </button>
-        {isImportSectionOpen && (
-          <div className="collapsible-content">
-            <div className="form-grid form-grid-3">
-              <label>
-                Fecha desde
-                <input
-                  className="input"
-                  type="date"
-                  value={importRange.from_date}
-                  onChange={(event) => setImportRange((prev) => ({ ...prev, from_date: event.target.value }))}
-                />
-              </label>
-              <label>
-                Fecha hasta
-                <input
-                  className="input"
-                  type="date"
-                  value={importRange.to_date}
-                  onChange={(event) => setImportRange((prev) => ({ ...prev, to_date: event.target.value }))}
-                />
-              </label>
-            </div>
-            <div className="form-actions">
-              <button type="button" className="btn-primary" onClick={onImport} disabled={importing || loading}>
-                {importing ? 'Importando...' : 'Importar rango'}
-              </button>
-            </div>
+    <div className="page-stack tv-cases-page">
+      <Card
+        title="Casos TeamViewer"
+        subtitle="Este modulo consulta e importa conexiones/casos de TeamViewer. No reemplaza incidentes internos: funciona como registro operativo externo."
+        actions={<Badge tone="primary">{rows.length} en pagina</Badge>}
+      >
+        <div className="tv-cases-summary">
+          <div className="tv-cases-summary-block">
+            <span>Busqueda actual</span>
+            <strong>{hasSearched ? `${rows.length} resultados` : 'Sin consulta'}</strong>
+            <small>{activeFiltersSummary}</small>
           </div>
-        )}
-      </section>
-
-      <section className="section-card collapsible-section">
-        <button
-          type="button"
-          className="collapsible-toggle"
-          onClick={() => setIsManualSectionOpen((prev) => !prev)}
-          aria-expanded={isManualSectionOpen}
-        >
-          <span>Agregar caso manual</span>
-          <small>{isManualSectionOpen ? 'Ocultar' : 'Desplegar'}</small>
-        </button>
-        {isManualSectionOpen && (
-          <div className="collapsible-content">
-            <form className="form-grid form-grid-3" onSubmit={onCreateManual}>
-              <label>
-                Inicio
-                <input
-                  className="input"
-                  type="datetime-local"
-                  value={manualForm.started_at}
-                  onChange={(event) => setManualForm((prev) => ({ ...prev, started_at: event.target.value }))}
-                  required
-                />
-              </label>
-              <label>
-                Fin
-                <input
-                  className="input"
-                  type="datetime-local"
-                  value={manualForm.ended_at}
-                  onChange={(event) => setManualForm((prev) => ({ ...prev, ended_at: event.target.value }))}
-                />
-              </label>
-              <label>
-                Tecnico *
-                <select
-                  className="input"
-                  value={manualForm.technician_user_id}
-                  onChange={(event) => setManualForm((prev) => ({ ...prev, technician_user_id: event.target.value }))}
-                  required
-                >
-                  <option value="">Seleccionar tecnico</option>
-                  {technicianOptions.map((technician) => (
-                    <option key={technician.id} value={technician.id}>
-                      {technician.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Grupo TeamViewer *
-                <select
-                  className="input"
-                  value={manualForm.teamviewer_group_name}
-                  onChange={(event) => setManualForm((prev) => ({ ...prev, teamviewer_group_name: event.target.value }))}
-                  required
-                >
-                  <option value="">Seleccionar grupo</option>
-                  {groupOptions.map((group) => (
-                    <option key={group.group_name} value={group.group_name}>
-                      {group.group_name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="full-row">
-                Comentario (formato: problema - solicitante)
-                <input
-                  className="input"
-                  value={manualForm.note_raw}
-                  onChange={(event) => setManualForm((prev) => ({ ...prev, note_raw: event.target.value }))}
-                  required
-                />
-              </label>
-              <div className="form-actions">
-                <button
-                  type="submit"
-                  className="btn-primary"
-                  disabled={savingManual || !manualForm.technician_user_id || !manualForm.teamviewer_group_name}
-                >
-                  {savingManual ? 'Guardando...' : 'Agregar caso manual'}
-                </button>
-              </div>
-            </form>
-            {selectedManualGroup && (
-              <small>
-                Grupo seleccionado: {selectedManualGroup.group_name}
-                {selectedManualGroup.location_name ? ` | Local vinculado: ${selectedManualGroup.location_name}` : ''}
-              </small>
-            )}
+          <div className="tv-cases-summary-block">
+            <span>Rango inicial</span>
+            <strong>
+              {listFilters.from_date || '-'} a {listFilters.to_date || '-'}
+            </strong>
+            <small>Se precarga el mes actual para acelerar consulta.</small>
           </div>
-        )}
-      </section>
+        </div>
+      </Card>
 
       <InlineError message={error} />
       <InlineSuccess message={success} />
 
+      <div className="tv-cases-tools-grid">
+        <Card title="Importar casos" subtitle="Carga un rango y refresca catalogos para que soporte trabaje con datos recientes.">
+          <div className="form-grid form-grid-3">
+            <label>
+              Fecha desde
+              <input
+                className="input"
+                type="date"
+                value={importRange.from_date}
+                onChange={(event) => setImportRange((prev) => ({ ...prev, from_date: event.target.value }))}
+              />
+            </label>
+            <label>
+              Fecha hasta
+              <input
+                className="input"
+                type="date"
+                value={importRange.to_date}
+                onChange={(event) => setImportRange((prev) => ({ ...prev, to_date: event.target.value }))}
+              />
+            </label>
+          </div>
+          <div className="form-actions">
+            <Button variant="primary" onClick={onImport} disabled={importing || loading}>
+              {importing ? 'Importando...' : 'Importar rango'}
+            </Button>
+          </div>
+        </Card>
+
+        <Card title="Alta manual" subtitle="Registra un caso externo cuando no llega por importacion o necesita carga correctiva.">
+          <form className="form-grid form-grid-3" onSubmit={onCreateManual}>
+            <label>
+              Inicio
+              <input
+                className="input"
+                type="datetime-local"
+                value={manualForm.started_at}
+                onChange={(event) => setManualForm((prev) => ({ ...prev, started_at: event.target.value }))}
+                required
+              />
+            </label>
+            <label>
+              Fin
+              <input
+                className="input"
+                type="datetime-local"
+                value={manualForm.ended_at}
+                onChange={(event) => setManualForm((prev) => ({ ...prev, ended_at: event.target.value }))}
+              />
+            </label>
+            <label>
+              Tecnico *
+              <select
+                className="input"
+                value={manualForm.technician_user_id}
+                onChange={(event) => setManualForm((prev) => ({ ...prev, technician_user_id: event.target.value }))}
+                required
+              >
+                <option value="">Seleccionar tecnico</option>
+                {technicianOptions.map((technician) => (
+                  <option key={technician.id} value={technician.id}>
+                    {technician.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Grupo TeamViewer *
+              <select
+                className="input"
+                value={manualForm.teamviewer_group_name}
+                onChange={(event) => setManualForm((prev) => ({ ...prev, teamviewer_group_name: event.target.value }))}
+                required
+              >
+                <option value="">Seleccionar grupo</option>
+                {groupOptions.map((group) => (
+                  <option key={group.group_name} value={group.group_name}>
+                    {group.group_name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="full-row">
+              Comentario
+              <input
+                className="input"
+                value={manualForm.note_raw}
+                onChange={(event) => setManualForm((prev) => ({ ...prev, note_raw: event.target.value }))}
+                placeholder="problema - solicitante"
+                required
+              />
+            </label>
+            {selectedManualGroup && (
+              <div className="full-row">
+                <small className="panel-caption">
+                  Grupo: {selectedManualGroup.group_name}
+                  {selectedManualGroup.location_name ? ` | Local vinculado: ${selectedManualGroup.location_name}` : ''}
+                </small>
+              </div>
+            )}
+            <div className="form-actions full-row">
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={savingManual || !manualForm.technician_user_id || !manualForm.teamviewer_group_name}
+              >
+                {savingManual ? 'Guardando...' : 'Crear caso manual'}
+              </Button>
+            </div>
+          </form>
+        </Card>
+      </div>
+
       {summary && (
-        <section className="section-card">
-          <h2>Resumen de importacion</h2>
+        <Card title="Resultado de la ultima importacion" subtitle="Se muestran contadores utiles para validar calidad de entrada y descarte.">
           <div className="key-value-grid">
             <div><strong>Total recibidos:</strong> {summary.total_received}</div>
-            <div><strong>Total con nota:</strong> {summary.total_with_note}</div>
-            <div><strong>Total validos por formato:</strong> {summary.total_valid_format}</div>
-            <div><strong>Total insertados:</strong> {summary.total_inserted}</div>
-            <div><strong>Total duplicados:</strong> {summary.total_duplicated}</div>
-            <div><strong>Total descartados formato invalido:</strong> {summary.total_discarded_invalid_format}</div>
+            <div><strong>Con nota:</strong> {summary.total_with_note}</div>
+            <div><strong>Formato valido:</strong> {summary.total_valid_format}</div>
+            <div><strong>Insertados:</strong> {summary.total_inserted}</div>
+            <div><strong>Duplicados:</strong> {summary.total_duplicated}</div>
+            <div><strong>Formato invalido:</strong> {summary.total_discarded_invalid_format}</div>
           </div>
-        </section>
+        </Card>
       )}
 
       {discarded.length > 0 && (
-        <section className="section-card">
-          <h2>Descartados (muestra)</h2>
-          <div className="table-wrap">
-            <table className="table compact">
-              <thead>
-                <tr>
-                  <th>External ID</th>
-                  <th>Motivo</th>
-                </tr>
-              </thead>
-              <tbody>
-                {discarded.slice(0, 20).map((row, index) => (
-                  <tr key={`${row.external_connection_id || 'no-id'}-${index}`}>
-                    <td>{row.external_connection_id || '-'}</td>
-                    <td>{row.reason}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
+        <Card title="Descartados" subtitle="Muestra acotada para revisar por que no entraron ciertos registros.">
+          <DataTable
+            columns={[
+              { key: 'external_id', header: 'External ID' },
+              { key: 'reason', header: 'Motivo' }
+            ]}
+            rows={discarded.slice(0, 20).map((row, index) => ({
+              key: `${row.external_connection_id || 'no-id'}-${index}`,
+              cells: [row.external_connection_id || '-', row.reason]
+            }))}
+            tableClassName="compact"
+          />
+        </Card>
       )}
 
-      <section className="section-card">
-        <div className="section-head">
-          <h2>Consulta de casos</h2>
-          <small>{hasSearched ? `Mostrando ${listSummaryLabel} en esta pagina.` : 'Sin consulta ejecutada.'}</small>
-        </div>
-
-        <div className="incident-summary-total">
-          <strong>{hasSearched ? rows.length : 0}</strong>
-          <span>{activeFiltersSummary}</span>
-        </div>
-
+      <Card
+        title="Consulta de casos"
+        subtitle="Filtros orientados a busqueda operativa: rango, tecnico, grupo, local y texto libre."
+        actions={<Badge tone={hasMore ? 'warning' : 'neutral'}>{hasMore ? 'Hay mas paginas' : 'Fin de resultados'}</Badge>}
+      >
         <div className="form-grid form-grid-3">
           <label>
             Local
@@ -583,93 +597,49 @@ function TeamViewerImportedCasesPage() {
         </div>
 
         <div className="form-actions">
-          <button type="button" className="btn-primary" onClick={onApplyFilters} disabled={loading}>
+          <Button variant="primary" onClick={onApplyFilters} disabled={loading}>
             Buscar casos
-          </button>
-          <button type="button" className="btn-secondary" onClick={onResetFilters} disabled={loading}>
+          </Button>
+          <Button variant="secondary" onClick={onResetFilters} disabled={loading}>
             Restablecer filtros
-          </button>
+          </Button>
         </div>
 
         {!hasSearched ? (
-          <div className="kanban-empty">Selecciona fecha desde, fecha hasta o un rango y luego hace clic en "Buscar casos".</div>
+          <div className="dashboard-empty-state">
+            Selecciona un rango y ejecuta la busqueda para consultar casos.
+          </div>
         ) : loading ? (
           <LoadingBlock label="Actualizando casos..." />
         ) : (
           <>
-            <div className="table-wrap table-wrap-xl">
-              <table className="table compact">
-                <thead>
-                  <tr>
-                    <th>Fecha inicio</th>
-                    <th>Fecha fin</th>
-                    <th>Tecnico</th>
-                    <th>Grupo</th>
-                    <th>Local</th>
-                    <th>Solicitante</th>
-                    <th>Descripcion del problema</th>
-                    <th>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row) => {
-                    const resolvedLocationId = row.resolved_location_id || row.location_id || null;
-                    const location = resolvedLocationId
-                      ? locations.find((item) => item.id === resolvedLocationId)
-                      : null;
-
-                    return (
-                      <tr key={row.id}>
-                        <td>{formatDateTime(row.started_at)}</td>
-                        <td>{formatDateTime(row.ended_at)}</td>
-                        <td>{resolveTechnicianFromCase(row)}</td>
-                        <td>{row.teamviewer_group_name || '-'}</td>
-                        <td>{location?.name || row.resolved_location_name || row.teamviewer_group_name || '-'}</td>
-                        <td>{row.requested_by || '-'}</td>
-                        <td>{row.problem_description || '-'}</td>
-                        <td>
-                          <button
-                            type="button"
-                            className="btn-danger"
-                            onClick={() => onDeleteCase(row)}
-                            disabled={runningActionCaseId === row.id}
-                          >
-                            Eliminar
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {rows.length === 0 && (
-                    <tr>
-                      <td colSpan="8" className="empty-row">Sin resultados para los filtros actuales.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+            <DataTable
+              columns={tableColumns}
+              rows={tableRows}
+              emptyMessage="Sin resultados para los filtros actuales."
+              tableClassName="compact"
+              extraWide
+            />
 
             <div className="form-actions">
-              <button
-                type="button"
-                className="btn-secondary"
+              <Button
+                variant="secondary"
                 onClick={() => setPageOffset((prev) => Math.max(prev - PAGE_SIZE, 0))}
                 disabled={loading || pageOffset === 0}
               >
                 Pagina anterior
-              </button>
-              <button
-                type="button"
-                className="btn-secondary"
+              </Button>
+              <Button
+                variant="secondary"
                 onClick={() => setPageOffset((prev) => prev + PAGE_SIZE)}
                 disabled={loading || !hasMore}
               >
                 Pagina siguiente
-              </button>
+              </Button>
             </div>
           </>
         )}
-      </section>
+      </Card>
     </div>
   );
 }

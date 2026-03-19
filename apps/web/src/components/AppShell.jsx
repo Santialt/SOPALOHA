@@ -2,13 +2,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { applyTheme, getPreferredTheme } from '../theme';
+import Button from './Button';
 import LocationQuickSearch from './LocationQuickSearch';
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/locations', label: 'Locales' },
   { to: '/aloha-master', label: 'ALOHA MASTER' },
-  { to: '/incidents', label: 'Casos TeamViewer' },
+  { to: '/incidents', label: 'Casos TV' },
   { to: '/tasks', label: 'Tareas' },
   { to: '/on-call', label: 'Guardias' },
   { to: '/teamviewer-explorer', label: 'TeamViewer Explorer' },
@@ -17,7 +18,7 @@ const navItems = [
 ];
 
 const pageTitles = {
-  '/dashboard': 'Dashboard Operativo',
+  '/dashboard': 'Control operativo',
   '/locations': 'Gestion de locales',
   '/aloha-master': 'Aloha Master',
   '/incidents': 'Casos TeamViewer',
@@ -113,12 +114,12 @@ function AppShell() {
 
             <div className="main-header-actions">
               <div className="form-actions">
-                <button type="button" className="theme-toggle" onClick={onToggleTheme}>
+                <Button variant="secondary" className="theme-toggle" onClick={onToggleTheme}>
                   Tema: {theme === 'dark' ? 'Oscuro' : 'Claro'}
-                </button>
-                <button type="button" className="btn-secondary" onClick={onLogout}>
+                </Button>
+                <Button variant="secondary" onClick={onLogout}>
                   Cerrar sesion
-                </button>
+                </Button>
               </div>
             </div>
           </div>
