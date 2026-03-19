@@ -155,6 +155,7 @@ function TasksPage() {
   const [draggingUndatedTaskId, setDraggingUndatedTaskId] = useState(null);
   const [calendarDropDateKey, setCalendarDropDateKey] = useState('');
   const [movingTaskToCalendarId, setMovingTaskToCalendarId] = useState(null);
+  const [isFormExpanded, setIsFormExpanded] = useState(false);
 
   const [tasks, setTasks] = useState([]);
   const [locations, setLocations] = useState([]);
@@ -240,6 +241,7 @@ function TasksPage() {
 
   const onEdit = (task) => {
     setEditingTaskId(task.id);
+    setIsFormExpanded(true);
     setError('');
     setSuccess('');
     setForm({
@@ -499,132 +501,154 @@ function TasksPage() {
   if (loading) return <LoadingBlock label="Cargando tareas operativas..." />;
 
   return (
-    <div className="grid-two-columns">
-      <section className="section-card">
-        <h2>{editingTaskId ? `Editar tarea #${editingTaskId}` : 'Alta de tarea'}</h2>
-        <InlineError message={error} />
-        <InlineSuccess message={success} />
+    <div className="page-stack tasks-page">
+      <section className="section-card collapsible-section">
+        <button
+          type="button"
+          className="collapsible-toggle"
+          onClick={() => setIsFormExpanded((prev) => !prev)}
+          aria-expanded={isFormExpanded}
+        >
+          <span>
+            <strong>{editingTaskId ? `Editar tarea #${editingTaskId}` : 'Alta de tarea'}</strong>
+          </span>
+          <small>{isFormExpanded ? 'Ocultar formulario' : 'Desplegar formulario'}</small>
+        </button>
 
-        <form onSubmit={onSubmit} className="form-grid form-grid-3">
-          <label className="full-row">
-            Titulo *
-            <input
-              className="input"
-              value={form.title}
-              onChange={(event) => setForm({ ...form, title: event.target.value })}
-              required
-            />
-          </label>
+        {isFormExpanded && (
+          <div className="collapsible-content">
+            <InlineError message={error} />
+            <InlineSuccess message={success} />
 
-          <label>
-            Estado
-            <select
-              className="input"
-              value={form.status}
-              onChange={(event) => setForm({ ...form, status: event.target.value })}
-            >
-              {enums.operationalTaskStatus.map((status) => (
-                <option key={status} value={status}>{formatOperationalStatus(status)}</option>
-              ))}
-            </select>
-          </label>
+            <form onSubmit={onSubmit} className="form-grid form-grid-3">
+              <label className="full-row">
+                Titulo *
+                <input
+                  className="input"
+                  value={form.title}
+                  onChange={(event) => setForm({ ...form, title: event.target.value })}
+                  required
+                />
+              </label>
 
-          <label>
-            Prioridad
-            <select
-              className="input"
-              value={form.priority}
-              onChange={(event) => setForm({ ...form, priority: event.target.value })}
-            >
-              {enums.operationalTaskPriority.map((priority) => (
-                <option key={priority} value={priority}>{priority}</option>
-              ))}
-            </select>
-          </label>
+              <label>
+                Estado
+                <select
+                  className="input"
+                  value={form.status}
+                  onChange={(event) => setForm({ ...form, status: event.target.value })}
+                >
+                  {enums.operationalTaskStatus.map((status) => (
+                    <option key={status} value={status}>{formatOperationalStatus(status)}</option>
+                  ))}
+                </select>
+              </label>
 
-          <label>
-            Local
-            <select
-              className="input"
-              value={form.location_id}
-              onChange={(event) => setForm({ ...form, location_id: event.target.value })}
-            >
-              <option value="">Sin local</option>
-              {locations.map((location) => (
-                <option key={location.id} value={location.id}>{location.name}</option>
-              ))}
-            </select>
-          </label>
+              <label>
+                Prioridad
+                <select
+                  className="input"
+                  value={form.priority}
+                  onChange={(event) => setForm({ ...form, priority: event.target.value })}
+                >
+                  {enums.operationalTaskPriority.map((priority) => (
+                    <option key={priority} value={priority}>{priority}</option>
+                  ))}
+                </select>
+              </label>
 
-          <label>
-            Asignado a
-            <select
-              className="input"
-              value={form.assigned_user_id}
-              onChange={(event) => {
-                setForm({
-                  ...form,
-                  assigned_user_id: event.target.value
-                });
-                setAssignmentDirty(true);
-              }}
-            >
-              <option value="">Sin usuario</option>
-              {users.map((user) => (
-                <option key={user.id} value={user.id}>{user.name} ({user.role})</option>
-              ))}
-            </select>
-          </label>
-          {editingTaskHistoricalAssignee && !assignmentDirty && !form.assigned_user_id && (
-            <div className="full-row">
-              <small className="panel-caption">
-                Asignacion historica actual: {editingTaskHistoricalAssignee}. Se conserva mientras no reasignes la tarea.
-              </small>
-            </div>
-          )}
+              <label>
+                Local
+                <select
+                  className="input"
+                  value={form.location_id}
+                  onChange={(event) => setForm({ ...form, location_id: event.target.value })}
+                >
+                  <option value="">Sin local</option>
+                  {locations.map((location) => (
+                    <option key={location.id} value={location.id}>{location.name}</option>
+                  ))}
+                </select>
+              </label>
 
-          <label>
-            Vence
-            <input
-              type="date"
-              className="input"
-              value={form.due_date}
-              onChange={(event) => setForm({ ...form, due_date: event.target.value })}
-            />
-          </label>
+              <label>
+                Asignado a
+                <select
+                  className="input"
+                  value={form.assigned_user_id}
+                  onChange={(event) => {
+                    setForm({
+                      ...form,
+                      assigned_user_id: event.target.value
+                    });
+                    setAssignmentDirty(true);
+                  }}
+                >
+                  <option value="">Sin usuario</option>
+                  {users.map((user) => (
+                    <option key={user.id} value={user.id}>{user.name} ({user.role})</option>
+                  ))}
+                </select>
+              </label>
+              {editingTaskHistoricalAssignee && !assignmentDirty && !form.assigned_user_id && (
+                <div className="full-row">
+                  <small className="panel-caption">
+                    Asignacion historica actual: {editingTaskHistoricalAssignee}. Se conserva mientras no reasignes la tarea.
+                  </small>
+                </div>
+              )}
 
-          <label>
-            Programada para
-            <input
-              type="datetime-local"
-              className="input"
-              value={form.scheduled_for}
-              onChange={(event) => setForm({ ...form, scheduled_for: event.target.value })}
-            />
-          </label>
+              <label>
+                Vence
+                <input
+                  type="date"
+                  className="input"
+                  value={form.due_date}
+                  onChange={(event) => setForm({ ...form, due_date: event.target.value })}
+                />
+              </label>
 
-          <label className="full-row">
-            Descripcion
-            <textarea
-              rows="3"
-              className="input"
-              value={form.description}
-              onChange={(event) => setForm({ ...form, description: event.target.value })}
-            />
-          </label>
+              <label>
+                Programada para
+                <input
+                  type="datetime-local"
+                  className="input"
+                  value={form.scheduled_for}
+                  onChange={(event) => setForm({ ...form, scheduled_for: event.target.value })}
+                />
+              </label>
 
-          <div className="form-actions full-row">
-            <button type="submit" className="btn-primary" disabled={saving}>
-              {saving ? 'Guardando...' : editingTaskId ? 'Guardar cambios' : 'Crear tarea'}
-            </button>
-            {editingTaskId && (
-              <button type="button" className="btn-secondary" onClick={onCancelEdit}>
-                Cancelar edicion
-              </button>
-            )}
+              <label className="full-row">
+                Descripcion
+                <textarea
+                  rows="3"
+                  className="input"
+                  value={form.description}
+                  onChange={(event) => setForm({ ...form, description: event.target.value })}
+                />
+              </label>
+
+              <div className="form-actions full-row">
+                <button type="submit" className="btn-primary" disabled={saving}>
+                  {saving ? 'Guardando...' : editingTaskId ? 'Guardar cambios' : 'Crear tarea'}
+                </button>
+                {editingTaskId && (
+                  <button type="button" className="btn-secondary" onClick={onCancelEdit}>
+                    Cancelar edicion
+                  </button>
+                )}
+              </div>
+            </form>
           </div>
-        </form>
+        )}
       </section>
+
+      {!isFormExpanded && (
+        <>
+          <InlineError message={error} />
+          <InlineSuccess message={success} />
+        </>
+      )}
 
       <section className="section-card">
         <div className="section-head wrap">
