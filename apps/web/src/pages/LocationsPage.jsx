@@ -16,6 +16,7 @@ const initialForm = {
   version_modulo_fiscal: '',
   usa_nbo: false,
   city: '',
+  country: '',
   address: '',
   phone: '',
   cantidad_licencias_aloha: '',
@@ -31,7 +32,20 @@ const initialForm = {
 function mapLocationToForm(location) {
   return {
     ...initialForm,
-    ...location,
+    name: location.name || '',
+    company_name: location.company_name || '',
+    razon_social: location.razon_social || '',
+    cuit: location.cuit || '',
+    llave_aloha: location.llave_aloha || '',
+    version_aloha: location.version_aloha || '',
+    version_modulo_fiscal: location.version_modulo_fiscal || '',
+    country: location.country || '',
+    city: location.city || '',
+    address: location.address || '',
+    phone: location.phone || '',
+    cmc: location.cmc || '',
+    status: location.status || 'abierto',
+    notes: location.notes || '',
     usa_nbo: Boolean(location.usa_nbo),
     tiene_kitchen: Boolean(location.tiene_kitchen),
     usa_insight_pulse: Boolean(location.usa_insight_pulse),
@@ -98,6 +112,7 @@ function LocationsPage() {
         location.llave_aloha,
         location.version_aloha,
         location.city,
+        location.country,
         location.address,
         location.phone,
         location.cmc
@@ -203,119 +218,7 @@ function LocationsPage() {
   if (loading) return <LoadingBlock label="Cargando locales..." />;
 
   return (
-    <div className="grid-two-columns">
-      <section className="section-card">
-        <div className="section-head">
-          <div>
-            <h2>Listado de locales</h2>
-            {validSelectedId && (
-              <small>
-                Local enfocado: {selectedLocationFromState?.name || `#${validSelectedId}`}
-              </small>
-            )}
-            {!validSelectedId && (
-              <small>
-                {locationCountLabel}
-                {hasActiveSearch ? ` para "${search.trim()}"` : ` de ${locations.length} registrados`}
-              </small>
-            )}
-          </div>
-          <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Filtrar por nombre, CUIT, key Aloha, ciudad o telefono"
-            className="input"
-            disabled={Boolean(validSelectedId)}
-            aria-label="Filtrar listado de locales"
-          />
-        </div>
-
-        <InlineError message={error} />
-        <InlineSuccess message={success} />
-        {validSelectedId && (
-          <div className="form-actions">
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => setSearchParams({}, { replace: true })}
-            >
-              Limpiar foco rapido
-            </button>
-          </div>
-        )}
-
-        <div className="table-wrap table-wrap-wide">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Nombre</th>
-                <th>Empresa</th>
-                <th>CUIT</th>
-                <th>Aloha</th>
-                <th>Ciudad</th>
-                <th>Estado</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((location) => (
-                <tr
-                  key={location.id}
-                  ref={(node) => {
-                    if (node) {
-                      rowRefs.current.set(location.id, node);
-                    } else {
-                      rowRefs.current.delete(location.id);
-                    }
-                  }}
-                  onClick={() => navigate(`/locations/${location.id}`)}
-                  onKeyDown={(event) => {
-                    if (event.target !== event.currentTarget || isRowActionTarget(event.target)) {
-                      return;
-                    }
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault();
-                      navigate(`/locations/${location.id}`);
-                    }
-                  }}
-                  className={`row-clickable ${validSelectedId === location.id ? 'row-highlighted row-selected' : ''}`}
-                  tabIndex={0}
-                  aria-label={`Abrir detalle del local ${location.name}`}
-                >
-                  <td>{location.id}</td>
-                  <td>{location.name}</td>
-                  <td>{location.company_name || '-'}</td>
-                  <td>{location.cuit || '-'}</td>
-                  <td>{location.version_aloha || '-'}</td>
-                  <td>{location.city || '-'}</td>
-                  <td><span className={`badge ${location.status}`}>{location.status}</span></td>
-                  <td>
-                    <div className="form-actions">
-                      <button className="btn-small" onClick={(event) => onEdit(location, event)}>
-                        Editar
-                      </button>
-                      <button
-                        className="btn-danger"
-                        onClick={(event) => onDelete(location, event)}
-                        disabled={deletingId === location.id}
-                      >
-                        {deletingId === location.id ? 'Eliminando...' : 'Eliminar'}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan="8" className="empty-row">Sin resultados</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
+    <div className="page-stack">
       <section className="section-card">
         <div className="section-head wrap">
           <div>
@@ -370,6 +273,15 @@ function LocationsPage() {
               className="input"
               value={form.city}
               onChange={(event) => setForm({ ...form, city: event.target.value })}
+            />
+          </label>
+
+          <label>
+            Pais
+            <input
+              className="input"
+              value={form.country}
+              onChange={(event) => setForm({ ...form, country: event.target.value })}
             />
           </label>
 
@@ -543,6 +455,118 @@ function LocationsPage() {
             )}
           </div>
         </form>
+      </section>
+
+      <section className="section-card">
+        <div className="section-head">
+          <div>
+            <h2>Listado de locales</h2>
+            {validSelectedId && (
+              <small>
+                Local enfocado: {selectedLocationFromState?.name || `#${validSelectedId}`}
+              </small>
+            )}
+            {!validSelectedId && (
+              <small>
+                {locationCountLabel}
+                {hasActiveSearch ? ` para "${search.trim()}"` : ` de ${locations.length} registrados`}
+              </small>
+            )}
+          </div>
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Filtrar por nombre, CUIT, key Aloha, ciudad o telefono"
+            className="input"
+            disabled={Boolean(validSelectedId)}
+            aria-label="Filtrar listado de locales"
+          />
+        </div>
+
+        <InlineError message={error} />
+        <InlineSuccess message={success} />
+        {validSelectedId && (
+          <div className="form-actions">
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => setSearchParams({}, { replace: true })}
+            >
+              Limpiar foco rapido
+            </button>
+          </div>
+        )}
+
+        <div className="table-wrap table-wrap-wide">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Nombre</th>
+                <th>Empresa</th>
+                <th>CUIT</th>
+                <th>Aloha</th>
+                <th>Ciudad</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((location) => (
+                <tr
+                  key={location.id}
+                  ref={(node) => {
+                    if (node) {
+                      rowRefs.current.set(location.id, node);
+                    } else {
+                      rowRefs.current.delete(location.id);
+                    }
+                  }}
+                  onClick={() => navigate(`/locations/${location.id}`)}
+                  onKeyDown={(event) => {
+                    if (event.target !== event.currentTarget || isRowActionTarget(event.target)) {
+                      return;
+                    }
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      navigate(`/locations/${location.id}`);
+                    }
+                  }}
+                  className={`row-clickable ${validSelectedId === location.id ? 'row-highlighted row-selected' : ''}`}
+                  tabIndex={0}
+                  aria-label={`Abrir detalle del local ${location.name}`}
+                >
+                  <td>{location.id}</td>
+                  <td>{location.name}</td>
+                  <td>{location.company_name || '-'}</td>
+                  <td>{location.cuit || '-'}</td>
+                  <td>{location.version_aloha || '-'}</td>
+                  <td>{location.city || '-'}</td>
+                  <td><span className={`badge ${location.status}`}>{location.status}</span></td>
+                  <td>
+                    <div className="form-actions">
+                      <button className="btn-small" onClick={(event) => onEdit(location, event)}>
+                        Editar
+                      </button>
+                      <button
+                        className="btn-danger"
+                        onClick={(event) => onDelete(location, event)}
+                        disabled={deletingId === location.id}
+                      >
+                        {deletingId === location.id ? 'Eliminando...' : 'Eliminar'}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan="8" className="empty-row">Sin resultados</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
     </div>
   );

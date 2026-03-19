@@ -18,6 +18,7 @@ const locationRules = [
   { field: 'address' },
   { field: 'city' },
   { field: 'province' },
+  { field: 'country' },
   { field: 'phone' },
   { field: 'main_contact' },
   { field: 'notes' },

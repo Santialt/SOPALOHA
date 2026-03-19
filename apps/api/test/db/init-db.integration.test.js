@@ -110,6 +110,7 @@ test("SQLite initialization is idempotent and upgrades a legacy schema safely", 
 
   assert.ok(locationColumns.some((column) => column.name === "llave_aloha"));
   assert.ok(locationColumns.some((column) => column.name === "usa_nbo"));
+  assert.ok(locationColumns.some((column) => column.name === "country"));
   assert.ok(deviceColumns.some((column) => column.name === "device_role"));
   assert.ok(deviceColumns.some((column) => column.name === "windows_version"));
   assert.ok(incidentColumns.some((column) => column.name === "created_by"));

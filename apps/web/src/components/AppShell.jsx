@@ -7,6 +7,7 @@ import LocationQuickSearch from './LocationQuickSearch';
 const navItems = [
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/locations', label: 'Locales' },
+  { to: '/aloha-master', label: 'ALOHA MASTER' },
   { to: '/incidents', label: 'Casos TeamViewer' },
   { to: '/tasks', label: 'Tareas' },
   { to: '/on-call', label: 'Guardias' },
@@ -18,6 +19,7 @@ const navItems = [
 const pageTitles = {
   '/dashboard': 'Dashboard Operativo',
   '/locations': 'Gestion de locales',
+  '/aloha-master': 'Aloha Master',
   '/incidents': 'Casos TeamViewer',
   '/tasks': 'Tareas',
   '/on-call': 'Guardias',

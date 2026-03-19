@@ -278,83 +278,100 @@ test("fetchDevices tolerates malformed upstream JSON by returning an empty devic
   assert.deepEqual(devices, []);
 });
 
-test("fetchConnectionReports paginates through report pages and stops on repeated page signatures", async () => {
+test("fetchConnectionReports splits capped date ranges until TeamViewer returns all matching records", async () => {
   const client = loadClient({
     TEAMVIEWER_MAX_RETRIES: 0,
   });
 
-  const offsets = [];
+  const calls = [];
   global.fetch = async (url) => {
     const parsedUrl = new URL(String(url));
-    const offset = Number(parsedUrl.searchParams.get("offset"));
-    offsets.push(offset);
+    const fromDate = parsedUrl.searchParams.get("from_date");
+    const toDate = parsedUrl.searchParams.get("to_date");
+    calls.push({
+      from_date: fromDate,
+      to_date: toDate,
+      limit: parsedUrl.searchParams.get("limit"),
+    });
 
-    if (offset === 0) {
+    if (fromDate === "2026-03-01" && toDate === "2026-03-04") {
+      return jsonResponse({
+        records: Array.from({ length: 1000 }, (_, index) => ({
+          id: `cap-${index + 1}`,
+          start_time: "2026-03-04T12:00:00Z",
+        })),
+        records_remaining: 300,
+      });
+    }
+
+    if (fromDate === "2026-03-01" && toDate === "2026-03-02") {
       return jsonResponse({
         records: [
-          { id: "c1", start_time: "2026-03-10T10:00:00Z" },
-          { id: "c2", start_time: "2026-03-10T11:00:00Z" },
+          { id: "c1", start_time: "2026-03-01T10:00:00Z" },
+          { id: "c2", start_time: "2026-03-02T11:00:00Z" },
         ],
-        pagination: { next_offset: 2 },
+        records_remaining: 0,
       });
     }
 
-    if (offset === 2) {
+    if (fromDate === "2026-03-03" && toDate === "2026-03-04") {
       return jsonResponse({
-        records: [{ id: "c3", start_time: "2026-03-10T12:00:00Z" }],
-        pagination: { next_offset: 3 },
+        records: [
+          { id: "c3", start_time: "2026-03-03T12:00:00Z" },
+          { id: "c4", start_time: "2026-03-04T13:00:00Z" },
+        ],
+        records_remaining: 0,
       });
     }
 
-    return jsonResponse({
-      records: [{ id: "c3", start_time: "2026-03-10T12:00:00Z" }],
-      pagination: { next_offset: 4 },
-    });
+    return jsonResponse({ records: [], records_remaining: 0 });
   };
 
   const rows = await client.fetchConnectionReports({
-    from_date: "2026-03-01T00:00:00.000Z",
-    to_date: "2026-03-31T23:59:59.999Z",
+    from_date: "2026-03-01",
+    to_date: "2026-03-04",
   });
 
   assert.deepEqual(
     rows.map((row) => row.id),
-    ["c1", "c2", "c3"],
+    ["c1", "c2", "c3", "c4"],
   );
-  assert.deepEqual(offsets, [0, 2, 3]);
+  assert.deepEqual(calls, [
+    { from_date: "2026-03-01", to_date: "2026-03-04", limit: "1000" },
+    { from_date: "2026-03-01", to_date: "2026-03-02", limit: "1000" },
+    { from_date: "2026-03-03", to_date: "2026-03-04", limit: "1000" },
+  ]);
 });
 
-test("fetchConnectionReports stops on non-increasing pagination offsets", async () => {
+test("fetchConnectionReports returns the capped day and logs a warning when TeamViewer still truncates a single day", async () => {
   const client = loadClient({
     TEAMVIEWER_MAX_RETRIES: 0,
   });
 
-  const offsets = [];
   global.fetch = async (url) => {
     const parsedUrl = new URL(String(url));
-    const offset = Number(parsedUrl.searchParams.get("offset"));
-    offsets.push(offset);
+    const fromDate = parsedUrl.searchParams.get("from_date");
+    const toDate = parsedUrl.searchParams.get("to_date");
 
-    if (offset === 0) {
+    if (fromDate === "2026-03-01" && toDate === "2026-03-01") {
       return jsonResponse({
         records: [{ id: "c1", start_time: "2026-03-10T10:00:00Z" }],
-        pagination: { next_offset: 0 },
+        records_remaining: 20,
       });
     }
 
-    return jsonResponse({ records: [] });
+    return jsonResponse({ records: [], records_remaining: 0 });
   };
 
   const rows = await client.fetchConnectionReports({
-    from_date: "2026-03-01T00:00:00.000Z",
-    to_date: "2026-03-31T23:59:59.999Z",
+    from_date: "2026-03-01",
+    to_date: "2026-03-01",
   });
 
   assert.deepEqual(
     rows.map((row) => row.id),
     ["c1"],
   );
-  assert.deepEqual(offsets, [0]);
 });
 
 test("fetchConnectionReports does not retry alternate query strategies for upstream auth failures", async () => {

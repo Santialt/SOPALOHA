@@ -4,6 +4,7 @@ import AppShell from '../components/AppShell';
 import AdminRoute from '../components/AdminRoute';
 import LoadingBlock from '../components/LoadingBlock';
 import ProtectedRoute from '../components/ProtectedRoute';
+import AlohaMasterPage from '../pages/AlohaMasterPage';
 import DashboardPage from '../pages/DashboardPage';
 import LocationsPage from '../pages/LocationsPage';
 import LocationDetailPage from '../pages/LocationDetailPage';
@@ -25,6 +26,7 @@ export function AppRouter() {
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="locations" element={<LocationsPage />} />
+          <Route path="aloha-master" element={<AlohaMasterPage />} />
           <Route path="locations/:id" element={<LocationDetailPage />} />
           <Route path="incidents" element={<IncidentsPage />} />
           <Route path="tasks" element={<TasksPage />} />

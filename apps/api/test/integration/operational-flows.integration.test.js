@@ -62,6 +62,7 @@ test("critical operational CRUD flows work against a temporary SQLite database",
           body: {
             name: "Local Palermo",
             city: "Buenos Aires",
+            country: "Argentina",
             usa_nbo: true,
             status: "abierto",
             fecha_apertura: "2025-01-15",
@@ -73,6 +74,9 @@ test("critical operational CRUD flows work against a temporary SQLite database",
       assert.equal(createResult.body.name, "Local Palermo");
       assert.equal(createResult.body.status, "abierto");
       assert.equal(createResult.body.usa_nbo, true);
+      assert.equal(createResult.body.country, "Argentina");
+      assert.equal(createResult.body.terminales, 0);
+      assert.deepEqual(createResult.body.integrations, []);
       locationId = createResult.body.id;
 
       const listResult = await harness.authedRequest(
@@ -82,6 +86,10 @@ test("critical operational CRUD flows work against a temporary SQLite database",
       );
       assert.equal(listResult.status, 200);
       assert.ok(listResult.body.some((location) => location.id === locationId));
+      assert.equal(
+        listResult.body.find((location) => location.id === locationId)?.country,
+        "Argentina",
+      );
 
       const updateResult = await harness.authedRequest(
         adminUser,
@@ -91,6 +99,7 @@ test("critical operational CRUD flows work against a temporary SQLite database",
           body: {
             name: "Local Palermo Soho",
             city: "Buenos Aires",
+            country: "Argentina",
             usa_nbo: false,
             status: "cerrado",
             fecha_apertura: "2025-01-15",
@@ -103,6 +112,7 @@ test("critical operational CRUD flows work against a temporary SQLite database",
       assert.equal(updateResult.body.name, "Local Palermo Soho");
       assert.equal(updateResult.body.status, "cerrado");
       assert.equal(updateResult.body.usa_nbo, false);
+      assert.equal(updateResult.body.country, "Argentina");
     },
   );
 
@@ -177,6 +187,45 @@ test("critical operational CRUD flows work against a temporary SQLite database",
       assert.equal(updateResult.body.name, "POS Front");
       assert.equal(updateResult.body.device_role, "pos");
       assert.equal(updateResult.body.type, "pos_terminal");
+
+      const locationsAfterDevice = await harness.authedRequest(
+        adminUser,
+        "GET",
+        "/locations",
+      );
+      const projectedLocation = locationsAfterDevice.body.find(
+        (location) => location.id === locationId,
+      );
+      assert.equal(projectedLocation?.terminales, 1);
+    },
+  );
+
+  await t.test(
+    "locations project saved integrations in the main list without extra endpoints",
+    async () => {
+      const updateIntegrations = await harness.authedRequest(
+        adminUser,
+        "PUT",
+        `/locations/${locationId}/integrations`,
+        {
+          body: {
+            integrations: ["loyalty", "aks"],
+          },
+        },
+      );
+
+      assert.equal(updateIntegrations.status, 200);
+
+      const listResult = await harness.authedRequest(
+        adminUser,
+        "GET",
+        "/locations",
+      );
+      const projectedLocation = listResult.body.find(
+        (location) => location.id === locationId,
+      );
+
+      assert.deepEqual(projectedLocation?.integrations, ["aks", "loyalty"]);
     },
   );
 

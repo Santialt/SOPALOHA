@@ -1,7 +1,34 @@
 const db = require('../db/connection');
 
 function findAll() {
-  return db.prepare('SELECT * FROM locations ORDER BY name ASC').all();
+  return db
+    .prepare(
+      `
+      SELECT
+        locations.*,
+        (
+          SELECT COUNT(*)
+          FROM devices
+          WHERE devices.location_id = locations.id
+            AND (
+              devices.device_role = 'pos' OR
+              devices.type = 'pos_terminal'
+            )
+        ) AS terminales,
+        (
+          SELECT GROUP_CONCAT(integration_name, '||')
+          FROM (
+            SELECT integration_name
+            FROM location_integrations
+            WHERE location_id = locations.id
+            ORDER BY integration_name ASC
+          )
+        ) AS integrations_catalog
+      FROM locations
+      ORDER BY name ASC
+    `
+    )
+    .all();
 }
 
 function countAll() {
@@ -52,12 +79,12 @@ function create(payload) {
   const stmt = db.prepare(`
     INSERT INTO locations (
       name, company_name, razon_social, cuit, llave_aloha, version_aloha, version_modulo_fiscal,
-      usa_nbo, network_notes, address, city, province, phone, main_contact, status, notes,
+      usa_nbo, network_notes, address, city, province, country, phone, main_contact, status, notes,
       cantidad_licencias_aloha, tiene_kitchen, usa_insight_pulse, cmc, fecha_apertura, fecha_cierre
     )
     VALUES (
       @name, @company_name, @razon_social, @cuit, @llave_aloha, @version_aloha, @version_modulo_fiscal,
-      @usa_nbo, @network_notes, @address, @city, @province, @phone, @main_contact, @status, @notes,
+      @usa_nbo, @network_notes, @address, @city, @province, @country, @phone, @main_contact, @status, @notes,
       @cantidad_licencias_aloha, @tiene_kitchen, @usa_insight_pulse, @cmc, @fecha_apertura, @fecha_cierre
     )
   `);
@@ -74,6 +101,7 @@ function create(payload) {
     address: payload.address || null,
     city: payload.city || null,
     province: payload.province || null,
+    country: payload.country || null,
     phone: payload.phone || null,
     main_contact: payload.main_contact || null,
     status: payload.status || 'active',
@@ -104,6 +132,7 @@ function update(id, payload) {
       address = @address,
       city = @city,
       province = @province,
+      country = @country,
       phone = @phone,
       main_contact = @main_contact,
       status = @status,
@@ -130,6 +159,7 @@ function update(id, payload) {
     address: payload.address || null,
     city: payload.city || null,
     province: payload.province || null,
+    country: payload.country || null,
     phone: payload.phone || null,
     main_contact: payload.main_contact || null,
     status: payload.status || 'active',

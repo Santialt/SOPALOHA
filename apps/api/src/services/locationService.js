@@ -25,6 +25,11 @@ function normalizeInteger(value) {
   return Number.isInteger(numericValue) ? numericValue : null;
 }
 
+function normalizeString(value) {
+  if (isBlank(value)) return null;
+  return String(value).trim();
+}
+
 function normalizeStatusForStorage(value) {
   if (value === 'cerrado' || value === 'inactive') return 'inactive';
   return 'active';
@@ -43,7 +48,12 @@ function mapLocationForResponse(row) {
     status: normalizeStatusForResponse(row.status),
     usa_nbo: Boolean(row.usa_nbo),
     tiene_kitchen: Boolean(row.tiene_kitchen),
-    usa_insight_pulse: Boolean(row.usa_insight_pulse)
+    usa_insight_pulse: Boolean(row.usa_insight_pulse),
+    terminales: Number(row.terminales) || 0,
+    integrations: String(row.integrations_catalog || '')
+      .split('||')
+      .map((item) => item.trim())
+      .filter(Boolean)
   };
 }
 
@@ -64,6 +74,7 @@ function normalizeLocationPayload(payload, existingLocation = null) {
     tiene_kitchen: toBoolean(payload.tiene_kitchen),
     usa_insight_pulse: toBoolean(payload.usa_insight_pulse),
     cantidad_licencias_aloha: normalizeInteger(payload.cantidad_licencias_aloha),
+    country: normalizeString(payload.country),
     fecha_apertura: fechaApertura,
     fecha_cierre: status === 'active' ? null : fechaCierreBase,
     status
