@@ -12,7 +12,6 @@ const incidentRoutes = require('./routes/incidentRoutes');
 const weeklyTaskRoutes = require('./routes/weeklyTaskRoutes');
 const taskRoutes = require('./routes/taskRoutes');
 const locationNoteRoutes = require('./routes/locationNoteRoutes');
-const teamviewerConnectionRoutes = require('./routes/teamviewerConnectionRoutes');
 const teamviewerRoutes = require('./routes/teamviewerRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const supportActionRoutes = require('./routes/supportActionRoutes');
@@ -29,9 +28,28 @@ const { requestContext } = require('./middleware/requestContext');
 const { notFound } = require('./middleware/notFound');
 const { errorHandler } = require('./middleware/errorHandler');
 
+function parseTrustProxySetting(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+
+  if (!normalized || normalized === 'false' || normalized === '0') {
+    return false;
+  }
+
+  if (normalized === 'true') {
+    return true;
+  }
+
+  if (/^\d+$/.test(normalized)) {
+    return Number(normalized);
+  }
+
+  return value;
+}
+
 const app = express();
 
 app.disable('x-powered-by');
+app.set('trust proxy', parseTrustProxySetting(process.env.TRUST_PROXY));
 app.use(setSecurityHeaders);
 app.use(requestContext);
 app.use(corsMiddleware());
@@ -50,7 +68,6 @@ app.use('/weekly-tasks', weeklyTaskRoutes);
 app.use('/tasks', taskRoutes);
 app.use('/location-notes', locationNoteRoutes);
 app.use('/dashboard', dashboardRoutes);
-app.use('/teamviewer-connections', teamviewerConnectionRoutes);
 app.use('/teamviewer', teamviewerRoutes);
 app.use('/support-actions', supportActionRoutes);
 app.use('/on-call-shifts', onCallShiftRoutes);

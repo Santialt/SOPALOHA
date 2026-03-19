@@ -35,6 +35,7 @@ function createApiHarness(options = {}) {
   process.env.AUTH_LOGIN_RATE_LIMIT_MAX = String(
     options.authLoginRateLimitMax || "500",
   );
+  process.env.TRUST_PROXY = String(options.trustProxy || "");
   process.env.TEAMVIEWER_API_TOKEN = options.teamviewerApiToken || "";
   process.env.TEAMVIEWER_REPORTS_API_TOKEN =
     options.teamviewerReportsApiToken || "";
@@ -101,7 +102,6 @@ function createApiHarness(options = {}) {
 
   async function request(method, route, options = {}) {
     const headers = {
-      Origin: "http://localhost:5173",
       ...(options.headers || {}),
     };
     if (headers.Origin === null) {
@@ -182,6 +182,13 @@ function createApiHarness(options = {}) {
     );
   }
 
+  function withApiKey(headers = {}) {
+    return {
+      ...headers,
+      "X-Internal-Api-Key": options.internalApiKey || "",
+    };
+  }
+
   return {
     baseUrl: () => baseUrl,
     db,
@@ -196,6 +203,7 @@ function createApiHarness(options = {}) {
     test,
     createLocalDateTimeString,
     authedRequest,
+    withApiKey,
   };
 }
 
