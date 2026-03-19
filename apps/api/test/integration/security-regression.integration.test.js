@@ -7,6 +7,8 @@ test("security regression coverage hardens internal access, admin-only operation
   const harness = createApiHarness({
     prefix: "sopaloha-security-regression-",
     authSessionSecret: "sopaloha-security-regression-secret",
+    internalApiKey: "security-suite-api-key",
+    trustProxy: "1",
   });
 
   const adminUser = {
@@ -31,7 +33,7 @@ test("security regression coverage hardens internal access, admin-only operation
   });
 
   await t.test(
-    "CORS allows configured origins and blocks unlisted or implicit internal origins",
+    "CORS remains browser-facing only while access control depends on network perimeter or API key",
     async () => {
       const allowedOrigin = "http://localhost:5173";
       const allowedResult = await harness.request("OPTIONS", "/auth/login", {
@@ -75,22 +77,55 @@ test("security regression coverage hardens internal access, admin-only operation
           password: adminUser.password,
         },
       });
-      assert.equal(noOriginResult.status, 401);
-      assert.equal(
-        noOriginResult.body.message,
-        "Unauthorized internal API request",
+      assert.equal(noOriginResult.status, 200);
+
+      const deniedForwardedResult = await harness.request(
+        "POST",
+        "/auth/login",
+        {
+          headers: {
+            Origin: allowedOrigin,
+            "X-Forwarded-For": "203.0.113.20",
+          },
+          body: {
+            email: adminUser.email,
+            password: adminUser.password,
+          },
+        },
       );
+      assert.equal(deniedForwardedResult.status, 401);
+      assert.equal(
+        deniedForwardedResult.body.message,
+        "Internal network access or valid API key required",
+      );
+
+      const allowedForwardedResult = await harness.request(
+        "POST",
+        "/auth/login",
+        {
+          headers: harness.withApiKey({
+            Origin: allowedOrigin,
+            "X-Forwarded-For": "203.0.113.20",
+          }),
+          body: {
+            email: adminUser.email,
+            password: adminUser.password,
+          },
+        },
+      );
+      assert.equal(allowedForwardedResult.status, 200);
     },
   );
 
   await t.test(
-    "support actions remain admin-only even when internal-access checks pass",
+    "support actions remain admin-only and now require a valid API key",
     async () => {
       const techPingResult = await harness.authedRequest(
         techUser,
         "POST",
         "/support-actions/ping",
         {
+          headers: harness.withApiKey(),
           body: {},
         },
       );
@@ -101,16 +136,32 @@ test("security regression coverage hardens internal access, admin-only operation
         "POST",
         "/support-actions/teamviewer/open",
         {
+          headers: harness.withApiKey(),
           body: {},
         },
       );
       assert.equal(techOpenResult.status, 403);
+
+      const adminPingWithoutApiKey = await harness.authedRequest(
+        adminUser,
+        "POST",
+        "/support-actions/ping",
+        {
+          body: {},
+        },
+      );
+      assert.equal(adminPingWithoutApiKey.status, 401);
+      assert.equal(
+        adminPingWithoutApiKey.body.message,
+        "Valid internal API key required",
+      );
 
       const adminPingResult = await harness.authedRequest(
         adminUser,
         "POST",
         "/support-actions/ping",
         {
+          headers: harness.withApiKey(),
           body: {},
         },
       );
@@ -122,6 +173,7 @@ test("security regression coverage hardens internal access, admin-only operation
         "POST",
         "/support-actions/teamviewer/open",
         {
+          headers: harness.withApiKey(),
           body: {},
         },
       );

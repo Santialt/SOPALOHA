@@ -55,6 +55,7 @@ test("TeamViewer backend hardening covers preview, import, degradation, and rout
   const harness = createApiHarness({
     prefix: "sopaloha-teamviewer-",
     authSessionSecret: "sopaloha-teamviewer-suite-secret",
+    internalApiKey: "teamviewer-suite-api-key",
     teamviewerApiToken: "teamviewer-test-token",
     teamviewerReportsApiToken: "teamviewer-reports-test-token",
     teamviewerMaxRetries: 1,
@@ -195,10 +196,24 @@ test("TeamViewer backend hardening covers preview, import, degradation, and rout
       assert.equal(techImportResult.status, 403);
       assert.equal(techImportResult.body.message, "Forbidden");
 
+      const adminImportWithoutApiKey = await harness.authedRequest(
+        adminUser,
+        "POST",
+        "/teamviewer/import",
+      );
+      assert.equal(adminImportWithoutApiKey.status, 401);
+      assert.equal(
+        adminImportWithoutApiKey.body.message,
+        "Valid internal API key required",
+      );
+
       const importResult = await harness.authedRequest(
         adminUser,
         "POST",
         "/teamviewer/import",
+        {
+          headers: harness.withApiKey(),
+        },
       );
       assert.equal(importResult.status, 200);
       assert.equal(importResult.body.summary.locations_created, 1);
@@ -318,6 +333,7 @@ test("TeamViewer backend hardening covers preview, import, degradation, and rout
         "POST",
         "/teamviewer/import-cases",
         {
+          headers: harness.withApiKey(),
           body: {
             from_date: "2026-03-01",
             to_date: "2026-03-31",
@@ -397,6 +413,7 @@ test("TeamViewer backend hardening covers preview, import, degradation, and rout
         "POST",
         "/teamviewer/imported-cases",
         {
+          headers: harness.withApiKey(),
           body: {
             started_at: "2026-03-11T09:00:00Z",
             ended_at: "2026-03-11T09:10:00Z",
@@ -433,6 +450,9 @@ test("TeamViewer backend hardening covers preview, import, degradation, and rout
         adminUser,
         "DELETE",
         `/teamviewer/imported-cases/${adminManualCase.body.id}`,
+        {
+          headers: harness.withApiKey(),
+        },
       );
       assert.equal(adminDeleteManualCase.status, 204);
     },
@@ -593,6 +613,7 @@ test("TeamViewer backend hardening covers preview, import, degradation, and rout
         "POST",
         "/teamviewer/import-cases",
         {
+          headers: harness.withApiKey(),
           body: {
             from_date: "2026-03-01",
             to_date: "2026-03-31",

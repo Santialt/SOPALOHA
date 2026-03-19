@@ -84,7 +84,7 @@ test("SQLite initialization is idempotent and upgrades a legacy schema safely", 
   process.env.AUTH_LOGIN_RATE_LIMIT_MAX = "500";
 
   const db = require("../../src/db/connection");
-  const { initDatabase } = require("../../src/db/initDb");
+  const { getMigrationStatus, initDatabase } = require("../../src/db/initDb");
 
   t.after(() => {
     db.close();
@@ -106,6 +106,9 @@ test("SQLite initialization is idempotent and upgrades a legacy schema safely", 
     .all();
   const onCallShiftColumns = db
     .prepare("PRAGMA table_info(on_call_shifts)")
+    .all();
+  const migrationRows = db
+    .prepare("SELECT id FROM schema_migrations ORDER BY id ASC")
     .all();
 
   assert.ok(locationColumns.some((column) => column.name === "llave_aloha"));
@@ -147,4 +150,9 @@ test("SQLite initialization is idempotent and upgrades a legacy schema safely", 
   assert.equal(adminUsers.total, 0);
   assert.equal(templateCount.total, 3);
   assert.equal(technicianCount.total, 3);
+  assert.deepEqual(
+    migrationRows.map((row) => row.id),
+    ["001_init", "002_release_hardening"],
+  );
+  assert.equal(getMigrationStatus().pending.length, 0);
 });

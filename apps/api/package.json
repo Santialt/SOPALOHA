@@ -9,9 +9,10 @@
     "db:init": "node src/db/initDb.js",
     "admin:create": "node scripts/create-admin.js",
     "db:backup": "node scripts/backup-db.js",
+    "db:restore": "node scripts/restore-db.js",
     "lint": "node ../../node_modules/eslint/bin/eslint.js src test --ext .js",
     "format:check:phase1": "node ../../node_modules/prettier/bin/prettier.cjs --check \"src/server.js\" \"src/db/**/*.js\" \"test/**/*.js\" \"package.json\"",
-    "test": "node --test test/**/*.test.js",
+    "test": "node --test",
     "test:smoke": "node --test test/smoke/api.smoke.test.js"
   },
   "dependencies": {
