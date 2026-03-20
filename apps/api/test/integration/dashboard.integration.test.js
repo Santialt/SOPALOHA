@@ -370,14 +370,8 @@ test("GET /dashboard/summary returns operational dashboard metrics without infer
       category: "aloha",
       incidentCount: 2,
     });
-    assert.equal(
-      JSON.stringify(result.body).includes("tv-open-1"),
-      false,
-    );
-    assert.equal(
-      JSON.stringify(result.body).includes("Local Centro"),
-      true,
-    );
+    assert.equal(JSON.stringify(result.body).includes("tv-open-1"), false);
+    assert.equal(JSON.stringify(result.body).includes("Local Centro"), true);
 
     harness.db.prepare("DELETE FROM tasks").run();
     const locationC = harness.db

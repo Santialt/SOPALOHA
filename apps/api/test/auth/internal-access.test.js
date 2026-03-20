@@ -115,7 +115,13 @@ test("permissive or malformed TRUST_PROXY values fail closed during startup", as
     "test-invalid-trust-proxy.db",
   );
 
-  for (const trustProxyValue of ["loopback", "linklocal", "uniquelocal", "all", "not-a-proxy-range"]) {
+  for (const trustProxyValue of [
+    "loopback",
+    "linklocal",
+    "uniquelocal",
+    "all",
+    "not-a-proxy-range",
+  ]) {
     const result = spawnSync(
       process.execPath,
       [

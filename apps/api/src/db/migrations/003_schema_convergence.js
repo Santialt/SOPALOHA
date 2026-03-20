@@ -116,10 +116,15 @@ function assertSchemaShape(tableName, expected) {
     }
   }
 
-  const actualIndexes = new Set(getIndexSnapshot(tableName).map((index) => index.name));
-  for (const statement of expected.postCreateStatements.filter((sql) => /^\s*create\s+index/i.test(sql))) {
+  const actualIndexes = new Set(
+    getIndexSnapshot(tableName).map((index) => index.name),
+  );
+  for (const statement of expected.postCreateStatements.filter((sql) =>
+    /^\s*create\s+index/i.test(sql),
+  )) {
     const expectedIndexName =
-      statement.match(/create\s+index\s+if\s+not\s+exists\s+("?[\w_]+"?)/i)?.[1]
+      statement
+        .match(/create\s+index\s+if\s+not\s+exists\s+("?[\w_]+"?)/i)?.[1]
         ?.replace(/"/g, "") || null;
     if (!expectedIndexName || !actualIndexes.has(expectedIndexName)) {
       throw new Error(
@@ -128,10 +133,15 @@ function assertSchemaShape(tableName, expected) {
     }
   }
 
-  const actualTriggers = new Set(getTriggerSnapshot(tableName).map((trigger) => trigger.name));
-  for (const statement of expected.postCreateStatements.filter((sql) => /^\s*create\s+trigger/i.test(sql))) {
+  const actualTriggers = new Set(
+    getTriggerSnapshot(tableName).map((trigger) => trigger.name),
+  );
+  for (const statement of expected.postCreateStatements.filter((sql) =>
+    /^\s*create\s+trigger/i.test(sql),
+  )) {
     const expectedTriggerName =
-      statement.match(/create\s+trigger\s+if\s+not\s+exists\s+("?[\w_]+"?)/i)?.[1]
+      statement
+        .match(/create\s+trigger\s+if\s+not\s+exists\s+("?[\w_]+"?)/i)?.[1]
         ?.replace(/"/g, "") || null;
     if (!expectedTriggerName || !actualTriggers.has(expectedTriggerName)) {
       throw new Error(
@@ -305,25 +315,85 @@ function applySchemaConvergenceMigration() {
       { name: "razon_social", type: "text", notnull: 0, dflt_value: "", pk: 0 },
       { name: "cuit", type: "text", notnull: 0, dflt_value: "", pk: 0 },
       { name: "llave_aloha", type: "text", notnull: 0, dflt_value: "", pk: 0 },
-      { name: "version_aloha", type: "text", notnull: 0, dflt_value: "", pk: 0 },
-      { name: "version_modulo_fiscal", type: "text", notnull: 0, dflt_value: "", pk: 0 },
+      {
+        name: "version_aloha",
+        type: "text",
+        notnull: 0,
+        dflt_value: "",
+        pk: 0,
+      },
+      {
+        name: "version_modulo_fiscal",
+        type: "text",
+        notnull: 0,
+        dflt_value: "",
+        pk: 0,
+      },
       { name: "usa_nbo", type: "integer", notnull: 1, dflt_value: "0", pk: 0 },
-      { name: "network_notes", type: "text", notnull: 0, dflt_value: "", pk: 0 },
+      {
+        name: "network_notes",
+        type: "text",
+        notnull: 0,
+        dflt_value: "",
+        pk: 0,
+      },
       { name: "address", type: "text", notnull: 0, dflt_value: "", pk: 0 },
       { name: "city", type: "text", notnull: 0, dflt_value: "", pk: 0 },
       { name: "province", type: "text", notnull: 0, dflt_value: "", pk: 0 },
       { name: "phone", type: "text", notnull: 0, dflt_value: "", pk: 0 },
       { name: "main_contact", type: "text", notnull: 0, dflt_value: "", pk: 0 },
-      { name: "status", type: "text", notnull: 1, dflt_value: "'active'", pk: 0 },
+      {
+        name: "status",
+        type: "text",
+        notnull: 1,
+        dflt_value: "'active'",
+        pk: 0,
+      },
       { name: "notes", type: "text", notnull: 0, dflt_value: "", pk: 0 },
-      { name: "cantidad_licencias_aloha", type: "integer", notnull: 0, dflt_value: "", pk: 0 },
-      { name: "tiene_kitchen", type: "integer", notnull: 1, dflt_value: "0", pk: 0 },
-      { name: "usa_insight_pulse", type: "integer", notnull: 1, dflt_value: "0", pk: 0 },
+      {
+        name: "cantidad_licencias_aloha",
+        type: "integer",
+        notnull: 0,
+        dflt_value: "",
+        pk: 0,
+      },
+      {
+        name: "tiene_kitchen",
+        type: "integer",
+        notnull: 1,
+        dflt_value: "0",
+        pk: 0,
+      },
+      {
+        name: "usa_insight_pulse",
+        type: "integer",
+        notnull: 1,
+        dflt_value: "0",
+        pk: 0,
+      },
       { name: "cmc", type: "text", notnull: 0, dflt_value: "", pk: 0 },
-      { name: "fecha_apertura", type: "text", notnull: 0, dflt_value: "", pk: 0 },
+      {
+        name: "fecha_apertura",
+        type: "text",
+        notnull: 0,
+        dflt_value: "",
+        pk: 0,
+      },
       { name: "fecha_cierre", type: "text", notnull: 0, dflt_value: "", pk: 0 },
-      { name: "created_at", type: "text", notnull: 1, dflt_value: "datetime('now')", pk: 0 },
-      { name: "updated_at", type: "text", notnull: 1, dflt_value: "datetime('now')", pk: 0 },
+      {
+        name: "created_at",
+        type: "text",
+        notnull: 1,
+        dflt_value: "datetime('now')",
+        pk: 0,
+      },
+      {
+        name: "updated_at",
+        type: "text",
+        notnull: 1,
+        dflt_value: "datetime('now')",
+        pk: 0,
+      },
       { name: "country", type: "text", notnull: 0, dflt_value: "", pk: 0 },
     ],
     requiredSqlFragments: [
@@ -426,11 +496,29 @@ function applySchemaConvergenceMigration() {
       { name: "id", type: "integer", notnull: 0, dflt_value: "", pk: 1 },
       { name: "name", type: "text", notnull: 1, dflt_value: "", pk: 0 },
       { name: "email", type: "text", notnull: 1, dflt_value: "", pk: 0 },
-      { name: "password_hash", type: "text", notnull: 1, dflt_value: "", pk: 0 },
+      {
+        name: "password_hash",
+        type: "text",
+        notnull: 1,
+        dflt_value: "",
+        pk: 0,
+      },
       { name: "role", type: "text", notnull: 1, dflt_value: "", pk: 0 },
       { name: "active", type: "integer", notnull: 1, dflt_value: "1", pk: 0 },
-      { name: "created_at", type: "text", notnull: 1, dflt_value: "datetime('now')", pk: 0 },
-      { name: "updated_at", type: "text", notnull: 1, dflt_value: "datetime('now')", pk: 0 },
+      {
+        name: "created_at",
+        type: "text",
+        notnull: 1,
+        dflt_value: "datetime('now')",
+        pk: 0,
+      },
+      {
+        name: "updated_at",
+        type: "text",
+        notnull: 1,
+        dflt_value: "datetime('now')",
+        pk: 0,
+      },
     ],
     requiredSqlFragments: [
       "email text not null unique",
