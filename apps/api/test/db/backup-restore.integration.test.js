@@ -5,6 +5,7 @@ const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
 const Database = require("better-sqlite3");
+const { restoreDatabase } = require("../../scripts/restore-db");
 
 function runNode(args, options = {}) {
   const result = spawnSync(process.execPath, args, {
@@ -113,10 +114,66 @@ test("backup and restore scripts produce a restorable SQLite database with migra
     .prepare("SELECT id FROM schema_migrations ORDER BY id ASC")
     .all()
     .map((row) => row.id);
-  assert.deepEqual(appliedMigrations, ["001_init", "002_release_hardening"]);
+  assert.deepEqual(appliedMigrations, [
+    "001_init",
+    "002_release_hardening",
+    "003_schema_convergence",
+  ]);
 
   const preRestoreBackups = fs
     .readdirSync(tempDir)
     .filter((entry) => entry.startsWith("restored.db.pre-restore-"));
+  assert.equal(preRestoreBackups.length, 1);
+});
+
+test("restoreDatabase rolls back automatically when post-restore validation fails", async (t) => {
+  const tempDir = fs.mkdtempSync(
+    path.join(os.tmpdir(), "sopaloha-restore-rollback-"),
+  );
+  const sourceDbPath = path.join(tempDir, "source.db");
+  const targetDbPath = path.join(tempDir, "target.db");
+  const backupFilePath = path.join(tempDir, "backup.db");
+
+  t.after(() => {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  const sourceDb = new Database(sourceDbPath);
+  sourceDb.exec(`
+    CREATE TABLE marker (value TEXT NOT NULL);
+    INSERT INTO marker (value) VALUES ('backup-value');
+  `);
+  sourceDb.close();
+
+  fs.copyFileSync(sourceDbPath, backupFilePath);
+
+  const targetDb = new Database(targetDbPath);
+  targetDb.exec(`
+    CREATE TABLE marker (value TEXT NOT NULL);
+    INSERT INTO marker (value) VALUES ('pre-restore-value');
+  `);
+  targetDb.close();
+
+  assert.throws(
+    () =>
+      restoreDatabase({
+        sourcePath: backupFilePath,
+        targetPath: targetDbPath,
+        validate() {
+          throw new Error("simulated post-restore validation failure");
+        },
+      }),
+    /Previous database restored automatically/,
+  );
+
+  const rolledBackDb = new Database(targetDbPath, { readonly: true });
+  const marker = rolledBackDb.prepare("SELECT value FROM marker").get();
+  rolledBackDb.close();
+
+  assert.deepEqual(marker, { value: "pre-restore-value" });
+
+  const preRestoreBackups = fs
+    .readdirSync(tempDir)
+    .filter((entry) => entry.startsWith("target.db.pre-restore-"));
   assert.equal(preRestoreBackups.length, 1);
 });

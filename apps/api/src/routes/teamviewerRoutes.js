@@ -8,6 +8,9 @@ const { requireApiKey } = require('../middleware/security');
 const router = express.Router();
 const requireAdmin = requireRole('admin');
 
+router.use(requireAdmin);
+router.use(requireApiKey);
+
 router.get('/explorer', explorerController.getExplorer);
 router.get('/groups/:groupId', explorerController.getGroup);
 router.get('/devices/:teamviewerId', explorerController.getDevice);

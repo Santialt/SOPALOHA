@@ -13,6 +13,20 @@ function formatTimestamp(date) {
   return `${year}${month}${day}-${hours}${minutes}${seconds}`;
 }
 
+function clearModule(modulePath) {
+  const resolved = require.resolve(modulePath);
+  delete require.cache[resolved];
+}
+
+function clearAppDbModules() {
+  [
+    "../src/db/connection",
+    "../src/db/initDb",
+    "../src/db/migrations",
+    "../src/db/migrations/003_schema_convergence",
+  ].forEach(clearModule);
+}
+
 function verifySqliteFile(filePath) {
   const database = new Database(filePath, { readonly: false });
 
@@ -28,24 +42,61 @@ function verifySqliteFile(filePath) {
   }
 }
 
-async function run() {
-  const sourceArg = String(process.argv[2] || "").trim();
-  if (!sourceArg) {
-    throw new Error("Usage: node scripts/restore-db.js <backup-file> [target-db]");
+function validateRestoredDatabase(targetPath) {
+  process.env.SQLITE_DB_PATH = targetPath;
+  process.env.NODE_ENV = process.env.NODE_ENV || "production";
+  clearAppDbModules();
+
+  const db = require("../src/db/connection");
+  const { initDatabase } = require("../src/db/initDb");
+
+  try {
+    initDatabase();
+
+    const integrity = db.pragma("integrity_check", { simple: true });
+    if (String(integrity).toLowerCase() !== "ok") {
+      throw new Error(`integrity_check failed after restore: ${integrity}`);
+    }
+
+    const foreignKeyViolations = db.prepare("PRAGMA foreign_key_check").all();
+    if (foreignKeyViolations.length > 0) {
+      throw new Error(
+        `foreign_key_check failed after restore: ${JSON.stringify(foreignKeyViolations[0])}`,
+      );
+    }
+
+    db.prepare("SELECT COUNT(*) AS total FROM schema_migrations").get();
+    db.prepare("SELECT COUNT(*) AS total FROM locations").get();
+    db.prepare("SELECT COUNT(*) AS total FROM users").get();
+  } finally {
+    db.close();
+    clearAppDbModules();
+  }
+}
+
+function rollbackRestore({ targetPath, preRestoreBackupPath, provisionalFailurePath }) {
+  if (fs.existsSync(targetPath)) {
+    fs.rmSync(targetPath, { force: true });
   }
 
-  const sourcePath = path.resolve(process.cwd(), sourceArg);
+  if (preRestoreBackupPath && fs.existsSync(preRestoreBackupPath)) {
+    fs.copyFileSync(preRestoreBackupPath, targetPath);
+  } else if (provisionalFailurePath && fs.existsSync(provisionalFailurePath)) {
+    fs.rmSync(provisionalFailurePath, { force: true });
+  }
+}
+
+function restoreDatabase({ sourcePath, targetPath, validate = validateRestoredDatabase }) {
   if (!fs.existsSync(sourcePath)) {
     throw new Error(`Backup file not found: ${sourcePath}`);
   }
 
-  const targetArg = String(process.argv[3] || process.env.SQLITE_DB_PATH || "").trim();
-  const targetPath = resolveConfiguredDbPath(targetArg);
   const targetDir = path.dirname(targetPath);
   const tempRestorePath = path.join(
     targetDir,
     `${path.basename(targetPath)}.restore-${process.pid}.tmp`,
   );
+  const provisionalFailurePath = `${targetPath}.failed-restore-${formatTimestamp(new Date())}.db`;
 
   fs.mkdirSync(targetDir, { recursive: true });
   fs.copyFileSync(sourcePath, tempRestorePath);
@@ -60,30 +111,50 @@ async function run() {
 
   fs.renameSync(tempRestorePath, targetPath);
 
-  process.env.SQLITE_DB_PATH = targetPath;
-  process.env.NODE_ENV = process.env.NODE_ENV || "production";
-  const db = require("../src/db/connection");
-  const { initDatabase } = require("../src/db/initDb");
-
   try {
-    initDatabase();
-    const integrity = db.pragma("integrity_check", { simple: true });
-    if (String(integrity).toLowerCase() !== "ok") {
-      throw new Error(`integrity_check failed after restore: ${integrity}`);
+    validate(targetPath);
+  } catch (error) {
+    if (fs.existsSync(targetPath)) {
+      fs.copyFileSync(targetPath, provisionalFailurePath);
     }
 
-    db.prepare("SELECT 1 AS ok").get();
-  } finally {
-    db.close();
+    rollbackRestore({ targetPath, preRestoreBackupPath, provisionalFailurePath });
+    error.message = `${error.message}. Previous database restored automatically.`;
+    throw error;
   }
 
-  console.log(`SQLite restore completed at ${targetPath}`);
-  if (preRestoreBackupPath) {
-    console.log(`Previous database backup saved at ${preRestoreBackupPath}`);
+  return {
+    targetPath,
+    preRestoreBackupPath,
+  };
+}
+
+async function run() {
+  const sourceArg = String(process.argv[2] || "").trim();
+  if (!sourceArg) {
+    throw new Error("Usage: node scripts/restore-db.js <backup-file> [target-db]");
+  }
+
+  const sourcePath = path.resolve(process.cwd(), sourceArg);
+  const targetArg = String(process.argv[3] || process.env.SQLITE_DB_PATH || "").trim();
+  const targetPath = resolveConfiguredDbPath(targetArg);
+  const result = restoreDatabase({ sourcePath, targetPath });
+
+  console.log(`SQLite restore completed at ${result.targetPath}`);
+  if (result.preRestoreBackupPath) {
+    console.log(`Previous database backup saved at ${result.preRestoreBackupPath}`);
   }
 }
 
-run().catch((error) => {
-  console.error(`SQLite restore failed: ${error.message}`);
-  process.exit(1);
-});
+if (require.main === module) {
+  run().catch((error) => {
+    console.error(`SQLite restore failed: ${error.message}`);
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  restoreDatabase,
+  validateRestoredDatabase,
+  verifySqliteFile,
+};

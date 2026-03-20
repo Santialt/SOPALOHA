@@ -84,7 +84,7 @@ test("TeamViewer backend hardening covers preview, import, degradation, and rout
   });
 
   await t.test(
-    "unauthenticated TeamViewer routes are rejected, tech keeps read-only access, and admin can import",
+    "TeamViewer routes require admin plus API key before exposing upstream data",
     async () => {
       teamviewerFetch.reset();
 
@@ -94,6 +94,16 @@ test("TeamViewer backend hardening covers preview, import, degradation, and rout
       );
       assert.equal(unauthenticated.status, 401);
       assert.equal(unauthenticated.body.message, "Authentication required");
+
+      const techPreview = await harness.authedRequest(
+        techUser,
+        "GET",
+        "/teamviewer/import-preview",
+        {
+          headers: harness.withApiKey(),
+        },
+      );
+      assert.equal(techPreview.status, 403);
 
       const existingLocationId = harness.db
         .prepare(
@@ -156,10 +166,20 @@ test("TeamViewer backend hardening covers preview, import, degradation, and rout
         throw new Error(`Unexpected TeamViewer request: ${url}`);
       });
 
-      const preview = await harness.authedRequest(
-        techUser,
+      const previewWithoutApiKey = await harness.authedRequest(
+        adminUser,
         "GET",
         "/teamviewer/import-preview",
+      );
+      assert.equal(previewWithoutApiKey.status, 401);
+
+      const preview = await harness.authedRequest(
+        adminUser,
+        "GET",
+        "/teamviewer/import-preview",
+        {
+          headers: harness.withApiKey(),
+        },
       );
       assert.equal(preview.status, 200);
       assert.equal(preview.body.summary.locations_to_create, 1);
@@ -187,14 +207,6 @@ test("TeamViewer backend hardening covers preview, import, degradation, and rout
           status: "new",
         },
       );
-
-      const techImportResult = await harness.authedRequest(
-        techUser,
-        "POST",
-        "/teamviewer/import",
-      );
-      assert.equal(techImportResult.status, 403);
-      assert.equal(techImportResult.body.message, "Forbidden");
 
       const adminImportWithoutApiKey = await harness.authedRequest(
         adminUser,
@@ -238,7 +250,7 @@ test("TeamViewer backend hardening covers preview, import, degradation, and rout
   );
 
   await t.test(
-    "TeamViewer imported-case flows require admin mutations while preserving read-only access",
+    "TeamViewer imported-case reads and writes both require admin plus API key",
     async () => {
       teamviewerFetch.reset();
       const reportQueries = [];
@@ -328,6 +340,13 @@ test("TeamViewer backend hardening covers preview, import, degradation, and rout
       assert.equal(importCasesResult.status, 403);
       assert.equal(importCasesResult.body.message, "Forbidden");
 
+      const importedCasesWithoutApiKey = await harness.authedRequest(
+        adminUser,
+        "GET",
+        "/teamviewer/imported-cases",
+      );
+      assert.equal(importedCasesWithoutApiKey.status, 401);
+
       const adminImportCasesResult = await harness.authedRequest(
         adminUser,
         "POST",
@@ -363,9 +382,12 @@ test("TeamViewer backend hardening covers preview, import, degradation, and rout
       });
 
       const listImportedCases = await harness.authedRequest(
-        techUser,
+        adminUser,
         "GET",
         "/teamviewer/imported-cases",
+        {
+          headers: harness.withApiKey(),
+        },
       );
       assert.equal(listImportedCases.status, 200);
       assert.equal(listImportedCases.body.length, 2);
@@ -375,10 +397,24 @@ test("TeamViewer backend hardening covers preview, import, degradation, and rout
         .sort();
       assert.deepEqual(resolvedNames, ["Local Nuevo", "Local Reused"]);
 
+      const importedSyntheticUsers = harness.db
+        .prepare(
+          "SELECT email, active, password_hash FROM users WHERE lower(email) LIKE '%@teamviewer.local' ORDER BY email ASC",
+        )
+        .all();
+      assert.equal(importedSyntheticUsers.length, 2);
+      for (const importedUser of importedSyntheticUsers) {
+        assert.equal(importedUser.active, 0);
+        assert.doesNotMatch(importedUser.password_hash, /tv-import-/);
+      }
+
       const catalogs = await harness.authedRequest(
-        techUser,
+        adminUser,
         "GET",
         "/teamviewer/imported-cases/catalogs",
+        {
+          headers: harness.withApiKey(),
+        },
       );
       assert.equal(catalogs.status, 200);
       assert.ok(
@@ -431,9 +467,12 @@ test("TeamViewer backend hardening covers preview, import, degradation, and rout
       assert.equal(adminManualCase.body.technician_username, techUser.email);
 
       const filteredByTechnician = await harness.authedRequest(
-        techUser,
+        adminUser,
         "GET",
         `/teamviewer/imported-cases?from_date=2026-03-01&to_date=2026-03-31&technician_user_id=${techUserRecord.id}`,
+        {
+          headers: harness.withApiKey(),
+        },
       );
       assert.equal(filteredByTechnician.status, 200);
       assert.equal(filteredByTechnician.body.length, 1);
@@ -459,7 +498,7 @@ test("TeamViewer backend hardening covers preview, import, degradation, and rout
   );
 
   await t.test(
-    "TeamViewer location device statuses expose online, offline, and unknown without rebuilding explorer payloads in the client",
+    "TeamViewer location device statuses stay behind admin plus API key",
     async () => {
       teamviewerFetch.reset();
 
@@ -510,9 +549,12 @@ test("TeamViewer backend hardening covers preview, import, degradation, and rout
       });
 
       const result = await harness.authedRequest(
-        techUser,
+        adminUser,
         "GET",
         `/teamviewer/locations/${locationId}/device-statuses`,
+        {
+          headers: harness.withApiKey(),
+        },
       );
 
       assert.equal(result.status, 200);
@@ -589,6 +631,9 @@ test("TeamViewer backend hardening covers preview, import, degradation, and rout
         adminUser,
         "GET",
         "/teamviewer/import-preview",
+        {
+          headers: harness.withApiKey(),
+        },
       );
 
       assert.equal(result.status, 502);

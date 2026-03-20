@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const { URL } = require("url");
+const proxyAddr = require("proxy-addr");
 const { httpError } = require("../utils/httpError");
 const { logger } = require("../utils/logger");
 
@@ -29,6 +30,79 @@ function parseAllowedOrigins() {
 
 function extractConfiguredApiKey() {
   return String(process.env.INTERNAL_API_KEY || "").trim();
+}
+
+function parseTrustProxySetting(value) {
+  const raw = String(value ?? "").trim();
+  const normalized = raw.toLowerCase();
+
+  if (!normalized || normalized === "false" || normalized === "0") {
+    return {
+      enabled: false,
+      expressValue: false,
+      mode: "disabled",
+      explicitProxyRanges: [],
+    };
+  }
+
+  if (normalized === "true") {
+    throw new Error(
+      "TRUST_PROXY=true is not allowed. Use an exact hop count or an explicit proxy IP/CIDR list.",
+    );
+  }
+
+  if (/^\d+$/.test(normalized)) {
+    const hops = Number(normalized);
+    if (!Number.isInteger(hops) || hops < 1) {
+      throw new Error("TRUST_PROXY hop count must be a positive integer.");
+    }
+
+    return {
+      enabled: true,
+      expressValue: hops,
+      mode: "hop-count",
+      explicitProxyRanges: [],
+    };
+  }
+
+  const ranges = raw
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  if (ranges.length === 0) {
+    throw new Error(
+      "TRUST_PROXY is invalid. Use an exact hop count or an explicit proxy IP/CIDR list.",
+    );
+  }
+
+  for (const range of ranges) {
+    const lowered = range.toLowerCase();
+    if (
+      lowered === "loopback" ||
+      lowered === "linklocal" ||
+      lowered === "uniquelocal" ||
+      lowered === "all"
+    ) {
+      throw new Error(
+        `TRUST_PROXY value '${range}' is too permissive. Use explicit proxy IP addresses or CIDR ranges.`,
+      );
+    }
+  }
+
+  const tester = proxyAddr.compile(ranges);
+
+  return {
+    enabled: true,
+    expressValue: tester,
+    mode: "explicit-list",
+    explicitProxyRanges: ranges,
+    tester,
+  };
+}
+
+function getTrustProxyConfig() {
+  return parseTrustProxySetting(process.env.TRUST_PROXY);
 }
 
 function normalizeRemoteAddress(value) {
@@ -161,19 +235,52 @@ function hasValidApiKey(req) {
   );
 }
 
-function getRequestRemoteAddress(req) {
+function getDirectRemoteAddress(req) {
   return normalizeRemoteAddress(
-    req.ip ||
-      req.socket?.remoteAddress ||
+    req.socket?.remoteAddress ||
       req.connection?.remoteAddress ||
-      req.headers["x-forwarded-for"] ||
       "",
   );
 }
 
+function getRequestRemoteAddress(req) {
+  return normalizeRemoteAddress(req.ip || getDirectRemoteAddress(req));
+}
+
+function hasForwardedHeaders(req) {
+  return [
+    "x-forwarded-for",
+    "x-forwarded-host",
+    "x-forwarded-proto",
+    "forwarded",
+  ].some((header) => {
+    const value = req.headers[header];
+    return typeof value === "string" ? value.trim() !== "" : Boolean(value);
+  });
+}
+
+function isExplicitTrustedProxyConnection(req) {
+  const config = getTrustProxyConfig();
+  if (!config.enabled || config.mode !== "explicit-list" || !config.tester) {
+    return false;
+  }
+
+  const directRemoteAddress = getDirectRemoteAddress(req);
+  if (!directRemoteAddress) {
+    return false;
+  }
+
+  return config.tester(directRemoteAddress, 0);
+}
+
 function requireInternalAccess(req, res, next) {
-  const remoteAddress = getRequestRemoteAddress(req);
-  if (isLoopbackOrPrivateAddress(remoteAddress)) {
+  const directRemoteAddress = getDirectRemoteAddress(req);
+  const derivedRemoteAddress = getRequestRemoteAddress(req);
+  const forwardedHeadersPresent = hasForwardedHeaders(req);
+  const trustedDirectConnection = isLoopbackOrPrivateAddress(directRemoteAddress);
+  const trustedExplicitProxy = forwardedHeadersPresent && isExplicitTrustedProxyConnection(req);
+
+  if (trustedDirectConnection || trustedExplicitProxy) {
     return next();
   }
 
@@ -184,7 +291,9 @@ function requireInternalAccess(req, res, next) {
 
   logger.warn("Rejected request outside trusted network perimeter", {
     request_id: req.requestId,
-    remote_address: remoteAddress || null,
+    remote_address: derivedRemoteAddress || null,
+    direct_remote_address: directRemoteAddress || null,
+    forwarded_headers_present: forwardedHeadersPresent,
     api_key_presented: apiKeyStatus === false,
   });
 
@@ -218,10 +327,15 @@ function requireApiKey(req, res, next) {
 
 module.exports = {
   corsMiddleware,
+  getDirectRemoteAddress,
   getRequestRemoteAddress,
+  getTrustProxyConfig,
   hasValidApiKey,
+  hasForwardedHeaders,
   isLoopbackOrPrivateAddress,
+  isExplicitTrustedProxyConnection,
   isPrivateIpv4,
+  parseTrustProxySetting,
   requireApiKey,
   requireInternalAccess,
   setSecurityHeaders,
