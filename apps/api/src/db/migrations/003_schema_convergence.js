@@ -675,6 +675,69 @@ function applySchemaConvergenceMigration() {
     });
 
     rebuildTable({
+      name: "location_integrations",
+      createSql: `
+        CREATE TABLE location_integrations (
+          id INTEGER PRIMARY KEY,
+          location_id INTEGER NOT NULL,
+          integration_name TEXT NOT NULL,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          FOREIGN KEY (location_id) REFERENCES locations(id)
+            ON UPDATE CASCADE
+            ON DELETE CASCADE,
+          CHECK (length(trim(integration_name)) > 0),
+          UNIQUE (location_id, integration_name)
+        );
+      `,
+      copySql: (legacyName) => `
+        INSERT INTO location_integrations (
+          id, location_id, integration_name, created_at
+        )
+        SELECT
+          id,
+          location_id,
+          trim(integration_name),
+          coalesce(${sourceColumn(legacyName, "created_at", "NULL")}, datetime('now'))
+        FROM ${quoteIdentifier(legacyName)};
+      `,
+      postCreateStatements: [
+        "CREATE INDEX IF NOT EXISTS idx_location_integrations_location_id ON location_integrations(location_id);",
+      ],
+    });
+
+    rebuildTable({
+      name: "device_aliases",
+      createSql: `
+        CREATE TABLE device_aliases (
+          id INTEGER PRIMARY KEY,
+          device_id INTEGER NOT NULL,
+          alias TEXT NOT NULL,
+          normalized_alias TEXT GENERATED ALWAYS AS (lower(trim(alias))) VIRTUAL,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          FOREIGN KEY (device_id) REFERENCES devices(id)
+            ON UPDATE CASCADE
+            ON DELETE CASCADE,
+          UNIQUE (device_id, normalized_alias)
+        );
+      `,
+      copySql: (legacyName) => `
+        INSERT INTO device_aliases (
+          id, device_id, alias, created_at
+        )
+        SELECT
+          id,
+          device_id,
+          alias,
+          coalesce(${sourceColumn(legacyName, "created_at", "NULL")}, datetime('now'))
+        FROM ${quoteIdentifier(legacyName)};
+      `,
+      postCreateStatements: [
+        "CREATE INDEX IF NOT EXISTS idx_device_aliases_device_id ON device_aliases(device_id);",
+        "CREATE INDEX IF NOT EXISTS idx_device_aliases_norm_alias ON device_aliases(normalized_alias);",
+      ],
+    });
+
+    rebuildTable({
       name: "incidents",
       createSql: `
         CREATE TABLE incidents (
@@ -751,6 +814,142 @@ function applySchemaConvergenceMigration() {
         "CREATE INDEX IF NOT EXISTS idx_incidents_category ON incidents(category);",
         "CREATE INDEX IF NOT EXISTS idx_incidents_device_id ON incidents(device_id);",
         "CREATE INDEX IF NOT EXISTS idx_incidents_created_by ON incidents(created_by);",
+      ],
+    });
+
+    rebuildTable({
+      name: "teamviewer_connections",
+      createSql: `
+        CREATE TABLE teamviewer_connections (
+          id INTEGER PRIMARY KEY,
+          connection_date TEXT NOT NULL,
+          start_time TEXT NOT NULL,
+          end_time TEXT,
+          duration_minutes INTEGER NOT NULL DEFAULT 0 CHECK (duration_minutes >= 0),
+          partner_name TEXT,
+          teamviewer_id TEXT,
+          remote_device_name TEXT,
+          matched_location_id INTEGER,
+          matched_device_id INTEGER,
+          match_method TEXT CHECK (match_method IN ('teamviewer_id', 'device_name', 'manual', 'none')),
+          match_confidence INTEGER NOT NULL DEFAULT 0 CHECK (match_confidence BETWEEN 0 AND 100),
+          match_status TEXT NOT NULL DEFAULT 'unmatched'
+            CHECK (match_status IN ('matched', 'suggested', 'unmatched')),
+          import_file_name TEXT,
+          import_row_hash TEXT,
+          raw_csv_row TEXT,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          FOREIGN KEY (matched_location_id) REFERENCES locations(id)
+            ON UPDATE CASCADE
+            ON DELETE SET NULL,
+          FOREIGN KEY (matched_device_id) REFERENCES devices(id)
+            ON UPDATE CASCADE
+            ON DELETE SET NULL,
+          UNIQUE (import_row_hash)
+        );
+      `,
+      copySql: (legacyName) => `
+        INSERT INTO teamviewer_connections (
+          id, connection_date, start_time, end_time, duration_minutes, partner_name, teamviewer_id,
+          remote_device_name, matched_location_id, matched_device_id, match_method, match_confidence,
+          match_status, import_file_name, import_row_hash, raw_csv_row, created_at
+        )
+        SELECT
+          id,
+          connection_date,
+          start_time,
+          ${sourceColumn(legacyName, "end_time", "NULL")},
+          CASE
+            WHEN typeof(${sourceColumn(legacyName, "duration_minutes", "0")}) IN ('integer', 'real') AND ${sourceColumn(legacyName, "duration_minutes", "0")} >= 0
+              THEN CAST(${sourceColumn(legacyName, "duration_minutes", "0")} AS INTEGER)
+            ELSE 0
+          END,
+          ${sourceColumn(legacyName, "partner_name", "NULL")},
+          ${sourceColumn(legacyName, "teamviewer_id", "NULL")},
+          ${sourceColumn(legacyName, "remote_device_name", "NULL")},
+          ${sourceColumn(legacyName, "matched_location_id", "NULL")},
+          ${sourceColumn(legacyName, "matched_device_id", "NULL")},
+          CASE
+            WHEN coalesce(trim(${sourceColumn(legacyName, "match_method", "NULL")}), '') IN ('teamviewer_id', 'device_name', 'manual', 'none')
+              THEN trim(${sourceColumn(legacyName, "match_method", "NULL")})
+            ELSE NULL
+          END,
+          CASE
+            WHEN typeof(${sourceColumn(legacyName, "match_confidence", "0")}) IN ('integer', 'real') AND ${sourceColumn(legacyName, "match_confidence", "0")} BETWEEN 0 AND 100
+              THEN CAST(${sourceColumn(legacyName, "match_confidence", "0")} AS INTEGER)
+            ELSE 0
+          END,
+          CASE
+            WHEN coalesce(trim(${sourceColumn(legacyName, "match_status", "'unmatched'")}), '') IN ('matched', 'suggested', 'unmatched')
+              THEN trim(${sourceColumn(legacyName, "match_status", "'unmatched'")})
+            ELSE 'unmatched'
+          END,
+          ${sourceColumn(legacyName, "import_file_name", "NULL")},
+          ${sourceColumn(legacyName, "import_row_hash", "NULL")},
+          ${sourceColumn(legacyName, "raw_csv_row", "NULL")},
+          coalesce(${sourceColumn(legacyName, "created_at", "NULL")}, datetime('now'))
+        FROM ${quoteIdentifier(legacyName)};
+      `,
+      postCreateStatements: [
+        "CREATE INDEX IF NOT EXISTS idx_tv_conn_date ON teamviewer_connections(connection_date);",
+        "CREATE INDEX IF NOT EXISTS idx_tv_conn_teamviewer_id ON teamviewer_connections(teamviewer_id);",
+        "CREATE INDEX IF NOT EXISTS idx_tv_conn_partner_name_lower ON teamviewer_connections(lower(partner_name));",
+        "CREATE INDEX IF NOT EXISTS idx_tv_conn_remote_name_lower ON teamviewer_connections(lower(remote_device_name));",
+        "CREATE INDEX IF NOT EXISTS idx_tv_conn_match_status ON teamviewer_connections(match_status);",
+        "CREATE INDEX IF NOT EXISTS idx_tv_conn_matched_location ON teamviewer_connections(matched_location_id);",
+        "CREATE INDEX IF NOT EXISTS idx_tv_conn_matched_device ON teamviewer_connections(matched_device_id);",
+      ],
+    });
+
+    rebuildTable({
+      name: "weekly_tasks",
+      createSql: `
+        CREATE TABLE weekly_tasks (
+          id INTEGER PRIMARY KEY,
+          location_id INTEGER,
+          title TEXT NOT NULL,
+          description TEXT,
+          priority TEXT NOT NULL DEFAULT 'medium'
+            CHECK (priority IN ('low', 'medium', 'high', 'urgent')),
+          status TEXT NOT NULL DEFAULT 'todo'
+            CHECK (status IN ('todo', 'in_progress', 'blocked', 'done')),
+          due_date TEXT,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+          FOREIGN KEY (location_id) REFERENCES locations(id)
+            ON UPDATE CASCADE
+            ON DELETE SET NULL
+        );
+      `,
+      copySql: (legacyName) => `
+        INSERT INTO weekly_tasks (
+          id, location_id, title, description, priority, status, due_date, created_at, updated_at
+        )
+        SELECT
+          id,
+          ${sourceColumn(legacyName, "location_id", "NULL")},
+          title,
+          ${sourceColumn(legacyName, "description", "NULL")},
+          CASE
+            WHEN coalesce(trim(${sourceColumn(legacyName, "priority", "'medium'")}), '') IN ('low', 'medium', 'high', 'urgent')
+              THEN trim(${sourceColumn(legacyName, "priority", "'medium'")})
+            ELSE 'medium'
+          END,
+          CASE
+            WHEN coalesce(trim(${sourceColumn(legacyName, "status", "'todo'")}), '') IN ('todo', 'in_progress', 'blocked', 'done')
+              THEN trim(${sourceColumn(legacyName, "status", "'todo'")})
+            ELSE 'todo'
+          END,
+          ${sourceColumn(legacyName, "due_date", "NULL")},
+          coalesce(${sourceColumn(legacyName, "created_at", "NULL")}, datetime('now')),
+          coalesce(${sourceColumn(legacyName, "updated_at", "NULL")}, datetime('now'))
+        FROM ${quoteIdentifier(legacyName)};
+      `,
+      postCreateStatements: [
+        "CREATE TRIGGER IF NOT EXISTS trg_weekly_tasks_updated_at AFTER UPDATE ON weekly_tasks FOR EACH ROW BEGIN UPDATE weekly_tasks SET updated_at = datetime('now') WHERE id = NEW.id; END;",
+        "CREATE INDEX IF NOT EXISTS idx_weekly_tasks_status_due ON weekly_tasks(status, due_date);",
+        "CREATE INDEX IF NOT EXISTS idx_weekly_tasks_location ON weekly_tasks(location_id);",
+        "CREATE INDEX IF NOT EXISTS idx_weekly_tasks_priority ON weekly_tasks(priority);",
       ],
     });
 
@@ -842,6 +1041,46 @@ function applySchemaConvergenceMigration() {
         "CREATE INDEX IF NOT EXISTS idx_tasks_incident_id ON tasks(incident_id);",
         "CREATE INDEX IF NOT EXISTS idx_tasks_created_by ON tasks(created_by);",
         "CREATE INDEX IF NOT EXISTS idx_tasks_assigned_user_id ON tasks(assigned_user_id);",
+      ],
+    });
+
+    rebuildTable({
+      name: "comments",
+      createSql: `
+        CREATE TABLE comments (
+          id INTEGER PRIMARY KEY,
+          entity_type TEXT NOT NULL CHECK (entity_type IN ('incident', 'task')),
+          entity_id INTEGER NOT NULL,
+          user_id INTEGER NOT NULL,
+          comment TEXT NOT NULL,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+          FOREIGN KEY (user_id) REFERENCES users(id)
+            ON UPDATE CASCADE
+            ON DELETE RESTRICT
+        );
+      `,
+      copySql: (legacyName) => `
+        INSERT INTO comments (
+          id, entity_type, entity_id, user_id, comment, created_at, updated_at
+        )
+        SELECT
+          id,
+          CASE
+            WHEN coalesce(trim(${sourceColumn(legacyName, "entity_type", "NULL")}), '') IN ('incident', 'task')
+              THEN trim(${sourceColumn(legacyName, "entity_type", "NULL")})
+            ELSE 'incident'
+          END,
+          entity_id,
+          user_id,
+          comment,
+          coalesce(${sourceColumn(legacyName, "created_at", "NULL")}, datetime('now')),
+          coalesce(${sourceColumn(legacyName, "updated_at", "NULL")}, datetime('now'))
+        FROM ${quoteIdentifier(legacyName)};
+      `,
+      postCreateStatements: [
+        "CREATE TRIGGER IF NOT EXISTS trg_comments_updated_at AFTER UPDATE ON comments FOR EACH ROW BEGIN UPDATE comments SET updated_at = datetime('now') WHERE id = NEW.id; END;",
+        "CREATE INDEX IF NOT EXISTS idx_comments_entity ON comments(entity_type, entity_id, created_at DESC, id DESC);",
       ],
     });
 
