@@ -35,7 +35,11 @@ function collectSchema(db, names) {
   for (const name of names) {
     schema[name] = {
       tableSql: normalizeSql(
-        db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?").get(name)?.sql,
+        db
+          .prepare(
+            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?",
+          )
+          .get(name)?.sql,
       ),
       indexes: db
         .prepare(
@@ -72,7 +76,9 @@ function collectSchema(db, names) {
 
 test("SQLite legacy upgrade converges to the same critical schema as a fresh install", async (t) => {
   const repoRoot = path.resolve(__dirname, "../../../..");
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "sopaloha-api-db-init-"));
+  const tempDir = fs.mkdtempSync(
+    path.join(os.tmpdir(), "sopaloha-api-db-init-"),
+  );
   const legacyDbPath = path.join(tempDir, "legacy-support.db");
   const freshDbPath = path.join(tempDir, "fresh-support.db");
 
@@ -226,10 +232,15 @@ test("SQLite legacy upgrade converges to the same critical schema as a fresh ins
     .get();
   assert.equal(upgradedDevice.type, "other");
   assert.equal(upgradedDevice.device_role, "other");
-  assert.equal(deviceColumns.some((column) => column.name === "password"), false);
+  assert.equal(
+    deviceColumns.some((column) => column.name === "password"),
+    false,
+  );
 
   const upgradedIncident = upgradedDb
-    .prepare("SELECT category, status, time_spent_minutes FROM incidents WHERE id = 1")
+    .prepare(
+      "SELECT category, status, time_spent_minutes FROM incidents WHERE id = 1",
+    )
     .get();
   assert.deepEqual(upgradedIncident, {
     category: "other",

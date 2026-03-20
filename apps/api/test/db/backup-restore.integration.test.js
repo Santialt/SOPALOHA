@@ -127,7 +127,9 @@ test("backup and restore scripts produce a restorable SQLite database with migra
 });
 
 test("restoreDatabase rolls back automatically when post-restore validation fails", async (t) => {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "sopaloha-restore-rollback-"));
+  const tempDir = fs.mkdtempSync(
+    path.join(os.tmpdir(), "sopaloha-restore-rollback-"),
+  );
   const sourceDbPath = path.join(tempDir, "source.db");
   const targetDbPath = path.join(tempDir, "target.db");
   const backupFilePath = path.join(tempDir, "backup.db");

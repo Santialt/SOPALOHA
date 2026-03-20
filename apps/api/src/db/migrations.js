@@ -2,7 +2,9 @@ const fs = require("fs");
 const path = require("path");
 const db = require("./connection");
 const { logger } = require("../utils/logger");
-const { applySchemaConvergenceMigration } = require("./migrations/003_schema_convergence");
+const {
+  applySchemaConvergenceMigration,
+} = require("./migrations/003_schema_convergence");
 
 const MIGRATIONS_DIR = path.resolve(__dirname, "migrations");
 
@@ -265,10 +267,9 @@ function applyPendingMigrations() {
     } else {
       const apply = db.transaction(() => {
         executeMigration(migration);
-        db.prepare("INSERT INTO schema_migrations (id, type) VALUES (?, ?)").run(
-          migration.id,
-          migration.type,
-        );
+        db.prepare(
+          "INSERT INTO schema_migrations (id, type) VALUES (?, ?)",
+        ).run(migration.id, migration.type);
       });
 
       apply();

@@ -46,12 +46,17 @@ function rebuildTable(definition) {
   }
 
   const legacyName = `${definition.name}__legacy_003`;
-  db.exec(`ALTER TABLE ${quoteIdentifier(definition.name)} RENAME TO ${quoteIdentifier(legacyName)};`);
+  db.exec(
+    `ALTER TABLE ${quoteIdentifier(definition.name)} RENAME TO ${quoteIdentifier(legacyName)};`,
+  );
   db.exec(definition.createSql);
   const copySql =
     typeof definition.copySql === "function"
       ? definition.copySql(legacyName)
-      : definition.copySql.replaceAll("__LEGACY_TABLE__", quoteIdentifier(legacyName));
+      : definition.copySql.replaceAll(
+          "__LEGACY_TABLE__",
+          quoteIdentifier(legacyName),
+        );
   db.exec(copySql);
   db.exec(`DROP TABLE ${quoteIdentifier(legacyName)};`);
 
@@ -76,9 +81,12 @@ function hardenLegacyImportedUsers() {
     });
 
   if (result.changes > 0) {
-    logger.warn("Disabled legacy TeamViewer-imported users and rotated stored login material", {
-      affected_users: result.changes,
-    });
+    logger.warn(
+      "Disabled legacy TeamViewer-imported users and rotated stored login material",
+      {
+        affected_users: result.changes,
+      },
+    );
   }
 }
 
@@ -568,12 +576,16 @@ function applySchemaConvergenceMigration() {
 
   const fkViolations = db.prepare("PRAGMA foreign_key_check").all();
   if (fkViolations.length > 0) {
-    throw new Error(`foreign_key_check failed after schema convergence: ${JSON.stringify(fkViolations[0])}`);
+    throw new Error(
+      `foreign_key_check failed after schema convergence: ${JSON.stringify(fkViolations[0])}`,
+    );
   }
 
   const integrity = db.pragma("integrity_check", { simple: true });
   if (String(integrity).toLowerCase() !== "ok") {
-    throw new Error(`integrity_check failed after schema convergence: ${integrity}`);
+    throw new Error(
+      `integrity_check failed after schema convergence: ${integrity}`,
+    );
   }
 }
 

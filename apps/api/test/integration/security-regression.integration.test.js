@@ -80,16 +80,20 @@ test("security regression coverage hardens internal access, admin-only operation
       });
       assert.equal(noOriginResult.status, 200);
 
-      const localForwardedResult = await harness.request("POST", "/auth/login", {
-        headers: {
-          Origin: allowedOrigin,
-          "X-Forwarded-For": "203.0.113.20",
+      const localForwardedResult = await harness.request(
+        "POST",
+        "/auth/login",
+        {
+          headers: {
+            Origin: allowedOrigin,
+            "X-Forwarded-For": "203.0.113.20",
+          },
+          body: {
+            email: adminUser.email,
+            password: adminUser.password,
+          },
         },
-        body: {
-          email: adminUser.email,
-          password: adminUser.password,
-        },
-      });
+      );
       assert.equal(localForwardedResult.status, 200);
     },
   );
@@ -265,35 +269,45 @@ test("security regression coverage hardens internal access, admin-only operation
     },
   );
 
-  await t.test("health splits public liveness from protected readiness without writing probe files", async () => {
-    const beforeEntries = fs.readdirSync(harness.tempDir);
+  await t.test(
+    "health splits public liveness from protected readiness without writing probe files",
+    async () => {
+      const beforeEntries = fs.readdirSync(harness.tempDir);
 
-    const liveness = await harness.request("GET", "/health");
-    assert.equal(liveness.status, 200);
-    assert.deepEqual(liveness.body, { status: "ok" });
+      const liveness = await harness.request("GET", "/health");
+      assert.equal(liveness.status, 200);
+      assert.deepEqual(liveness.body, { status: "ok" });
 
-    const readinessWithoutApiKey = await harness.request("GET", "/health/ready");
-    assert.equal(readinessWithoutApiKey.status, 401);
+      const readinessWithoutApiKey = await harness.request(
+        "GET",
+        "/health/ready",
+      );
+      assert.equal(readinessWithoutApiKey.status, 401);
 
-    const readinessInvalidApiKey = await harness.request("GET", "/health/ready", {
-      headers: {
-        "X-Internal-Api-Key": "invalid-key",
-      },
-    });
-    assert.equal(readinessInvalidApiKey.status, 401);
+      const readinessInvalidApiKey = await harness.request(
+        "GET",
+        "/health/ready",
+        {
+          headers: {
+            "X-Internal-Api-Key": "invalid-key",
+          },
+        },
+      );
+      assert.equal(readinessInvalidApiKey.status, 401);
 
-    const readiness = await harness.request("GET", "/health/ready", {
-      headers: harness.withApiKey(),
-    });
-    assert.equal(readiness.status, 200);
-    assert.equal(readiness.body.status, "ok");
-    assert.deepEqual(readiness.body.checks, {
-      db: "ok",
-      disk: "ok",
-      migrations: "ok",
-    });
+      const readiness = await harness.request("GET", "/health/ready", {
+        headers: harness.withApiKey(),
+      });
+      assert.equal(readiness.status, 200);
+      assert.equal(readiness.body.status, "ok");
+      assert.deepEqual(readiness.body.checks, {
+        db: "ok",
+        disk: "ok",
+        migrations: "ok",
+      });
 
-    const afterEntries = fs.readdirSync(harness.tempDir);
-    assert.deepEqual(afterEntries.sort(), beforeEntries.sort());
-  });
+      const afterEntries = fs.readdirSync(harness.tempDir);
+      assert.deepEqual(afterEntries.sort(), beforeEntries.sort());
+    },
+  );
 });
