@@ -30,10 +30,213 @@ function randomPasswordHash() {
   return hashPassword(crypto.randomBytes(48).toString("hex"));
 }
 
+function normalizeSql(sql) {
+  return String(sql || "")
+    .replace(/\s+/g, " ")
+    .replace(/`/g, '"')
+    .trim()
+    .toLowerCase();
+}
+
+function getTableSql(tableName) {
+  return normalizeSql(
+    db
+      .prepare(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?",
+      )
+      .get(tableName)?.sql,
+  );
+}
+
+function getIndexSnapshot(tableName) {
+  return db
+    .prepare(
+      `
+      SELECT name, sql
+      FROM sqlite_master
+      WHERE type = 'index'
+        AND tbl_name = ?
+        AND name NOT LIKE 'sqlite_autoindex_%'
+      ORDER BY name ASC
+    `,
+    )
+    .all(tableName)
+    .map((row) => ({
+      name: row.name,
+      sql: normalizeSql(row.sql),
+    }));
+}
+
+function getColumnSnapshot(tableName) {
+  return db
+    .prepare(`PRAGMA table_info(${quoteIdentifier(tableName)})`)
+    .all()
+    .map((column) => ({
+      name: column.name,
+      type: normalizeSql(column.type),
+      notnull: column.notnull,
+      dflt_value: normalizeSql(column.dflt_value),
+      pk: column.pk,
+    }));
+}
+
+function getTriggerSnapshot(tableName) {
+  return db
+    .prepare(
+      `
+      SELECT name, sql
+      FROM sqlite_master
+      WHERE type = 'trigger'
+        AND tbl_name = ?
+      ORDER BY name ASC
+    `,
+    )
+    .all(tableName)
+    .map((row) => ({
+      name: row.name,
+      sql: normalizeSql(row.sql),
+    }));
+}
+
+function assertSchemaShape(tableName, expected) {
+  const actualTableSql = getTableSql(tableName);
+  const actualColumns = JSON.stringify(getColumnSnapshot(tableName));
+  const expectedColumns = JSON.stringify(expected.columns);
+  if (actualColumns !== expectedColumns) {
+    throw new Error(
+      `schema convergence mismatch for ${tableName}: column definition does not match expected shape`,
+    );
+  }
+
+  for (const fragment of expected.requiredSqlFragments || []) {
+    if (!actualTableSql.includes(normalizeSql(fragment))) {
+      throw new Error(
+        `schema convergence mismatch for ${tableName}: missing required SQL fragment '${fragment}'`,
+      );
+    }
+  }
+
+  const actualIndexes = new Set(getIndexSnapshot(tableName).map((index) => index.name));
+  for (const statement of expected.postCreateStatements.filter((sql) => /^\s*create\s+index/i.test(sql))) {
+    const expectedIndexName =
+      statement.match(/create\s+index\s+if\s+not\s+exists\s+("?[\w_]+"?)/i)?.[1]
+        ?.replace(/"/g, "") || null;
+    if (!expectedIndexName || !actualIndexes.has(expectedIndexName)) {
+      throw new Error(
+        `schema convergence mismatch for ${tableName}: missing expected index '${expectedIndexName}'`,
+      );
+    }
+  }
+
+  const actualTriggers = new Set(getTriggerSnapshot(tableName).map((trigger) => trigger.name));
+  for (const statement of expected.postCreateStatements.filter((sql) => /^\s*create\s+trigger/i.test(sql))) {
+    const expectedTriggerName =
+      statement.match(/create\s+trigger\s+if\s+not\s+exists\s+("?[\w_]+"?)/i)?.[1]
+        ?.replace(/"/g, "") || null;
+    if (!expectedTriggerName || !actualTriggers.has(expectedTriggerName)) {
+      throw new Error(
+        `schema convergence mismatch for ${tableName}: missing expected trigger '${expectedTriggerName}'`,
+      );
+    }
+  }
+}
+
 function sourceColumn(tableName, columnName, fallback = "NULL") {
   return hasColumn(tableName, columnName)
     ? quoteIdentifier(columnName)
     : fallback;
+}
+
+function assertNoDuplicateNormalizedValues(tableName, columnName, label) {
+  const duplicates = db
+    .prepare(
+      `
+      SELECT lower(trim(${quoteIdentifier(columnName)})) AS normalized_value, COUNT(*) AS total
+      FROM ${quoteIdentifier(tableName)}
+      GROUP BY lower(trim(${quoteIdentifier(columnName)}))
+      HAVING normalized_value IS NOT NULL
+         AND normalized_value <> ''
+         AND COUNT(*) > 1
+      ORDER BY total DESC, normalized_value ASC
+      LIMIT 1
+    `,
+    )
+    .get();
+
+  if (duplicates) {
+    throw new Error(
+      `${label} contains duplicate values after normalization: '${duplicates.normalized_value}'`,
+    );
+  }
+}
+
+function assertNoRows(tableName, whereSql, params, message) {
+  const row = db
+    .prepare(
+      `SELECT * FROM ${quoteIdentifier(tableName)} WHERE ${whereSql} LIMIT 1`,
+    )
+    .get(params);
+
+  if (row) {
+    throw new Error(`${message}: ${JSON.stringify(row)}`);
+  }
+}
+
+function validateLegacyUsersForConvergence() {
+  if (!hasTable("users")) {
+    return;
+  }
+
+  assertNoDuplicateNormalizedValues("users", "email", "users.email");
+  assertNoRows(
+    "users",
+    "trim(coalesce(name, '')) = ''",
+    {},
+    "users contains blank names that cannot satisfy NOT NULL/meaningful auth constraints",
+  );
+  assertNoRows(
+    "users",
+    "trim(coalesce(email, '')) = ''",
+    {},
+    "users contains blank emails that cannot satisfy UNIQUE(email)",
+  );
+  assertNoRows(
+    "users",
+    "trim(coalesce(password_hash, '')) = ''",
+    {},
+    "users contains blank password_hash values",
+  );
+  assertNoRows(
+    "users",
+    "lower(trim(coalesce(role, ''))) NOT IN ('admin', 'tech')",
+    {},
+    "users contains unsupported role values",
+  );
+  assertNoRows(
+    "users",
+    "active IS NOT NULL AND CAST(active AS INTEGER) NOT IN (0, 1)",
+    {},
+    "users contains unsupported active values",
+  );
+}
+
+function validateLegacyLocationsForConvergence() {
+  if (!hasTable("locations")) {
+    return;
+  }
+
+  assertNoRows(
+    "locations",
+    "trim(coalesce(name, '')) = ''",
+    {},
+    "locations contains blank names",
+  );
+  assertNoRows(
+    "locations",
+    "status IS NOT NULL AND lower(trim(coalesce(status, ''))) NOT IN ('active', 'inactive')",
+    {},
+    "locations contains unsupported status values",
+  );
 }
 
 function rebuildTable(definition) {
@@ -91,6 +294,185 @@ function hardenLegacyImportedUsers() {
 }
 
 function applySchemaConvergenceMigration() {
+  validateLegacyUsersForConvergence();
+  validateLegacyLocationsForConvergence();
+  const locationsDefinition = {
+    name: "locations",
+    columns: [
+      { name: "id", type: "integer", notnull: 0, dflt_value: "", pk: 1 },
+      { name: "name", type: "text", notnull: 1, dflt_value: "", pk: 0 },
+      { name: "company_name", type: "text", notnull: 0, dflt_value: "", pk: 0 },
+      { name: "razon_social", type: "text", notnull: 0, dflt_value: "", pk: 0 },
+      { name: "cuit", type: "text", notnull: 0, dflt_value: "", pk: 0 },
+      { name: "llave_aloha", type: "text", notnull: 0, dflt_value: "", pk: 0 },
+      { name: "version_aloha", type: "text", notnull: 0, dflt_value: "", pk: 0 },
+      { name: "version_modulo_fiscal", type: "text", notnull: 0, dflt_value: "", pk: 0 },
+      { name: "usa_nbo", type: "integer", notnull: 1, dflt_value: "0", pk: 0 },
+      { name: "network_notes", type: "text", notnull: 0, dflt_value: "", pk: 0 },
+      { name: "address", type: "text", notnull: 0, dflt_value: "", pk: 0 },
+      { name: "city", type: "text", notnull: 0, dflt_value: "", pk: 0 },
+      { name: "province", type: "text", notnull: 0, dflt_value: "", pk: 0 },
+      { name: "phone", type: "text", notnull: 0, dflt_value: "", pk: 0 },
+      { name: "main_contact", type: "text", notnull: 0, dflt_value: "", pk: 0 },
+      { name: "status", type: "text", notnull: 1, dflt_value: "'active'", pk: 0 },
+      { name: "notes", type: "text", notnull: 0, dflt_value: "", pk: 0 },
+      { name: "cantidad_licencias_aloha", type: "integer", notnull: 0, dflt_value: "", pk: 0 },
+      { name: "tiene_kitchen", type: "integer", notnull: 1, dflt_value: "0", pk: 0 },
+      { name: "usa_insight_pulse", type: "integer", notnull: 1, dflt_value: "0", pk: 0 },
+      { name: "cmc", type: "text", notnull: 0, dflt_value: "", pk: 0 },
+      { name: "fecha_apertura", type: "text", notnull: 0, dflt_value: "", pk: 0 },
+      { name: "fecha_cierre", type: "text", notnull: 0, dflt_value: "", pk: 0 },
+      { name: "created_at", type: "text", notnull: 1, dflt_value: "datetime('now')", pk: 0 },
+      { name: "updated_at", type: "text", notnull: 1, dflt_value: "datetime('now')", pk: 0 },
+      { name: "country", type: "text", notnull: 0, dflt_value: "", pk: 0 },
+    ],
+    requiredSqlFragments: [
+      "check (status in ('active', 'inactive'))",
+      "check (usa_nbo in (0, 1))",
+      "check (tiene_kitchen in (0, 1))",
+      "check (usa_insight_pulse in (0, 1))",
+    ],
+    createSql: `
+      CREATE TABLE locations (
+        id INTEGER PRIMARY KEY,
+        name TEXT NOT NULL,
+        company_name TEXT,
+        razon_social TEXT,
+        cuit TEXT,
+        llave_aloha TEXT,
+        version_aloha TEXT,
+        version_modulo_fiscal TEXT,
+        usa_nbo INTEGER NOT NULL DEFAULT 0 CHECK (usa_nbo IN (0, 1)),
+        network_notes TEXT,
+        address TEXT,
+        city TEXT,
+        province TEXT,
+        phone TEXT,
+        main_contact TEXT,
+        status TEXT NOT NULL DEFAULT 'active'
+          CHECK (status IN ('active', 'inactive')),
+        notes TEXT,
+        cantidad_licencias_aloha INTEGER,
+        tiene_kitchen INTEGER NOT NULL DEFAULT 0 CHECK (tiene_kitchen IN (0, 1)),
+        usa_insight_pulse INTEGER NOT NULL DEFAULT 0 CHECK (usa_insight_pulse IN (0, 1)),
+        cmc TEXT,
+        fecha_apertura TEXT,
+        fecha_cierre TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        country TEXT
+      );
+    `,
+    copySql: (legacyName) => `
+      INSERT INTO locations (
+        id, name, company_name, razon_social, cuit, llave_aloha, version_aloha, version_modulo_fiscal,
+        usa_nbo, network_notes, address, city, province, phone, main_contact, status, notes,
+        cantidad_licencias_aloha, tiene_kitchen, usa_insight_pulse, cmc, fecha_apertura, fecha_cierre,
+        created_at, updated_at, country
+      )
+      SELECT
+        id,
+        trim(name),
+        ${sourceColumn(legacyName, "company_name", "NULL")},
+        ${sourceColumn(legacyName, "razon_social", "NULL")},
+        ${sourceColumn(legacyName, "cuit", "NULL")},
+        ${sourceColumn(legacyName, "llave_aloha", "NULL")},
+        ${sourceColumn(legacyName, "version_aloha", "NULL")},
+        ${sourceColumn(legacyName, "version_modulo_fiscal", "NULL")},
+        CASE
+          WHEN CAST(coalesce(${sourceColumn(legacyName, "usa_nbo", "0")}, 0) AS INTEGER) = 1 THEN 1
+          ELSE 0
+        END,
+        ${sourceColumn(legacyName, "network_notes", "NULL")},
+        ${sourceColumn(legacyName, "address", "NULL")},
+        ${sourceColumn(legacyName, "city", "NULL")},
+        ${sourceColumn(legacyName, "province", "NULL")},
+        ${sourceColumn(legacyName, "phone", "NULL")},
+        ${sourceColumn(legacyName, "main_contact", "NULL")},
+        lower(trim(coalesce(${sourceColumn(legacyName, "status", "'active'")}, 'active'))),
+        ${sourceColumn(legacyName, "notes", "NULL")},
+        ${sourceColumn(legacyName, "cantidad_licencias_aloha", "NULL")},
+        CASE
+          WHEN CAST(coalesce(${sourceColumn(legacyName, "tiene_kitchen", "0")}, 0) AS INTEGER) = 1 THEN 1
+          ELSE 0
+        END,
+        CASE
+          WHEN CAST(coalesce(${sourceColumn(legacyName, "usa_insight_pulse", "0")}, 0) AS INTEGER) = 1 THEN 1
+          ELSE 0
+        END,
+        ${sourceColumn(legacyName, "cmc", "NULL")},
+        ${sourceColumn(legacyName, "fecha_apertura", "NULL")},
+        ${sourceColumn(legacyName, "fecha_cierre", "NULL")},
+        coalesce(${sourceColumn(legacyName, "created_at", "NULL")}, datetime('now')),
+        coalesce(${sourceColumn(legacyName, "updated_at", "NULL")}, datetime('now')),
+        ${sourceColumn(legacyName, "country", "NULL")}
+      FROM ${quoteIdentifier(legacyName)};
+    `,
+    postCreateStatements: [
+      "CREATE TRIGGER IF NOT EXISTS trg_locations_updated_at AFTER UPDATE ON locations FOR EACH ROW BEGIN UPDATE locations SET updated_at = datetime('now') WHERE id = NEW.id; END;",
+      "CREATE INDEX IF NOT EXISTS idx_locations_name ON locations(name);",
+      "CREATE INDEX IF NOT EXISTS idx_locations_status ON locations(status);",
+      "CREATE INDEX IF NOT EXISTS idx_locations_city ON locations(city);",
+      "CREATE INDEX IF NOT EXISTS idx_locations_name_search ON locations(lower(name));",
+      "CREATE INDEX IF NOT EXISTS idx_locations_llave_aloha_search ON locations(lower(llave_aloha));",
+      "CREATE INDEX IF NOT EXISTS idx_locations_cuit_search ON locations(lower(cuit));",
+      "CREATE INDEX IF NOT EXISTS idx_locations_razon_social_search ON locations(lower(razon_social));",
+    ],
+  };
+
+  const usersDefinition = {
+    name: "users",
+    columns: [
+      { name: "id", type: "integer", notnull: 0, dflt_value: "", pk: 1 },
+      { name: "name", type: "text", notnull: 1, dflt_value: "", pk: 0 },
+      { name: "email", type: "text", notnull: 1, dflt_value: "", pk: 0 },
+      { name: "password_hash", type: "text", notnull: 1, dflt_value: "", pk: 0 },
+      { name: "role", type: "text", notnull: 1, dflt_value: "", pk: 0 },
+      { name: "active", type: "integer", notnull: 1, dflt_value: "1", pk: 0 },
+      { name: "created_at", type: "text", notnull: 1, dflt_value: "datetime('now')", pk: 0 },
+      { name: "updated_at", type: "text", notnull: 1, dflt_value: "datetime('now')", pk: 0 },
+    ],
+    requiredSqlFragments: [
+      "email text not null unique",
+      "check (role in ('admin', 'tech'))",
+      "check (active in (0, 1))",
+    ],
+    createSql: `
+      CREATE TABLE users (
+        id INTEGER PRIMARY KEY,
+        name TEXT NOT NULL,
+        email TEXT NOT NULL UNIQUE,
+        password_hash TEXT NOT NULL,
+        role TEXT NOT NULL CHECK (role IN ('admin', 'tech')),
+        active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+    `,
+    copySql: (legacyName) => `
+      INSERT INTO users (
+        id, name, email, password_hash, role, active, created_at, updated_at
+      )
+      SELECT
+        id,
+        trim(name),
+        lower(trim(email)),
+        password_hash,
+        lower(trim(role)),
+        CASE
+          WHEN CAST(coalesce(active, 1) AS INTEGER) = 1 THEN 1
+          ELSE 0
+        END,
+        coalesce(${sourceColumn(legacyName, "created_at", "NULL")}, datetime('now')),
+        coalesce(${sourceColumn(legacyName, "updated_at", "NULL")}, datetime('now'))
+      FROM ${quoteIdentifier(legacyName)};
+    `,
+    postCreateStatements: [
+      "CREATE TRIGGER IF NOT EXISTS trg_users_updated_at AFTER UPDATE ON users FOR EACH ROW BEGIN UPDATE users SET updated_at = datetime('now') WHERE id = NEW.id; END;",
+      "CREATE INDEX IF NOT EXISTS idx_users_email ON users(lower(email));",
+      "CREATE INDEX IF NOT EXISTS idx_users_role_active ON users(role, active);",
+    ],
+  };
   db.exec("PRAGMA foreign_keys = OFF");
 
   try {
@@ -98,6 +480,9 @@ function applySchemaConvergenceMigration() {
     db.exec("DROP VIEW IF EXISTS v_daily_location_summary;");
 
     hardenLegacyImportedUsers();
+
+    rebuildTable(locationsDefinition);
+    rebuildTable(usersDefinition);
 
     rebuildTable({
       name: "devices",
@@ -587,6 +972,9 @@ function applySchemaConvergenceMigration() {
       `integrity_check failed after schema convergence: ${integrity}`,
     );
   }
+
+  assertSchemaShape("locations", locationsDefinition);
+  assertSchemaShape("users", usersDefinition);
 }
 
 module.exports = {

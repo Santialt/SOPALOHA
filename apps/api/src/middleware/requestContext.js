@@ -1,11 +1,9 @@
 const { logger } = require('../utils/logger');
-
-function getClientIp(req) {
-  return String(req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '')
-    .split(',')[0]
-    .trim()
-    .replace(/^::ffff:/, '');
-}
+const {
+  getDirectRemoteAddress,
+  getRequestRemoteAddress,
+  hasForwardedHeaders
+} = require('./security');
 
 function requestContext(req, res, next) {
   const start = process.hrtime.bigint();
@@ -22,7 +20,11 @@ function requestContext(req, res, next) {
       status,
       duration_ms: Math.round(durationMs * 100) / 100,
       user_id: req.user?.id || null,
-      ip: getClientIp(req),
+      ip: getRequestRemoteAddress(req) || null,
+      direct_ip: getDirectRemoteAddress(req) || null,
+      forwarded_for_chain: hasForwardedHeaders(req)
+        ? String(req.headers['x-forwarded-for'] || '').trim() || null
+        : null,
       user_agent: req.headers['user-agent'] || null
     });
   });

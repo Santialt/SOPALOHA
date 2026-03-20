@@ -250,6 +250,112 @@ test("TeamViewer backend hardening covers preview, import, degradation, and rout
   );
 
   await t.test(
+    "specific TeamViewer explorer routes stay behind admin plus API key",
+    async () => {
+      teamviewerFetch.reset();
+
+      teamviewerFetch.setHandler(async (url) => {
+        const parsedUrl = new URL(url);
+
+        if (parsedUrl.pathname === "/api/v1/device-groups") {
+          return jsonResponse({
+            groups: [{ id: "g-1", name: "Explorer Group" }],
+          });
+        }
+
+        if (parsedUrl.pathname === "/api/v1/devices") {
+          return jsonResponse({
+            devices: [
+              {
+                id: "tv-device-1",
+                device_id: "tv-device-1",
+                groupid: "g-1",
+                alias: "Explorer Device",
+                remotecontrol_id: "123456789",
+                online_state: "online",
+              },
+            ],
+          });
+        }
+
+        throw new Error(`Unexpected TeamViewer request: ${url}`);
+      });
+
+      const locationId = harness.db
+        .prepare(
+          `INSERT INTO locations (name, status) VALUES ('Explorer Local', 'active')`,
+        )
+        .run().lastInsertRowid;
+      harness.db
+        .prepare(
+          `
+          INSERT INTO devices (location_id, name, type, device_role, teamviewer_id)
+          VALUES (?, 'Explorer Device', 'server', 'server', '123456789')
+        `,
+        )
+        .run(locationId);
+
+      for (const route of [
+        "/teamviewer/explorer",
+        "/teamviewer/groups/g-1",
+        "/teamviewer/devices/123456789",
+      ]) {
+        const unauthenticated = await harness.request("GET", route);
+        assert.equal(unauthenticated.status, 401, route);
+
+        const techWithApiKey = await harness.authedRequest(
+          techUser,
+          "GET",
+          route,
+          {
+            headers: harness.withApiKey(),
+          },
+        );
+        assert.equal(techWithApiKey.status, 403, route);
+
+        const adminWithoutApiKey = await harness.authedRequest(
+          adminUser,
+          "GET",
+          route,
+        );
+        assert.equal(adminWithoutApiKey.status, 401, route);
+      }
+
+      const explorer = await harness.authedRequest(
+        adminUser,
+        "GET",
+        "/teamviewer/explorer",
+        {
+          headers: harness.withApiKey(),
+        },
+      );
+      assert.equal(explorer.status, 200);
+
+      const group = await harness.authedRequest(
+        adminUser,
+        "GET",
+        "/teamviewer/groups/g-1",
+        {
+          headers: harness.withApiKey(),
+        },
+      );
+      assert.equal(group.status, 200);
+      assert.equal(group.body.group.group_id, "g-1");
+
+      const device = await harness.authedRequest(
+        adminUser,
+        "GET",
+        "/teamviewer/devices/123456789",
+        {
+          headers: harness.withApiKey(),
+        },
+      );
+      assert.equal(device.status, 200);
+      assert.equal(device.body.device.teamviewer_id, "123456789");
+    },
+  );
+
+  await t.test(
     "TeamViewer imported-case reads and writes both require admin plus API key",
     async () => {
       teamviewerFetch.reset();
@@ -391,6 +497,35 @@ test("TeamViewer backend hardening covers preview, import, degradation, and rout
       );
       assert.equal(listImportedCases.status, 200);
       assert.equal(listImportedCases.body.length, 2);
+      const importedCaseId = listImportedCases.body[0].id;
+
+      const getImportedCaseWithoutApiKey = await harness.authedRequest(
+        adminUser,
+        "GET",
+        `/teamviewer/imported-cases/${importedCaseId}`,
+      );
+      assert.equal(getImportedCaseWithoutApiKey.status, 401);
+
+      const getImportedCaseAsTech = await harness.authedRequest(
+        techUser,
+        "GET",
+        `/teamviewer/imported-cases/${importedCaseId}`,
+        {
+          headers: harness.withApiKey(),
+        },
+      );
+      assert.equal(getImportedCaseAsTech.status, 403);
+
+      const getImportedCase = await harness.authedRequest(
+        adminUser,
+        "GET",
+        `/teamviewer/imported-cases/${importedCaseId}`,
+        {
+          headers: harness.withApiKey(),
+        },
+      );
+      assert.equal(getImportedCase.status, 200);
+      assert.equal(getImportedCase.body.id, importedCaseId);
 
       const resolvedNames = listImportedCases.body
         .map((row) => row.resolved_location_name)

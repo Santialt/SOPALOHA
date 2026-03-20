@@ -23,6 +23,14 @@ test("parseTrustProxySetting rejects ambiguous or permissive values", async () =
     /TRUST_PROXY=true is not allowed/,
   );
   assert.throws(() => parseTrustProxySetting("loopback"), /too permissive/);
+  assert.throws(() => parseTrustProxySetting("linklocal"), /too permissive/);
+  assert.throws(() => parseTrustProxySetting("uniquelocal"), /too permissive/);
+  assert.throws(() => parseTrustProxySetting("all"), /too permissive/);
+  assert.throws(
+    () => parseTrustProxySetting("not-a-proxy-range"),
+    /ip address|subnet|invalid|proxy/i,
+  );
+  assert.equal(parseTrustProxySetting("").enabled, false);
   assert.equal(parseTrustProxySetting("1").expressValue, 1);
   assert.equal(parseTrustProxySetting("203.0.113.10/32").mode, "explicit-list");
 });
@@ -96,4 +104,30 @@ test("invalid TRUST_PROXY blocks startup instead of falling back to permissive E
     result.stderr || result.stdout,
     /TRUST_PROXY=true is not allowed/,
   );
+});
+
+test("permissive or malformed TRUST_PROXY values fail closed during startup", async () => {
+  const repoRoot = path.resolve(__dirname, "../../../..");
+  const sqliteDbPath = path.join(
+    repoRoot,
+    "apps",
+    "api",
+    "test-invalid-trust-proxy.db",
+  );
+
+  for (const trustProxyValue of ["loopback", "linklocal", "uniquelocal", "all", "not-a-proxy-range"]) {
+    const result = spawnSync(
+      process.execPath,
+      [
+        "-e",
+        `process.env.NODE_ENV="test"; process.env.AUTH_SESSION_SECRET="secret"; process.env.SQLITE_DB_PATH=${JSON.stringify(sqliteDbPath)}; process.env.TRUST_PROXY=${JSON.stringify(trustProxyValue)}; require("./apps/api/src/app");`,
+      ],
+      {
+        cwd: repoRoot,
+        encoding: "utf8",
+      },
+    );
+
+    assert.notEqual(result.status, 0, trustProxyValue);
+  }
 });

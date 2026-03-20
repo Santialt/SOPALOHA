@@ -68,6 +68,21 @@ function collectSchema(db, names) {
           on_delete: row.on_delete,
           match: row.match,
         })),
+      triggers: db
+        .prepare(
+          `
+          SELECT name, sql
+          FROM sqlite_master
+          WHERE type = 'trigger'
+            AND tbl_name = ?
+          ORDER BY name ASC
+        `,
+        )
+        .all(name)
+        .map((row) => ({
+          name: row.name,
+          sql: normalizeSql(row.sql),
+        })),
     };
   }
 
@@ -97,6 +112,17 @@ test("SQLite legacy upgrade converges to the same critical schema as a fresh ins
       main_contact TEXT,
       status TEXT NOT NULL DEFAULT 'active',
       notes TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE users (
+      id INTEGER PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL,
+      password_hash TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'tech',
+      active INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
@@ -159,6 +185,8 @@ test("SQLite legacy upgrade converges to the same critical schema as a fresh ins
     );
 
     INSERT INTO locations (name, status) VALUES ('Legacy Local', 'active');
+    INSERT INTO users (name, email, password_hash, role, active)
+      VALUES ('Legacy Admin', 'legacy.admin@example.com', 'hash', 'admin', 1);
     INSERT INTO devices (location_id, name, type, password) VALUES (1, 'Legacy Device', 'legacy_type', 'plaintext-secret');
     INSERT INTO incidents (location_id, incident_date, title, description, category, status)
       VALUES (1, '2026-03-01', 'Legacy Incident', 'Description', 'legacy_category', 'legacy_status');
@@ -203,6 +231,8 @@ test("SQLite legacy upgrade converges to the same critical schema as a fresh ins
   });
 
   const criticalTables = [
+    "locations",
+    "users",
     "devices",
     "incidents",
     "tasks",
@@ -260,4 +290,18 @@ test("SQLite legacy upgrade converges to the same critical schema as a fresh ins
   const integrity = upgradedDb.pragma("integrity_check", { simple: true });
   assert.equal(String(integrity).toLowerCase(), "ok");
   assert.deepEqual(upgradedDb.prepare("PRAGMA foreign_key_check").all(), []);
+
+  const insertedUser = upgradedDb
+    .prepare("SELECT email, role, active FROM users WHERE email = ?")
+    .get("legacy.admin@example.com");
+  assert.deepEqual(insertedUser, {
+    email: "legacy.admin@example.com",
+    role: "admin",
+    active: 1,
+  });
+
+  const locationStatus = upgradedDb
+    .prepare("SELECT status FROM locations WHERE id = 1")
+    .get();
+  assert.deepEqual(locationStatus, { status: "active" });
 });

@@ -16,7 +16,6 @@ function getMonthLookbackStart(days = 30) {
 
 function getSummary() {
   const incidentTotals = dashboardRepository.getIncidentStatusTotals();
-  const importedCaseTotals = dashboardRepository.getImportedCaseTotals();
   const taskTotals = dashboardRepository.getTaskStatusTotals();
   const lastMonthStart = getMonthLookbackStart(30);
   const today = formatDateOnly(new Date());
@@ -24,7 +23,7 @@ function getSummary() {
   const categoryBreakdown = dashboardRepository.findIncidentCategoryBreakdownByMonthStart(lastMonthStart);
   const mostFrequentCategory = categoryBreakdown[0] || null;
   const urgentTasksPreview = dashboardRepository.findOpenTasksWithDueDatePreview(today, 5);
-  const totalCases = incidentTotals.total + importedCaseTotals.total;
+  const totalCases = incidentTotals.total;
 
   return {
     locations: locationRepository.countAll(),

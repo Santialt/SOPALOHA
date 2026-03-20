@@ -8,13 +8,20 @@ test("GET /dashboard/summary returns operational dashboard metrics without infer
   try {
     await harness.start();
 
-    const credentials = {
-      name: "Dashboard Tech",
-      email: "dashboard@example.com",
+    const adminCredentials = {
+      name: "Dashboard Admin",
+      email: "dashboard.admin@example.com",
       password: "Secret123!",
       role: "admin",
     };
-    const user = harness.seedUser(credentials);
+    const techCredentials = {
+      name: "Dashboard Tech",
+      email: "dashboard.tech@example.com",
+      password: "Secret123!",
+      role: "tech",
+    };
+    const user = harness.seedUser(adminCredentials);
+    harness.seedUser(techCredentials);
 
     const now = new Date();
     const withinWindow = new Date(now);
@@ -274,8 +281,8 @@ test("GET /dashboard/summary returns operational dashboard metrics without infer
       );
 
     const loginResult = await harness.login(
-      credentials.email,
-      credentials.password,
+      adminCredentials.email,
+      adminCredentials.password,
     );
     assert.equal(loginResult.status, 200);
 
@@ -287,9 +294,9 @@ test("GET /dashboard/summary returns operational dashboard metrics without infer
 
     assert.equal(result.status, 200);
     assert.equal(result.body.locations, 2);
-    assert.equal(result.body.incidents, 5);
+    assert.equal(result.body.incidents, 4);
     assert.equal(result.body.tasks, 5);
-    assert.deepEqual(result.body.incidentMetrics.totalCases, 5);
+    assert.deepEqual(result.body.incidentMetrics.totalCases, 4);
     assert.equal(result.body.incidentMetrics.resolvedCases, undefined);
     assert.equal(result.body.incidentMetrics.inProgressCases, undefined);
     assert.equal(result.body.incidentMetrics.activeStatusKey, undefined);
@@ -352,12 +359,25 @@ test("GET /dashboard/summary returns operational dashboard metrics without infer
     assert.deepEqual(result.body.incidentMetrics.topLocations[0], {
       location_id: locationA,
       location_name: "Local Centro",
-      incident_count: 3,
+      incident_count: 2,
+    });
+    assert.deepEqual(result.body.incidentMetrics.topLocations[1], {
+      location_id: locationB,
+      location_name: "Local Norte",
+      incident_count: 1,
     });
     assert.deepEqual(result.body.incidentMetrics.mostFrequentCategory, {
       category: "aloha",
       incidentCount: 2,
     });
+    assert.equal(
+      JSON.stringify(result.body).includes("tv-open-1"),
+      false,
+    );
+    assert.equal(
+      JSON.stringify(result.body).includes("Local Centro"),
+      true,
+    );
 
     harness.db.prepare("DELETE FROM tasks").run();
     const locationC = harness.db
@@ -408,6 +428,32 @@ test("GET /dashboard/summary returns operational dashboard metrics without infer
     assert.equal(
       undatedResult.body.taskMetrics.urgentTasksPreview[0].due_date,
       null,
+    );
+
+    const techLoginResult = await harness.login(
+      techCredentials.email,
+      techCredentials.password,
+    );
+    assert.equal(techLoginResult.status, 200);
+
+    const techDashboard = await harness.requestWithSession(
+      "GET",
+      "/dashboard/summary",
+      techLoginResult.sessionCookie,
+    );
+    assert.equal(techDashboard.status, 200);
+    assert.equal(techDashboard.body.incidents, 4);
+    assert.equal(
+      JSON.stringify(techDashboard.body).includes("tv-open-1"),
+      false,
+    );
+    assert.equal(
+      JSON.stringify(techDashboard.body).includes("POS no responde - Soporte"),
+      false,
+    );
+    assert.equal(
+      JSON.stringify(techDashboard.body).includes("Local Centro"),
+      true,
     );
   } finally {
     await harness.stop();
