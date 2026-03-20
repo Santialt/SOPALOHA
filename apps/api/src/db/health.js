@@ -1,11 +1,5 @@
-const fs = require("fs");
-const path = require("path");
 const db = require("./connection");
 const { getMigrationStatus } = require("./migrations");
-
-function getDbDirectory() {
-  return path.dirname(db.dbFilePath);
-}
 
 function runDbCheck() {
   db.prepare("SELECT 1 AS ok").get();
@@ -16,19 +10,14 @@ function runDbCheck() {
 }
 
 function runDiskCheck() {
-  const dbPath = db.dbFilePath;
-  fs.accessSync(dbPath, fs.constants.R_OK | fs.constants.W_OK);
-
-  const probePath = path.join(
-    getDbDirectory(),
-    `.healthcheck-${process.pid}-${Date.now()}.tmp`,
-  );
-  fs.writeFileSync(probePath, "ok");
-  fs.unlinkSync(probePath);
+  const pageCount = db.pragma("page_count", { simple: true });
+  const freelistCount = db.pragma("freelist_count", { simple: true });
 
   return {
     status: "ok",
-    detail: "DB file and directory are writable",
+    detail: "SQLite storage metadata is readable",
+    page_count: Number(pageCount),
+    freelist_count: Number(freelistCount),
   };
 }
 

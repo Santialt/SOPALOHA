@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const db = require("./connection");
 const { logger } = require("../utils/logger");
+const { applySchemaConvergenceMigration } = require("./migrations/003_schema_convergence");
 
 const MIGRATIONS_DIR = path.resolve(__dirname, "migrations");
 
@@ -211,6 +212,12 @@ const MIGRATIONS = [
     type: "js",
     up: applyReleaseHardeningMigration,
   },
+  {
+    id: "003_schema_convergence",
+    type: "js",
+    transactional: false,
+    up: applySchemaConvergenceMigration,
+  },
 ];
 
 function ensureMigrationsTable() {
@@ -249,15 +256,23 @@ function applyPendingMigrations() {
   );
 
   for (const migration of pending) {
-    const apply = db.transaction(() => {
+    if (migration.transactional === false) {
       executeMigration(migration);
       db.prepare("INSERT INTO schema_migrations (id, type) VALUES (?, ?)").run(
         migration.id,
         migration.type,
       );
-    });
+    } else {
+      const apply = db.transaction(() => {
+        executeMigration(migration);
+        db.prepare("INSERT INTO schema_migrations (id, type) VALUES (?, ?)").run(
+          migration.id,
+          migration.type,
+        );
+      });
 
-    apply();
+      apply();
+    }
 
     logger.info("Applied SQLite migration", {
       migration_id: migration.id,

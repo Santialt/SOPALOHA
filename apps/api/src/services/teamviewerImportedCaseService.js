@@ -3,6 +3,7 @@ const userRepository = require('../repositories/userRepository');
 const { fetchConnectionReports, fetchGroups } = require('./teamviewerApiClient');
 const { httpError } = require('../utils/httpError');
 const { hashPassword } = require('../utils/passwords');
+const crypto = require('crypto');
 
 const IMPORTED_TEAMVIEWER_TECHNICIANS = [
   {
@@ -263,6 +264,16 @@ function findImportedTechnicianProfile(technicianDisplayName, technicianUsername
   };
 }
 
+function createDisabledImportedUser(profile) {
+  return userRepository.create({
+    name: profile.name,
+    email: profile.email,
+    password_hash: hashPassword(crypto.randomBytes(48).toString('hex')),
+    role: 'tech',
+    active: false
+  });
+}
+
 function findOrCreateImportedTechnician(normalizedCase) {
   const profile = findImportedTechnicianProfile(
     normalizedCase.technician_display_name,
@@ -277,18 +288,7 @@ function findOrCreateImportedTechnician(normalizedCase) {
     return byEmail;
   }
 
-  const byName = userRepository.findByName(profile.name);
-  if (byName) {
-    return byName;
-  }
-
-  return userRepository.create({
-    name: profile.name,
-    email: profile.email,
-    password_hash: hashPassword(`tv-import-${profile.email}`),
-    role: 'tech',
-    active: true
-  });
+  return createDisabledImportedUser(profile);
 }
 
 function normalizeRawConnection(rawConnection) {

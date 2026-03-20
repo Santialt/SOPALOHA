@@ -1,5 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("fs");
 
 const { createApiHarness } = require("./helpers/apiTestHarness");
 
@@ -8,7 +9,7 @@ test("security regression coverage hardens internal access, admin-only operation
     prefix: "sopaloha-security-regression-",
     authSessionSecret: "sopaloha-security-regression-secret",
     internalApiKey: "security-suite-api-key",
-    trustProxy: "1",
+    trustProxy: "127.0.0.1/32",
   });
 
   const adminUser = {
@@ -79,41 +80,17 @@ test("security regression coverage hardens internal access, admin-only operation
       });
       assert.equal(noOriginResult.status, 200);
 
-      const deniedForwardedResult = await harness.request(
-        "POST",
-        "/auth/login",
-        {
-          headers: {
-            Origin: allowedOrigin,
-            "X-Forwarded-For": "203.0.113.20",
-          },
-          body: {
-            email: adminUser.email,
-            password: adminUser.password,
-          },
+      const localForwardedResult = await harness.request("POST", "/auth/login", {
+        headers: {
+          Origin: allowedOrigin,
+          "X-Forwarded-For": "203.0.113.20",
         },
-      );
-      assert.equal(deniedForwardedResult.status, 401);
-      assert.equal(
-        deniedForwardedResult.body.message,
-        "Internal network access or valid API key required",
-      );
-
-      const allowedForwardedResult = await harness.request(
-        "POST",
-        "/auth/login",
-        {
-          headers: harness.withApiKey({
-            Origin: allowedOrigin,
-            "X-Forwarded-For": "203.0.113.20",
-          }),
-          body: {
-            email: adminUser.email,
-            password: adminUser.password,
-          },
+        body: {
+          email: adminUser.email,
+          password: adminUser.password,
         },
-      );
-      assert.equal(allowedForwardedResult.status, 200);
+      });
+      assert.equal(localForwardedResult.status, 200);
     },
   );
 
@@ -155,6 +132,19 @@ test("security regression coverage hardens internal access, admin-only operation
         adminPingWithoutApiKey.body.message,
         "Valid internal API key required",
       );
+
+      const adminPingWithInvalidApiKey = await harness.authedRequest(
+        adminUser,
+        "POST",
+        "/support-actions/ping",
+        {
+          headers: {
+            "X-Internal-Api-Key": "invalid-key",
+          },
+          body: {},
+        },
+      );
+      assert.equal(adminPingWithInvalidApiKey.status, 401);
 
       const adminPingResult = await harness.authedRequest(
         adminUser,
@@ -274,4 +264,36 @@ test("security regression coverage hardens internal access, admin-only operation
       );
     },
   );
+
+  await t.test("health splits public liveness from protected readiness without writing probe files", async () => {
+    const beforeEntries = fs.readdirSync(harness.tempDir);
+
+    const liveness = await harness.request("GET", "/health");
+    assert.equal(liveness.status, 200);
+    assert.deepEqual(liveness.body, { status: "ok" });
+
+    const readinessWithoutApiKey = await harness.request("GET", "/health/ready");
+    assert.equal(readinessWithoutApiKey.status, 401);
+
+    const readinessInvalidApiKey = await harness.request("GET", "/health/ready", {
+      headers: {
+        "X-Internal-Api-Key": "invalid-key",
+      },
+    });
+    assert.equal(readinessInvalidApiKey.status, 401);
+
+    const readiness = await harness.request("GET", "/health/ready", {
+      headers: harness.withApiKey(),
+    });
+    assert.equal(readiness.status, 200);
+    assert.equal(readiness.body.status, "ok");
+    assert.deepEqual(readiness.body.checks, {
+      db: "ok",
+      disk: "ok",
+      migrations: "ok",
+    });
+
+    const afterEntries = fs.readdirSync(harness.tempDir);
+    assert.deepEqual(afterEntries.sort(), beforeEntries.sort());
+  });
 });

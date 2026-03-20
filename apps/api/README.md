@@ -22,13 +22,33 @@ apps/api/
 
 ## Hardening interno
 
-- `GET /health` sigue abierto.
+- `GET /health` queda abierto solo como liveness minima y responde `{"status":"ok"}`.
+- `GET /health/ready` queda protegido con `INTERNAL_API_KEY` y devuelve checks operativos.
 - El resto de la API acepta solo origenes explicitamente definidos en `CORS_ALLOWED_ORIGINS`.
 - Sin `INTERNAL_API_KEY`, la API queda limitada a loopback y red privada.
 - Con `INTERNAL_API_KEY`, la API exige `X-Internal-Api-Key` o `Authorization: Bearer`.
+- `TRUST_PROXY=true` y aliases permisivos (`loopback`, `uniquelocal`, `linklocal`) ya no son validos.
+- `TRUST_PROXY` solo admite:
+  - hop count exacto, por ejemplo `TRUST_PROXY=1`
+  - lista explicita de proxies, por ejemplo `TRUST_PROXY=127.0.0.1/32,10.0.0.10/32`
+- La IP derivada de `X-Forwarded-For` nunca habilita acceso interno por ser privada/loopback. El perimetro se decide por conexion directa real, proxy explicito confiable o API key valida.
 - `AUTH_SESSION_SECRET` es obligatorio. Si falta, la API no inicia.
 - `POST /support-actions/ping` y `POST /support-actions/teamviewer/open` requieren red interna y, si existe, API key valida.
 - `devices.password` queda deprecado: ya no se devuelve ni se persiste, y los valores legados se limpian al iniciar la API.
+- Todas las rutas `/teamviewer/*` requieren `admin` + `INTERNAL_API_KEY`, incluyendo lecturas.
+- La importacion de TeamViewer no deja cuentas autenticables: cualquier usuario sintetico `@teamviewer.local` queda desactivado y con material de login aleatorio no derivable.
+
+## Despliegue seguro
+
+- Bind local: exponer la API solo en `127.0.0.1` o una red privada controlada.
+- Reverse proxy explicito: configurar `TRUST_PROXY` con hop count exacto o IP/CIDR explicitos y no exponer la app directamente a Internet.
+- API key obligatoria: usar `INTERNAL_API_KEY` para readiness, TeamViewer y cualquier operacion sensible.
+
+No usar:
+
+- `TRUST_PROXY=true`
+- aliases amplios de trust proxy
+- despliegues donde la app quede expuesta directamente y dependa solo de `X-Forwarded-For`
 
 ## Cómo correr
 
@@ -57,20 +77,22 @@ Servidor:
 ## Endpoints
 
 - `GET /health`
+- `GET /health/ready`
 - `GET|POST|GET:id|PUT:id|DELETE:id /locations`
 - `GET|POST|GET:id|PUT:id|DELETE:id /devices`
 - `GET|POST|GET:id|PUT:id|DELETE:id /incidents`
 - `GET|POST|PUT:id|DELETE:id /weekly-tasks`
 - `GET|POST|DELETE:id /location-notes`
 - `GET /teamviewer-connections` (deshabilitado, responde `410`)
-- `GET /teamviewer/import-preview`
-- `POST /teamviewer/import`
+- `GET /teamviewer/import-preview` (`admin` + API key)
+- `POST /teamviewer/import` (`admin` + API key)
 
 ## TeamViewer import (API)
 
 - Requiere `TEAMVIEWER_API_TOKEN` en entorno del backend.
 - Para reportes de conexiones (casos importados) se puede usar `TEAMVIEWER_REPORTS_API_TOKEN`.
   - Si no se define, se usa `TEAMVIEWER_API_TOKEN` como fallback.
+- Todas las rutas `/teamviewer/*` requieren sesion `admin` y API key valida.
 - `GET /teamviewer/import-preview`:
   - consulta grupos y dispositivos en TeamViewer
   - calcula `locations` nuevos/reutilizados por nombre de grupo
@@ -90,9 +112,9 @@ Servidor:
   - `npm run db:backup`
 - Restore:
   - detener backend
-  - reemplazar `data/support.db`
-  - borrar `support.db-wal` y `support.db-shm` si existen
-  - volver a iniciar y validar `GET /health`
+  - ejecutar `npm run db:restore -- <backup-file> [target-db]`
+  - el restore hace backup previo, restore provisional, validacion operativa y rollback automatico si falla
+  - volver a iniciar y validar `GET /health` y `GET /health/ready` con API key
 - Referencia breve:
   - ver `docs/internal-operations.md`
 

@@ -20,7 +20,9 @@ const onCallTemplateRoutes = require('./routes/onCallTemplateRoutes');
 const onCallTechnicianRoutes = require('./routes/onCallTechnicianRoutes');
 const {
   corsMiddleware,
+  getTrustProxyConfig,
   requireInternalAccess,
+  requireApiKey,
   setSecurityHeaders
 } = require('./middleware/security');
 const { attachAuth, requireAuth } = require('./middleware/auth');
@@ -28,34 +30,18 @@ const { requestContext } = require('./middleware/requestContext');
 const { notFound } = require('./middleware/notFound');
 const { errorHandler } = require('./middleware/errorHandler');
 
-function parseTrustProxySetting(value) {
-  const normalized = String(value || '').trim().toLowerCase();
-
-  if (!normalized || normalized === 'false' || normalized === '0') {
-    return false;
-  }
-
-  if (normalized === 'true') {
-    return true;
-  }
-
-  if (/^\d+$/.test(normalized)) {
-    return Number(normalized);
-  }
-
-  return value;
-}
-
 const app = express();
+const trustProxyConfig = getTrustProxyConfig();
 
 app.disable('x-powered-by');
-app.set('trust proxy', parseTrustProxySetting(process.env.TRUST_PROXY));
+app.set('trust proxy', trustProxyConfig.expressValue);
 app.use(setSecurityHeaders);
 app.use(requestContext);
 app.use(corsMiddleware());
 app.use(express.json({ limit: '250kb' }));
 
-app.get('/health', health);
+app.get('/health', health.liveness);
+app.get('/health/ready', requireApiKey, health.readiness);
 app.use(requireInternalAccess);
 app.use(attachAuth);
 app.use('/auth', authRoutes);

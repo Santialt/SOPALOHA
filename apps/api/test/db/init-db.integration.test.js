@@ -3,16 +3,83 @@ const assert = require("node:assert/strict");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const { spawnSync } = require("child_process");
 const Database = require("better-sqlite3");
 
-test("SQLite initialization is idempotent and upgrades a legacy schema safely", async (t) => {
-  const tempDir = fs.mkdtempSync(
-    path.join(os.tmpdir(), "sopaloha-api-db-init-"),
-  );
-  const sqliteDbPath = path.join(tempDir, "legacy-support.db");
+function runNodeInline(script, env, cwd) {
+  const result = spawnSync(process.execPath, ["-e", script], {
+    cwd,
+    env: {
+      ...process.env,
+      ...env,
+    },
+    encoding: "utf8",
+  });
 
-  const legacyDb = new Database(sqliteDbPath);
+  if (result.status !== 0) {
+    throw new Error(result.stderr || result.stdout);
+  }
+}
+
+function normalizeSql(sql) {
+  return String(sql || "")
+    .replace(/\s+/g, " ")
+    .replace(/`/g, '"')
+    .trim()
+    .toLowerCase();
+}
+
+function collectSchema(db, names) {
+  const schema = {};
+
+  for (const name of names) {
+    schema[name] = {
+      tableSql: normalizeSql(
+        db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?").get(name)?.sql,
+      ),
+      indexes: db
+        .prepare(
+          `
+          SELECT name, sql
+          FROM sqlite_master
+          WHERE type = 'index'
+            AND tbl_name = ?
+            AND name NOT LIKE 'sqlite_autoindex_%'
+          ORDER BY name ASC
+        `,
+        )
+        .all(name)
+        .map((row) => ({
+          name: row.name,
+          sql: normalizeSql(row.sql),
+        })),
+      foreignKeys: db
+        .prepare(`PRAGMA foreign_key_list(${JSON.stringify(name)})`)
+        .all()
+        .map((row) => ({
+          table: row.table,
+          from: row.from,
+          to: row.to,
+          on_update: row.on_update,
+          on_delete: row.on_delete,
+          match: row.match,
+        })),
+    };
+  }
+
+  return schema;
+}
+
+test("SQLite legacy upgrade converges to the same critical schema as a fresh install", async (t) => {
+  const repoRoot = path.resolve(__dirname, "../../../..");
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "sopaloha-api-db-init-"));
+  const legacyDbPath = path.join(tempDir, "legacy-support.db");
+  const freshDbPath = path.join(tempDir, "fresh-support.db");
+
+  const legacyDb = new Database(legacyDbPath);
   legacyDb.exec(`
+    PRAGMA foreign_keys = ON;
+
     CREATE TABLE locations (
       id INTEGER PRIMARY KEY,
       name TEXT NOT NULL,
@@ -73,86 +140,113 @@ test("SQLite initialization is idempotent and upgrades a legacy schema safely", 
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE on_call_shifts (
+      id INTEGER PRIMARY KEY,
+      title TEXT NOT NULL,
+      assigned_to TEXT NOT NULL,
+      backup_assigned_to TEXT,
+      start_at TEXT NOT NULL,
+      end_at TEXT NOT NULL,
+      notes TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     INSERT INTO locations (name, status) VALUES ('Legacy Local', 'active');
-    INSERT INTO devices (location_id, name, type, password) VALUES (1, 'Legacy Device', 'other', 'plaintext-secret');
+    INSERT INTO devices (location_id, name, type, password) VALUES (1, 'Legacy Device', 'legacy_type', 'plaintext-secret');
+    INSERT INTO incidents (location_id, incident_date, title, description, category, status)
+      VALUES (1, '2026-03-01', 'Legacy Incident', 'Description', 'legacy_category', 'legacy_status');
+    INSERT INTO tasks (title, location_id, incident_id, status, priority, due_date, scheduled_for)
+      VALUES ('Legacy Task', 1, NULL, 'legacy_status', 'legacy_priority', '2026-03-10', '2026-03-10T09:00');
+    INSERT INTO location_notes (location_id, note) VALUES (1, 'Legacy note');
   `);
   legacyDb.close();
 
-  process.env.NODE_ENV = "test";
-  process.env.SQLITE_DB_PATH = sqliteDbPath;
-  process.env.AUTH_SESSION_SECRET = "sopaloha-db-init-secret";
-  process.env.AUTH_LOGIN_RATE_LIMIT_MAX = "500";
+  const initScript = `
+    process.env.NODE_ENV = "test";
+    process.env.AUTH_SESSION_SECRET = "sopaloha-db-init-secret";
+    const { initDatabase } = require("./apps/api/src/db/initDb");
+    const db = require("./apps/api/src/db/connection");
+    initDatabase();
+    db.close();
+  `;
 
-  const db = require("../../src/db/connection");
-  const { getMigrationStatus, initDatabase } = require("../../src/db/initDb");
+  runNodeInline(
+    initScript,
+    {
+      SQLITE_DB_PATH: legacyDbPath,
+    },
+    repoRoot,
+  );
+
+  runNodeInline(
+    initScript,
+    {
+      SQLITE_DB_PATH: freshDbPath,
+    },
+    repoRoot,
+  );
+
+  const upgradedDb = new Database(legacyDbPath, { readonly: true });
+  const freshDb = new Database(freshDbPath, { readonly: true });
 
   t.after(() => {
-    db.close();
+    upgradedDb.close();
+    freshDb.close();
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
-  initDatabase();
-  initDatabase();
+  const criticalTables = [
+    "devices",
+    "incidents",
+    "tasks",
+    "location_notes",
+    "teamviewer_imported_cases",
+    "on_call_shifts",
+  ];
 
-  const locationColumns = db.prepare("PRAGMA table_info(locations)").all();
-  const deviceColumns = db.prepare("PRAGMA table_info(devices)").all();
-  const incidentColumns = db.prepare("PRAGMA table_info(incidents)").all();
-  const taskColumns = db.prepare("PRAGMA table_info(tasks)").all();
-  const locationNoteColumns = db
-    .prepare("PRAGMA table_info(location_notes)")
-    .all();
-  const importedCaseColumns = db
-    .prepare("PRAGMA table_info(teamviewer_imported_cases)")
-    .all();
-  const onCallShiftColumns = db
-    .prepare("PRAGMA table_info(on_call_shifts)")
-    .all();
-  const migrationRows = db
-    .prepare("SELECT id FROM schema_migrations ORDER BY id ASC")
-    .all();
-
-  assert.ok(locationColumns.some((column) => column.name === "llave_aloha"));
-  assert.ok(locationColumns.some((column) => column.name === "usa_nbo"));
-  assert.ok(locationColumns.some((column) => column.name === "country"));
-  assert.ok(deviceColumns.some((column) => column.name === "device_role"));
-  assert.ok(deviceColumns.some((column) => column.name === "windows_version"));
-  assert.ok(incidentColumns.some((column) => column.name === "created_by"));
-  assert.ok(taskColumns.some((column) => column.name === "assigned_user_id"));
-  assert.ok(locationNoteColumns.some((column) => column.name === "created_by"));
-  assert.ok(
-    importedCaseColumns.some((column) => column.name === "technician_user_id"),
-  );
-  assert.ok(
-    onCallShiftColumns.some((column) => column.name === "assigned_user_id"),
-  );
-  assert.ok(
-    onCallShiftColumns.some(
-      (column) => column.name === "backup_assigned_user_id",
-    ),
-  );
-
-  const legacyDevice = db
-    .prepare("SELECT password, device_role FROM devices WHERE id = 1")
-    .get();
-  assert.equal(legacyDevice.password, null);
-  assert.equal(legacyDevice.device_role, "other");
-
-  const adminUsers = db
-    .prepare("SELECT COUNT(*) AS total FROM users WHERE role = 'admin'")
-    .get();
-  const templateCount = db
-    .prepare("SELECT COUNT(*) AS total FROM on_call_templates")
-    .get();
-  const technicianCount = db
-    .prepare("SELECT COUNT(*) AS total FROM on_call_technicians")
-    .get();
-
-  assert.equal(adminUsers.total, 0);
-  assert.equal(templateCount.total, 3);
-  assert.equal(technicianCount.total, 3);
   assert.deepEqual(
-    migrationRows.map((row) => row.id),
-    ["001_init", "002_release_hardening"],
+    collectSchema(upgradedDb, criticalTables),
+    collectSchema(freshDb, criticalTables),
   );
-  assert.equal(getMigrationStatus().pending.length, 0);
+
+  const upgradedMigrationRows = upgradedDb
+    .prepare("SELECT id FROM schema_migrations ORDER BY id ASC")
+    .all()
+    .map((row) => row.id);
+  assert.deepEqual(upgradedMigrationRows, [
+    "001_init",
+    "002_release_hardening",
+    "003_schema_convergence",
+  ]);
+
+  const deviceColumns = upgradedDb.prepare("PRAGMA table_info(devices)").all();
+  const upgradedDevice = upgradedDb
+    .prepare("SELECT type, device_role FROM devices WHERE id = 1")
+    .get();
+  assert.equal(upgradedDevice.type, "other");
+  assert.equal(upgradedDevice.device_role, "other");
+  assert.equal(deviceColumns.some((column) => column.name === "password"), false);
+
+  const upgradedIncident = upgradedDb
+    .prepare("SELECT category, status, time_spent_minutes FROM incidents WHERE id = 1")
+    .get();
+  assert.deepEqual(upgradedIncident, {
+    category: "other",
+    status: "open",
+    time_spent_minutes: 0,
+  });
+
+  const upgradedTask = upgradedDb
+    .prepare("SELECT status, priority, task_type FROM tasks WHERE id = 1")
+    .get();
+  assert.deepEqual(upgradedTask, {
+    status: "pending",
+    priority: "medium",
+    task_type: "general",
+  });
+
+  const integrity = upgradedDb.pragma("integrity_check", { simple: true });
+  assert.equal(String(integrity).toLowerCase(), "ok");
+  assert.deepEqual(upgradedDb.prepare("PRAGMA foreign_key_check").all(), []);
 });

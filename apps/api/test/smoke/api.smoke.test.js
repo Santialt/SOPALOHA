@@ -65,11 +65,7 @@ test("el API responde health y permite login basico con DB temporal", async (t) 
   assert.equal(healthResponse.status, 200);
   const healthBody = await healthResponse.json();
   assert.equal(healthBody.status, "ok");
-  assert.deepEqual(healthBody.checks, {
-    db: "ok",
-    disk: "ok",
-    migrations: "ok",
-  });
+  assert.deepEqual(healthBody, { status: "ok" });
 
   const loginResponse = await fetch(`${baseUrl}/auth/login`, {
     method: "POST",
