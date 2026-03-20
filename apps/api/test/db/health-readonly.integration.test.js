@@ -68,11 +68,7 @@ test("/health/ready stays read-only and does not bootstrap schema_migrations", a
 
   assert.equal(result.status, 0, result.stderr || result.stdout);
   const output = JSON.parse(
-    result.stdout
-      .trim()
-      .split(/\r?\n/)
-      .filter(Boolean)
-      .pop(),
+    result.stdout.trim().split(/\r?\n/).filter(Boolean).pop(),
   );
 
   assert.equal(output.status, 500);

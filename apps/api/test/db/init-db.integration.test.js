@@ -298,7 +298,9 @@ test("SQLite legacy upgrade converges to the same critical schema as a fresh ins
   assert.deepEqual(upgradedDb.prepare("PRAGMA foreign_key_check").all(), []);
 
   const insertedUser = upgradedDb
-    .prepare("SELECT email, role, active, login_enabled FROM users WHERE email = ?")
+    .prepare(
+      "SELECT email, role, active, login_enabled FROM users WHERE email = ?",
+    )
     .get("legacy.admin@example.com");
   assert.deepEqual(insertedUser, {
     email: "legacy.admin@example.com",
