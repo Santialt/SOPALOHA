@@ -220,6 +220,11 @@ const MIGRATIONS = [
     transactional: false,
     up: applySchemaConvergenceMigration,
   },
+  {
+    id: "004_user_login_enablement",
+    type: "js",
+    up: applyUserLoginEnablementMigration,
+  },
 ];
 
 function ensureMigrationsTable() {
@@ -229,6 +234,46 @@ function ensureMigrationsTable() {
       type TEXT NOT NULL CHECK (type IN ('sql', 'js')),
       applied_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+  `);
+}
+
+function hasSchemaMigrationsTable() {
+  const row = db
+    .prepare(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'schema_migrations'",
+    )
+    .get();
+
+  return Boolean(row);
+}
+
+function applyUserLoginEnablementMigration() {
+  if (!hasTable("users")) {
+    return;
+  }
+
+  addColumn(
+    "users",
+    "login_enabled",
+    "INTEGER NOT NULL DEFAULT 0 CHECK (login_enabled IN (0, 1))",
+  );
+
+  db.exec(`
+    UPDATE users
+    SET login_enabled = CASE
+      WHEN lower(trim(email)) LIKE '%@teamviewer.local' THEN 0
+      ELSE 1
+    END
+    WHERE login_enabled IS NULL
+       OR CAST(login_enabled AS INTEGER) NOT IN (0, 1)
+       OR (
+         lower(trim(email)) LIKE '%@teamviewer.local'
+         AND CAST(login_enabled AS INTEGER) <> 0
+       )
+       OR (
+         lower(trim(email)) NOT LIKE '%@teamviewer.local'
+         AND CAST(login_enabled AS INTEGER) <> 1
+       );
   `);
 }
 
@@ -307,12 +352,40 @@ function getMigrationStatus() {
   };
 }
 
+function getMigrationStatusReadOnly() {
+  if (!hasSchemaMigrationsTable()) {
+    throw new Error("schema_migrations table is missing");
+  }
+
+  const rows = db
+    .prepare(
+      "SELECT id, type, applied_at FROM schema_migrations ORDER BY id ASC",
+    )
+    .all();
+  const appliedIds = new Set(rows.map((row) => row.id));
+  const pending = MIGRATIONS.filter(
+    (migration) => !appliedIds.has(migration.id),
+  );
+
+  return {
+    applied: rows,
+    pending: pending.map((migration) => ({
+      id: migration.id,
+      type: migration.type,
+    })),
+    current: rows.length > 0 ? rows[rows.length - 1].id : null,
+    expected: MIGRATIONS.length,
+  };
+}
+
 module.exports = {
   MIGRATIONS,
   MIGRATIONS_DIR,
   addColumn,
   applyPendingMigrations,
   getMigrationStatus,
+  getMigrationStatusReadOnly,
   hasColumn,
+  hasSchemaMigrationsTable,
   hasTable,
 };

@@ -270,7 +270,8 @@ function createDisabledImportedUser(profile) {
     email: profile.email,
     password_hash: hashPassword(crypto.randomBytes(48).toString('hex')),
     role: 'tech',
-    active: false
+    active: false,
+    login_enabled: false
   });
 }
 

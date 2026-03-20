@@ -1,5 +1,5 @@
 const db = require("./connection");
-const { getMigrationStatus } = require("./migrations");
+const { getMigrationStatusReadOnly } = require("./migrations");
 
 function runDbCheck() {
   db.prepare("SELECT 1 AS ok").get();
@@ -22,7 +22,7 @@ function runDiskCheck() {
 }
 
 function runMigrationCheck() {
-  const status = getMigrationStatus();
+  const status = getMigrationStatusReadOnly();
   if (status.pending.length > 0) {
     return {
       status: "error",

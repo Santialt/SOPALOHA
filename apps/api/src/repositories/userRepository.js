@@ -30,7 +30,7 @@ function findAll(filters = {}) {
   return db
     .prepare(
       `
-      SELECT id, name, email, role, active, created_at, updated_at
+      SELECT id, name, email, role, active, login_enabled, created_at, updated_at
       FROM users
       ${whereSql}
       ORDER BY lower(name) ASC, id ASC
@@ -94,8 +94,8 @@ function create(payload) {
   const result = db
     .prepare(
       `
-      INSERT INTO users (name, email, password_hash, role, active)
-      VALUES (@name, @email, @password_hash, @role, @active)
+      INSERT INTO users (name, email, password_hash, role, active, login_enabled)
+      VALUES (@name, @email, @password_hash, @role, @active, @login_enabled)
     `
     )
     .run({
@@ -103,7 +103,8 @@ function create(payload) {
       email: payload.email,
       password_hash: payload.password_hash,
       role: payload.role,
-      active: payload.active ? 1 : 0
+      active: payload.active ? 1 : 0,
+      login_enabled: payload.login_enabled ? 1 : 0
     });
 
   return findById(result.lastInsertRowid);
@@ -118,7 +119,8 @@ function update(id, payload) {
       email = @email,
       password_hash = @password_hash,
       role = @role,
-      active = @active
+      active = @active,
+      login_enabled = @login_enabled
     WHERE id = @id
   `
   ).run({
@@ -127,7 +129,8 @@ function update(id, payload) {
     email: payload.email,
     password_hash: payload.password_hash,
     role: payload.role,
-    active: payload.active ? 1 : 0
+    active: payload.active ? 1 : 0,
+    login_enabled: payload.login_enabled ? 1 : 0
   });
 
   return findById(id);
@@ -135,6 +138,27 @@ function update(id, payload) {
 
 function updateActive(id, active) {
   db.prepare('UPDATE users SET active = ? WHERE id = ?').run(active ? 1 : 0, id);
+  return findById(id);
+}
+
+function enableLogin(id, payload) {
+  db.prepare(
+    `
+    UPDATE users
+    SET
+      password_hash = @password_hash,
+      role = @role,
+      active = @active,
+      login_enabled = 1
+    WHERE id = @id
+  `,
+  ).run({
+    id,
+    password_hash: payload.password_hash,
+    role: payload.role,
+    active: payload.active ? 1 : 0
+  });
+
   return findById(id);
 }
 
@@ -147,6 +171,7 @@ module.exports = {
   findByEmail,
   findByName,
   findById,
+  enableLogin,
   update,
   updateActive
 };

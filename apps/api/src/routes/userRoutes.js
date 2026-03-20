@@ -20,12 +20,19 @@ const userUpdateRules = [
   { field: 'active', type: 'boolean' }
 ];
 
+const enableLoginRules = [
+  { field: 'password', required: true },
+  { field: 'role', allowedValues: ['admin', 'tech'] },
+  { field: 'active', type: 'boolean' }
+];
+
 router.get('/assignable', controller.listAssignableUsers);
 
 router.use(requireRole('admin'));
 router.get('/', controller.listUsers);
 router.get('/:id', controller.getUserById);
 router.post('/', validateBody([...userRules, { field: 'password', required: true }]), controller.createUser);
+router.post('/:id/enable-login', validateBody(enableLoginRules), controller.enableUserLogin);
 router.put('/:id', validateBody(userUpdateRules), controller.updateUser);
 router.patch('/:id/active', validateBody([{ field: 'active', required: true, type: 'boolean' }]), controller.updateUserActive);
 

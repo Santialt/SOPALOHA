@@ -13,7 +13,12 @@ function login(payload, res) {
   }
 
   const user = userRepository.findByEmail(email);
-  if (!user || !user.active || !verifyPassword(password, user.password_hash)) {
+  if (
+    !user ||
+    !user.active ||
+    !user.login_enabled ||
+    !verifyPassword(password, user.password_hash)
+  ) {
     throw httpError(401, 'Invalid credentials');
   }
 

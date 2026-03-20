@@ -52,7 +52,7 @@ test("backup and restore scripts produce a restorable SQLite database with migra
         const { hashPassword } = require("./apps/api/src/utils/passwords");
         initDatabase();
         db.prepare("INSERT INTO locations (name, status, country) VALUES (?, 'active', ?)").run("Restore Local", "AR");
-        db.prepare("INSERT INTO users (name, email, password_hash, role, active) VALUES (?, ?, ?, 'admin', 1)")
+        db.prepare("INSERT INTO users (name, email, password_hash, role, active, login_enabled) VALUES (?, ?, ?, 'admin', 1, 1)")
           .run("Restore Admin", "restore.admin@example.com", hashPassword("Restore#123"));
         db.close();
       `,
@@ -118,6 +118,7 @@ test("backup and restore scripts produce a restorable SQLite database with migra
     "001_init",
     "002_release_hardening",
     "003_schema_convergence",
+    "004_user_login_enablement",
   ]);
 
   const preRestoreBackups = fs

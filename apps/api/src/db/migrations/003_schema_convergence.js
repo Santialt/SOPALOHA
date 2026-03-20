@@ -279,12 +279,16 @@ function rebuildTable(definition) {
 }
 
 function hardenLegacyImportedUsers() {
+  const loginEnabledAssignment = hasColumn("users", "login_enabled")
+    ? "login_enabled = 0,"
+    : "";
   const result = db
     .prepare(
       `
       UPDATE users
       SET
         active = 0,
+        ${loginEnabledAssignment}
         password_hash = @password_hash
       WHERE lower(trim(email)) LIKE '%@teamviewer.local'
     `,
@@ -506,6 +510,13 @@ function applySchemaConvergenceMigration() {
       { name: "role", type: "text", notnull: 1, dflt_value: "", pk: 0 },
       { name: "active", type: "integer", notnull: 1, dflt_value: "1", pk: 0 },
       {
+        name: "login_enabled",
+        type: "integer",
+        notnull: 1,
+        dflt_value: "0",
+        pk: 0,
+      },
+      {
         name: "created_at",
         type: "text",
         notnull: 1,
@@ -524,6 +535,7 @@ function applySchemaConvergenceMigration() {
       "email text not null unique",
       "check (role in ('admin', 'tech'))",
       "check (active in (0, 1))",
+      "check (login_enabled in (0, 1))",
     ],
     createSql: `
       CREATE TABLE users (
@@ -533,13 +545,14 @@ function applySchemaConvergenceMigration() {
         password_hash TEXT NOT NULL,
         role TEXT NOT NULL CHECK (role IN ('admin', 'tech')),
         active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
+        login_enabled INTEGER NOT NULL DEFAULT 0 CHECK (login_enabled IN (0, 1)),
         created_at TEXT NOT NULL DEFAULT (datetime('now')),
         updated_at TEXT NOT NULL DEFAULT (datetime('now'))
       );
     `,
     copySql: (legacyName) => `
       INSERT INTO users (
-        id, name, email, password_hash, role, active, created_at, updated_at
+        id, name, email, password_hash, role, active, login_enabled, created_at, updated_at
       )
       SELECT
         id,
@@ -549,6 +562,11 @@ function applySchemaConvergenceMigration() {
         lower(trim(role)),
         CASE
           WHEN CAST(coalesce(active, 1) AS INTEGER) = 1 THEN 1
+          ELSE 0
+        END,
+        CASE
+          WHEN lower(trim(email)) LIKE '%@teamviewer.local' THEN 0
+          WHEN CAST(coalesce(${sourceColumn(legacyName, "login_enabled", "1")}, 1) AS INTEGER) = 1 THEN 1
           ELSE 0
         END,
         coalesce(${sourceColumn(legacyName, "created_at", "NULL")}, datetime('now')),

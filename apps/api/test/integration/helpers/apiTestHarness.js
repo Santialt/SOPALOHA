@@ -83,8 +83,8 @@ function createApiHarness(options = {}) {
     const result = db
       .prepare(
         `
-          INSERT INTO users (name, email, password_hash, role, active)
-          VALUES (?, ?, ?, ?, ?)
+          INSERT INTO users (name, email, password_hash, role, active, login_enabled)
+          VALUES (?, ?, ?, ?, ?, ?)
         `,
       )
       .run(
@@ -93,6 +93,7 @@ function createApiHarness(options = {}) {
         hashPassword(user.password),
         user.role || "tech",
         user.active === false ? 0 : 1,
+        user.login_enabled === false ? 0 : 1,
       );
 
     return db

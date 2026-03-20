@@ -2,6 +2,7 @@ const userRepository = require('../repositories/userRepository');
 const { httpError } = require('../utils/httpError');
 const { hashPassword } = require('../utils/passwords');
 const { toSafeUser } = require('../middleware/auth');
+const { logger } = require('../utils/logger');
 
 const allowedRoles = ['admin', 'tech'];
 
@@ -90,7 +91,8 @@ function createUser(payload) {
     email,
     password_hash: hashPassword(password),
     role,
-    active
+    active,
+    login_enabled: true
   });
 
   return toSafeUser(created);
@@ -136,7 +138,8 @@ function updateUser(id, payload, actor) {
       email,
       password_hash: passwordHash,
       role,
-      active
+      active,
+      login_enabled: Boolean(existing.login_enabled)
     })
   );
 }
@@ -158,9 +161,41 @@ function updateUserActive(id, active, actor) {
   return toSafeUser(userRepository.updateActive(id, normalizedActive));
 }
 
+function enableUserLogin(id, payload, actor) {
+  const existing = userRepository.findById(id);
+  if (!existing) throw httpError(404, 'User not found');
+
+  const password = String(payload.password || '');
+  if (!password.trim()) throw httpError(400, 'Field password is required');
+
+  const role = isBlank(payload.role) ? existing.role : String(payload.role).trim();
+  const active =
+    payload.active === undefined ? true : normalizeActive(payload.active, true);
+
+  validateRole(role);
+
+  const updated = userRepository.enableLogin(id, {
+    password_hash: hashPassword(password),
+    role,
+    active
+  });
+
+  logger.info('User login explicitly enabled by admin', {
+    actor_user_id: actor?.id || null,
+    target_user_id: updated.id,
+    target_email: updated.email,
+    was_login_enabled: Boolean(existing.login_enabled),
+    now_active: Boolean(updated.active),
+    now_login_enabled: Boolean(updated.login_enabled)
+  });
+
+  return toSafeUser(updated);
+}
+
 module.exports = {
   allowedRoles,
   createUser,
+  enableUserLogin,
   getUserById,
   listActiveTechnicians,
   listAssignableUsers,

@@ -60,8 +60,22 @@ function updateUserActive(req, res, next) {
   }
 }
 
+function enableUserLogin(req, res, next) {
+  try {
+    const updated = userService.enableUserLogin(
+      parseUserId(req.params.id),
+      req.body || {},
+      req.user,
+    );
+    res.json(updated);
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   createUser,
+  enableUserLogin,
   getUserById,
   listAssignableUsers,
   listUsers,

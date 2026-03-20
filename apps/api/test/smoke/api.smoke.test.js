@@ -37,8 +37,8 @@ test("el API responde health y permite login basico con DB temporal", async (t) 
 
   db.prepare(
     `
-      INSERT INTO users (name, email, password_hash, role, active)
-      VALUES (?, ?, ?, 'admin', 1)
+      INSERT INTO users (name, email, password_hash, role, active, login_enabled)
+      VALUES (?, ?, ?, 'admin', 1, 1)
     `,
   ).run("Smoke User", seededEmail, hashPassword(seededPassword));
 

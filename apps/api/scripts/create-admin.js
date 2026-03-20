@@ -60,8 +60,8 @@ async function run() {
 
   db.prepare(
     `
-      INSERT INTO users (name, email, password_hash, role, active)
-      VALUES (?, ?, ?, 'admin', 1)
+      INSERT INTO users (name, email, password_hash, role, active, login_enabled)
+      VALUES (?, ?, ?, 'admin', 1, 1)
     `
   ).run(name, email, hashPassword(password));
 

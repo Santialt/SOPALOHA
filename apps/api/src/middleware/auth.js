@@ -11,6 +11,7 @@ function toSafeUser(user) {
     email: user.email,
     role: user.role,
     active: Boolean(user.active),
+    login_enabled: Boolean(user.login_enabled),
     created_at: user.created_at,
     updated_at: user.updated_at
   };
@@ -32,7 +33,7 @@ function attachAuth(req, res, next) {
   }
 
   const user = userRepository.findById(Number(payload.sub));
-  if (!user || !user.active) {
+  if (!user || !user.active || !user.login_enabled) {
     req.user = null;
     return next();
   }

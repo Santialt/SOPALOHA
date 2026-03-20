@@ -259,6 +259,7 @@ test("SQLite legacy upgrade converges to the same critical schema as a fresh ins
     "001_init",
     "002_release_hardening",
     "003_schema_convergence",
+    "004_user_login_enablement",
   ]);
 
   const deviceColumns = upgradedDb.prepare("PRAGMA table_info(devices)").all();
@@ -297,12 +298,13 @@ test("SQLite legacy upgrade converges to the same critical schema as a fresh ins
   assert.deepEqual(upgradedDb.prepare("PRAGMA foreign_key_check").all(), []);
 
   const insertedUser = upgradedDb
-    .prepare("SELECT email, role, active FROM users WHERE email = ?")
+    .prepare("SELECT email, role, active, login_enabled FROM users WHERE email = ?")
     .get("legacy.admin@example.com");
   assert.deepEqual(insertedUser, {
     email: "legacy.admin@example.com",
     role: "admin",
     active: 1,
+    login_enabled: 1,
   });
 
   const locationStatus = upgradedDb

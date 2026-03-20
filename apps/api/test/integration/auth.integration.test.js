@@ -62,6 +62,43 @@ test("auth and authorization flows use session auth and role gates correctly", a
     assert.equal(result.body.message, "Invalid credentials");
   });
 
+  await t.test("login rejects users with login_enabled disabled and accepts them after explicit enable", async () => {
+    const importedUser = harness.seedUser({
+      name: "Imported Placeholder",
+      email: "imported.placeholder@teamviewer.local",
+      password: "Known#123",
+      role: "tech",
+      active: true,
+      login_enabled: false,
+    });
+
+    const blockedLogin = await harness.login(importedUser.email, "Known#123");
+    assert.equal(blockedLogin.status, 401);
+    assert.equal(blockedLogin.body.message, "Invalid credentials");
+
+    const enableResult = await harness.authedRequest(
+      adminUser,
+      "POST",
+      `/users/${importedUser.id}/enable-login`,
+      {
+        body: {
+          password: "Enabled#123",
+          active: true,
+        },
+      },
+    );
+    assert.equal(enableResult.status, 200);
+    assert.equal(enableResult.body.login_enabled, true);
+    assert.equal(enableResult.body.active, true);
+
+    const enabledLogin = await harness.login(
+      importedUser.email,
+      "Enabled#123",
+    );
+    assert.equal(enabledLogin.status, 200);
+    assert.equal(enabledLogin.body.email, importedUser.email);
+  });
+
   await t.test("protected routes reject unauthenticated requests", async () => {
     const result = await harness.request("GET", "/locations");
 

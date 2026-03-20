@@ -368,6 +368,7 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash TEXT NOT NULL,
   role TEXT NOT NULL CHECK (role IN ('admin', 'tech')),
   active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
+  login_enabled INTEGER NOT NULL DEFAULT 0 CHECK (login_enabled IN (0, 1)),
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );

@@ -534,14 +534,66 @@ test("TeamViewer backend hardening covers preview, import, degradation, and rout
 
       const importedSyntheticUsers = harness.db
         .prepare(
-          "SELECT email, active, password_hash FROM users WHERE lower(email) LIKE '%@teamviewer.local' ORDER BY email ASC",
+          "SELECT id, email, active, login_enabled, password_hash FROM users WHERE lower(email) LIKE '%@teamviewer.local' ORDER BY email ASC",
         )
         .all();
       assert.equal(importedSyntheticUsers.length, 2);
       for (const importedUser of importedSyntheticUsers) {
         assert.equal(importedUser.active, 0);
+        assert.equal(importedUser.login_enabled, 0);
         assert.doesNotMatch(importedUser.password_hash, /tv-import-/);
       }
+
+      const promotedImportedUser = importedSyntheticUsers[0];
+      const accidentalEnable = await harness.authedRequest(
+        adminUser,
+        "PUT",
+        `/users/${promotedImportedUser.id}`,
+        {
+          body: {
+            name: "Imported TeamViewer Promoted Accidentally",
+            email: promotedImportedUser.email,
+            role: "tech",
+            active: true,
+            password: "Known#123",
+          },
+        },
+      );
+      assert.equal(accidentalEnable.status, 200);
+      assert.equal(accidentalEnable.body.active, true);
+      assert.equal(accidentalEnable.body.login_enabled, false);
+
+      const blockedImportedLogin = await harness.login(
+        promotedImportedUser.email,
+        "Known#123",
+      );
+      assert.equal(blockedImportedLogin.status, 401);
+
+      const explicitEnable = await harness.authedRequest(
+        adminUser,
+        "POST",
+        `/users/${promotedImportedUser.id}/enable-login`,
+        {
+          body: {
+            password: "Enabled#123",
+            active: true,
+            role: "tech",
+          },
+        },
+      );
+      assert.equal(explicitEnable.status, 200);
+      assert.equal(explicitEnable.body.login_enabled, true);
+      assert.equal(explicitEnable.body.active, true);
+
+      const successfulImportedLogin = await harness.login(
+        promotedImportedUser.email,
+        "Enabled#123",
+      );
+      assert.equal(successfulImportedLogin.status, 200);
+      assert.equal(
+        successfulImportedLogin.body.email,
+        promotedImportedUser.email,
+      );
 
       const catalogs = await harness.authedRequest(
         adminUser,
